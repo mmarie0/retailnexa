@@ -1,0 +1,174 @@
+import 'server-only';
+import { cache } from 'react';
+import { cookies } from 'next/headers';
+import { notFound, redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import { computeAccess, entitlements, type Access, type OrgStatus, type SubscriptionStatus } from '@/lib/billing/access';
+import { isMemberRole, isPermission, type MemberRole, type Permission } from './permissions';
+
+/**
+ * Data Access Layer. Every page, Server Action and Route Handler that touches
+ * tenant data starts here. It verifies the session with Supabase Auth (not just
+ * the cookie), resolves the active organization from the caller's own
+ * memberships, and loads effective permissions from the database.
+ */
+
+export const ACTIVE_ORG_COOKIE = 'rn_org';
+
+export const getSupabase = cache(createClient);
+
+export const getCurrentUser = cache(async () => {
+  const supabase = await getSupabase();
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) return null;
+  return data.user;
+});
+
+export async function requireUser(next = '/app') {
+  const user = await getCurrentUser();
+  if (!user) redirect(`/login?next=${encodeURIComponent(next)}`);
+  return user;
+}
+
+export interface OrgSummary {
+  id: string;
+  name: string;
+  businessType: 'retail' | 'wholesale' | 'both';
+  status: OrgStatus;
+  role: MemberRole;
+}
+
+export const getMyOrganizations = cache(async (): Promise<OrgSummary[]> => {
+  const user = await getCurrentUser();
+  if (!user) return [];
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from('memberships')
+    .select('role, organizations!inner(id, name, business_type, status)')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .order('created_at');
+  if (error) throw error;
+  return (data ?? []).flatMap((m) => {
+    const o = m.organizations as unknown as { id: string; name: string; business_type: OrgSummary['businessType']; status: OrgStatus };
+    if (!o || !isMemberRole(m.role) || o.status === 'closed') return [];
+    return [{ id: o.id, name: o.name, businessType: o.business_type, status: o.status, role: m.role }];
+  });
+});
+
+export interface SubscriptionInfo {
+  status: SubscriptionStatus;
+  products: string[];
+  extraLocations: number;
+  trialEnd: Date | null;
+  currentPeriodEnd: Date | null;
+  cancelAtPeriodEnd: boolean;
+}
+
+export interface OrgContext {
+  user: { id: string; email: string };
+  org: OrgSummary;
+  orgs: OrgSummary[];
+  permissions: Set<Permission>;
+  subscription: SubscriptionInfo | null;
+  access: Access;
+  entitlements: Set<string>;
+}
+
+const toDate = (v: string | null) => (v ? new Date(v) : null);
+
+export const getOrgContext = cache(async (): Promise<OrgContext> => {
+  const user = await requireUser();
+  const orgs = await getMyOrganizations();
+  if (orgs.length === 0) redirect('/onboarding');
+
+  const selected = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value;
+  const org = orgs.find((o) => o.id === selected) ?? orgs[0];
+  const supabase = await getSupabase();
+
+  const [perms, sub, overrides] = await Promise.all([
+    supabase.rpc('my_permissions', { p_org: org.id }),
+    supabase
+      .from('subscriptions')
+      .select('status, products, extra_locations, trial_end, current_period_end, cancel_at_period_end')
+      .eq('organization_id', org.id)
+      .maybeSingle(),
+    supabase.from('feature_overrides').select('feature, enabled, expires_at').eq('organization_id', org.id),
+  ]);
+  if (perms.error) throw perms.error;
+  if (sub.error) throw sub.error;
+  if (overrides.error) throw overrides.error;
+
+  const subscription: SubscriptionInfo | null = sub.data
+    ? {
+        status: sub.data.status as SubscriptionStatus,
+        products: sub.data.products ?? [],
+        extraLocations: sub.data.extra_locations ?? 0,
+        trialEnd: toDate(sub.data.trial_end),
+        currentPeriodEnd: toDate(sub.data.current_period_end),
+        cancelAtPeriodEnd: !!sub.data.cancel_at_period_end,
+      }
+    : null;
+
+  const now = new Date();
+  return {
+    user: { id: user.id, email: user.email ?? '' },
+    org,
+    orgs,
+    permissions: new Set(((perms.data as string[] | null) ?? []).filter(isPermission)),
+    subscription,
+    access: computeAccess({ orgStatus: org.status, subscription, now }),
+    entitlements: entitlements(
+      subscription && ['trialing', 'active', 'past_due'].includes(subscription.status) ? subscription.products : [],
+      (overrides.data ?? []).map((o) => ({ feature: o.feature, enabled: o.enabled, expiresAt: toDate(o.expires_at) })),
+      now,
+    ),
+  };
+});
+
+export function can(ctx: OrgContext, permission: Permission) {
+  return ctx.permissions.has(permission);
+}
+
+/** For pages inside the tenant app: sends users without usable access to billing. */
+export async function requireAppAccess() {
+  const ctx = await getOrgContext();
+  if (!ctx.access.canUseApp) redirect('/app/billing');
+  return ctx;
+}
+
+// ---------------------------------------------------------------------------
+// Platform admin
+// ---------------------------------------------------------------------------
+export type PlatformRole = 'superadmin' | 'support' | 'billing' | 'readonly';
+
+export const getAdminContext = cache(async (opts: { allowWithoutMfa?: boolean } = {}) => {
+  const user = await requireUser('/admin');
+  const supabase = await getSupabase();
+  const { data: row } = await supabase
+    .from('platform_admins')
+    .select('role, mfa_required, is_active')
+    .eq('user_id', user.id)
+    .maybeSingle();
+  // Do not reveal that the admin portal exists to non-admins.
+  if (!row || !row.is_active) notFound();
+
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  const mfaOk = !row.mfa_required || aal?.currentLevel === 'aal2';
+  if (!mfaOk && !opts.allowWithoutMfa) redirect('/admin/mfa');
+  return { user: { id: user.id, email: user.email ?? '' }, role: row.role as PlatformRole, mfaOk, supabase };
+});
+
+export function adminCan(role: PlatformRole, action: 'suspend' | 'close' | 'entitlements' | 'leads' | 'announcements') {
+  switch (action) {
+    case 'close':
+      return role === 'superadmin';
+    case 'suspend':
+    case 'entitlements':
+      return role === 'superadmin' || role === 'billing';
+    case 'leads':
+      return role !== 'readonly';
+    case 'announcements':
+      return role === 'superadmin' || role === 'support';
+  }
+}

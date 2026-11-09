@@ -1,26 +1,70 @@
 @import "tailwindcss";
+@import "@fontsource-variable/plus-jakarta-sans";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * RetailNexa design tokens — carried over from the existing RetailNexa app
+ * ("Sky" theme): periwinkle paper, white cards, deep ink, bold colour blocks
+ * for headline numbers. Muted text is darkened from the prototype's #6F82A6 to
+ * meet WCAG AA on both paper and white.
+ */
+@theme {
+  --font-sans: "Plus Jakarta Sans Variable", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+
+  --color-paper: #ddeffc;
+  --color-card: #ffffff;
+  --color-ink: #1f2a4d;
+  --color-muted: #4f6288;
+  --color-line: #d6e6f5;
+  --color-soft: #eaf4fd;
+
+  --color-accent: #5b7ff5;
+  --color-accent-strong: #3f63de;
+  --color-accent-soft: #e2e8fe;
+
+  --color-indigo: #38357f;
+  --color-indigo-2: #4b489e;
+  --color-lav: #7f83d2;
+  --color-coral: #e2584f;
+  --color-coral-soft: #ffe3e0;
+
+  --color-paid: #1b8a61;
+  --color-paid-soft: #ddf4ea;
+  --color-soon: #9a620c;
+  --color-soon-soft: #fdf0da;
+  --color-late: #c63d36;
+  --color-late-soft: #fde5e3;
+
+  --shadow-card: 0 2px 6px rgba(70, 84, 160, 0.05), 0 10px 28px rgba(70, 84, 160, 0.09);
+  --radius-card: 14px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  h1, h2, h3 {
+    text-wrap: balance;
+    letter-spacing: -0.02em;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent-strong);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  .num {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

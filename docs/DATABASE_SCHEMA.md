@@ -1,0 +1,55 @@
+# Database schema
+
+Source of truth: `supabase/migrations/*.sql` (applied in filename order). This document explains intent; if they disagree, the migration wins and this file must be fixed.
+
+## Schemas
+- `public` — application tables and API-callable RPCs (exposed through PostgREST).
+- `private` — helper functions used inside RLS policies and RPCs, plus `rate_limits`. Not exposed by the API.
+- `auth` — owned by Supabase Auth. We only reference `auth.users(id)` and call `auth.uid()` / `auth.jwt()`.
+
+## Phase 1 tables
+
+| Table | Purpose | Client access (RLS) |
+|---|---|---|
+| `organizations` | Tenant. `business_type` retail/wholesale/both, `status` active/suspended/closed, `trial_consumed_at`, `canceled_at`, `retention_review_at` | Members read; `org.manage` updates name/legal_name/phone/website/timezone/currency only (column grants). Platform admins read. |
+| `profiles` | One per auth user (created by trigger) | Self, co-members, platform admins read; self updates `full_name` |
+| `memberships` | user ↔ org with `role`, `status` | Self, `members.view`, platform admins read. **Writes only via RPCs.** |
+| `locations` | Stores, warehouses, offices | Members read; `locations.manage` inserts/updates (no delete — deactivate) |
+| `member_locations` | Optional per-member location restriction | `members.view` read; `members.manage` insert/delete; same-org enforced by trigger |
+| `permissions`, `role_permissions` | Permission catalog + role defaults | Authenticated read |
+| `member_permission_overrides` | Per-member allow/deny | `members.view` read; writes via `set_member_permission` |
+| `invitations` | Email invites; **token stored as SHA-256 only**, 7-day expiry, cannot invite owners | `members.manage` reads all columns except `token_hash` |
+| `billing_accounts` | org ↔ Stripe customer (unique both ways) | `billing.view` read; service role writes |
+| `subscriptions` | Mirror of the org's Stripe subscription | Members read; service role writes via `sync_subscription` |
+| `subscription_events` | trial_started / status_change / reactivated / cancel_scheduled / cancel_unscheduled | `billing.view` read |
+| `stripe_events` | Webhook idempotency ledger (no payloads stored) | Platform superadmin/billing read |
+| `feature_overrides` | Platform-granted entitlement exceptions | Members read; platform admins write via RPC |
+| `platform_admins` | Platform staff + role + `mfa_required` | Self / superadmin read; no client writes |
+| `support_access_grants` | Tenant-granted, ≤72h, revocable staff access | `org.manage` and platform admins read |
+| `leads` | Demo requests / contact messages | Platform admins read; service role inserts |
+| `announcements` | Platform announcements | Authenticated read while live |
+| `audit_logs` | Append-only activity log | `audit.view` per org; platform admins all |
+
+## Key functions
+
+Authorization helpers (`private`, SECURITY DEFINER, `search_path=''`): `is_org_member`, `member_role`, `has_permission`, `is_platform_admin(roles[])` (requires `aal2` when `mfa_required`), `has_support_access`, `org_is_writable` (status = active), `shares_org_with`, `role_rank`.
+
+Tenant RPCs (granted to `authenticated`): `create_organization`, `my_permissions`, `invite_member`, `revoke_invitation`, `accept_invitation`, `update_member_role`, `set_member_status`, `set_member_permission`, `grant_support_access`, `revoke_support_access`.
+
+Platform RPCs (authenticated, re-check platform role + MFA): `admin_set_org_status`, `admin_set_feature_override`, `admin_update_lead`, `admin_create_announcement`, `admin_end_announcement`.
+
+System RPCs (`service_role` only): `claim_stripe_event`, `finish_stripe_event`, `link_billing_customer`, `sync_subscription`, `check_rate_limit`.
+
+## Conventions for new tables (Phase 2+)
+- `id uuid default gen_random_uuid()`, `organization_id uuid not null references organizations on delete cascade`, `created_at`, `updated_at` + `private.set_updated_at` trigger.
+- Money as `bigint` cents with a `currency char(3)`; quantities as `numeric(14,3)` where fractional units exist.
+- Enable RLS; SELECT policy `is_org_member(organization_id) or has_support_access(organization_id)` narrowed by the relevant `has_permission`; write policies check permission **and** `org_is_writable`.
+- Location-scoped tables check `member_locations` when the member has restrictions.
+- Revoke defaults, grant only needed columns; add the table to the audit trigger if it is configuration.
+- Ledger tables are insert-only (no UPDATE/DELETE grants; corrections via reversing entries).
+- Add RLS tests to `tests/db` before merging.
+
+## Migrations and recovery
+- Create migrations with a timestamp prefix; never edit a migration that has run in production — add a new one.
+- Destructive migrations (drop/rename column, delete data) need owner approval and a written rollback.
+- Supabase Pro plan: daily backups + point-in-time recovery (enable PITR before launch). Restore drill each quarter, documented in PROJECT_STATUS.md.
