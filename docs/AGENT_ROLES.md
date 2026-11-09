@@ -16,12 +16,20 @@
 
 Claude and Grok do **not** talk to each other directly. All coordination happens through issues, PR comments and the docs in this repo.
 
-## Grok integration (deferred — owner asked for it to be added last)
-Planned design, to be built once the core modules are done and the owner provides an xAI API key:
-- A GitHub App (or fine-grained token) with **read** access to code and **write** access only to issues and PR comments. No merge, push, deploy or secrets access.
-- A small controller (Vercel function or GitHub Action) triggered by `pull_request` and `deployment_status` webhooks. It sends the diff, PR description, TEST_PLAN.md and SECURITY_RULES.md to the xAI API and posts Grok’s review as a PR comment; findings tagged `bug` become issues.
-- Preview testing: the controller gives Grok the preview URL and a seeded **demo tenant** login only (fictional data, test-mode Stripe). Never production credentials.
-- Rate limits and a spend cap on the xAI key; every controller action logged.
+## Grok integration
+**Built: PR reviews** (`.github/workflows/grok-review.yml` + `scripts/grok-review.mjs`). On every non-draft pull request, GitHub Actions sends Grok the PR description, the diff (lockfiles excluded, capped at 120k characters), `docs/SECURITY_RULES.md` and `docs/TEST_PLAN.md`, and posts Grok’s review as one PR comment that is updated on each new push. Grok’s output has fixed sections: Verdict, Findings (severity, file:line, scenario, fix), Tests to add, Questions for the owner.
+
+To turn it on (owner):
+1. Create an API key at console.x.ai (set a monthly spend limit there).
+2. In the GitHub repo: Settings → Secrets and variables → Actions → **New repository secret** `XAI_API_KEY`.
+3. Optional: repository **variable** `XAI_MODEL` to change the model (default `grok-4.7`).
+Without the secret the job skips itself and never fails CI.
+
+Permissions: the workflow token can read code and write PR comments only (`contents: read`, `pull-requests: write`). It uses `pull_request`, never `pull_request_target`, so code from a fork can never see the key. Diff content is passed to Grok as untrusted data.
+
+Claude reads Grok’s comment on the PR and addresses findings on the same branch; Grok re-reviews on the next push.
+
+**Not built yet:** Grok testing the live preview deployment (needs Vercel preview URLs and a seeded demo-tenant login with test-mode Stripe — never production credentials), and Grok opening GitHub issues from findings (would add `issues: write`).
 
 ## Guardrails for all AI agents
 - Never commit secrets; never print env values in logs or PRs.

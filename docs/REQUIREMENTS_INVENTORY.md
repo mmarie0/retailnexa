@@ -17,7 +17,7 @@ None of the prototype features count as “implemented” for the SaaS: they hav
 | CLAUDE.md + docs set (PRD, architecture, schema, agent roles, API, security, status, roadmap, test plan) | ✅ | Plus SETUP.md and this inventory |
 | GitHub issues/branches/PRs as source of truth | 🔑 | Committed locally on `feat/phase-1-foundation`; needs repo access |
 | CI | ✅ | `.github/workflows/ci.yml` (runs once the repo exists) |
-| Grok reviewer integration via GitHub + xAI controller | ⏳ Phase 5 | Designed in AGENT_ROLES.md; deferred per owner |
+| Grok reviewer integration via GitHub + xAI controller | 🟡 | PR review workflow built (comment-only); needs `XAI_API_KEY` repo secret. Preview-deployment testing and issue creation later |
 | No secrets committed; no unrestricted AI production actions; owner approval for prod money/auth/destructive changes | ✅ | SECURITY_RULES.md §14, `.gitignore`, `.env.example` |
 
 ## §2 Platform architecture
