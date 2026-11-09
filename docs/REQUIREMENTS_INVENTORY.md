@@ -7,7 +7,7 @@ Every requirement in the master brief, with where it stands **in this codebase**
 **Existing prototypes examined (left unmodified, per owner direction):**
 - **A — “RetailNexa Online Reporting”** artifact: full clickable prototype (public site, retail owner, wholesale owner, salesperson, employee, kiosk, HQ admin). All data in one localStorage blob; no auth, no backend, Stripe/email simulated.
 - **B — “RetailOS Preview”** artifact: role-switching preview (Owner/Manager/Employee) with a 35-key permission matrix and an append-only activity log; in-memory only.
-- **C — “RetailNexa”** artifact (the owner’s day-to-day bills/sales app, ~5,800 lines): inventory pending — see “Notes” at the end.
+- **C — “RetailNexa”** artifact (the owner’s day-to-day app, ~5,800 lines): the most complete prototype. Overview, Bills (due calendar + budget/forecast, invoice archive with AI reading, vendors with terms/aging/payments/credits/merge, fixed costs, statements, bank reconciliation, rep visits, inter-store balances), Sales (daily reports up to 8 registers, over/short, monthly + year-over-year, categories, cash, profit with partner splits, investor PDF, year-end Excel), Staff (schedules, payroll, labor %, paystub PDFs), Upkeep, an “Ask” chat over local data, undo, backups, 8 themes. Persists in the Claude artifact document store; roles are stubbed (everyone is owner).
 
 None of the prototype features count as “implemented” for the SaaS: they have no server, no tenant isolation and no real auth. They are specifications we port from.
 
@@ -76,16 +76,17 @@ None of the prototype features count as “implemented” for the SaaS: they hav
 ## §8 Vendors & bills
 | Requirement | Status | Prototype |
 |---|---|---|
-| Vendor profiles (names, aliases, contact, terms, credit, history, balances, YTD/all-time, cost history), merging | ⏳ Phase 2 | A: vendor profiles with 12 stats, statement matching; C: owner’s live vendor/invoice workflow |
-| Invoice import, recurring/scheduled bills, partial payments, reminders, matching, price-increase flags | ⏳ Phase 2 | A: checks stay open until cleared (port this behaviour) |
+| Vendor profiles (names, aliases, contact, terms, credit, history, balances, YTD/all-time, cost history), merging | ⏳ Phase 2 | C: vendors with terms, aging, payments, credits, merge, learned statement-name aliases; fuzzy name match (stop-words + edit distance, 0.82 threshold — too loose, needs confirmation step). A: 12-stat profiles |
+| Invoice import, recurring/scheduled bills, partial payments, reminders, matching, price-increase flags | ⏳ Phase 2 | C: AI document reading with a second verification pass and a 10-type “smart upload” router; ~12 extraction prompts (invoice, statement, Z-report, register cash/drops, monthly, days, category, bill calendar, fixed costs, bank, payroll, P&L, store transfers) to port. Due-date rule: printed due date → printed terms → vendor terms. A: checks stay open until cleared |
+| Bank reconciliation matching | ⏳ Phase 2 | C: checks/withdrawals ↔ recorded payments; card deposits ↔ 1–3 days of card sales (ratio 0.93–1.005), which also yields the card-fee %. Port with review, not auto-post |
 | Interactive business calendar | ⏳ Phase 2–3 | A: bills calendar |
 
 ## §9 Retail module
 | Requirement | Status | Prototype |
 |---|---|---|
 | Inventory (catalog, variants, barcodes, imports, receiving, transfers, adjustments, counts, low/aged stock, cost history, pricing formulas, rounding, labels, printers, per-location) | ⏳ Phase 3 | Owner’s separate tools (invoice scanner, barcode sheet, wig count) inform this |
-| POS (scan, search, shortcuts, payments, discounts, returns, drawer reconciliation, receipts, permissions, reporting) + external POS CSV import | ⏳ Phase 3 (Vela POS CSV import Phase 2) | A: drawer counts by denomination; B: Vela upload, cash-under-18% flag |
-| Employees, schedules, time clock, breaks, timesheets, payroll calc, advances, bonuses, provider integration, self-service | ⏳ Phase 3 | A: PIN kiosk (PINs were plaintext — must be hashed), payroll with OT & advances; B: payroll run grid with lock-after-approval |
+| POS (scan, search, shortcuts, payments, discounts, returns, drawer reconciliation, receipts, permissions, reporting) + external POS CSV import | ⏳ Phase 3 (Vela POS CSV import Phase 2) | C: daily reports for up to 8 registers, over/short, advances/payouts — but **no Vela-specific parser** (generic AI or column guessing); a real Vela mapping must be built from actual Vela exports. A: drawer counts by denomination; B: cash-under-18% flag |
+| Employees, schedules, time clock, breaks, timesheets, payroll calc, advances, bonuses, provider integration, self-service | ⏳ Phase 3 | C: schedules, payroll with overtime/lunch rules, labor %, paystub PDFs with FICA wage bases, cash/check/ACH pay methods — income-tax withholding is a flat % (compliance risk: use a payroll provider or real tax tables). A: PIN kiosk (PINs were plaintext — must be hashed); B: payroll grid locked after approval |
 | Tasks with photo evidence, approval, resubmission, history; discipline records | ⏳ Phase 3 | A: task rotation skipping people on leave |
 | Optional NVR clip association via dedicated service | ⏳ Phase 3 design | |
 
@@ -130,6 +131,18 @@ None of the prototype features count as “implemented” for the SaaS: they hav
 | Accessible, mobile-responsive UI | ✅ (keyboard-navigable chart, labelled forms, reduced motion, AA text colours) |
 | No placeholder buttons / fake data / hard-coded financials in production | ✅ (unshipped modules are not in the app menu; marketing marks them “In development”) |
 
-## Notes
-- **Prototype C (“RetailNexa”, the owner’s current app)** — its inventory was still being compiled when this file was written. When it lands, its data model (vendors, invoices, statements, fixed costs, Vela POS reports) becomes the Phase 2 import and migration spec; this section will be updated.
-- Prototype issues not to repeat: client-only roles, plaintext employee PINs, check numbers assumed globally unique, fixed profit ratios, real-looking partner names in demo data.
+## Notes from the prototypes
+
+**Migrating the owner’s existing data (Phase 2).** Prototype C stores its records in the Claude artifact document store under collections for bills, fixed costs, statements, sales (by date), months and profits (by `YYYY-MM`), categories, employees, pay runs, schedule weeks, vendors (`v_<slug>`), bank lines, maintenance, cash weeks, profits, store transfers and distributions, plus uploaded files. A one-time importer (export from the artifact → JSON → RetailNexa import job) is planned so the owner’s history populates the new dashboards. Field-level mapping is kept in the working notes from the inventory, not in this repo, because they contain real partner names.
+
+**Accounting problems in prototype C that the new ledger must not repeat:**
+- Its “net profit” is cash in minus purchases: gross sales including tax, minus every bill and inventory order due that month, minus payroll. Inventory purchases are fully expensed and there is no cost of goods sold. RetailNexa separates purchases (inventory asset), COGS (recognised on sale) and payments (cash), and labels net income only when complete.
+- Costs land in the wrong month: bills count by due-date month, credits by invoice month, and bills with no due date never count. The ledger uses accrual dates with cash-basis reports derived from payments.
+- Points/discounts may be subtracted twice. Bank backfill can count spending twice and treats owner draws and sales-tax payments as expenses — these are equity and liability movements.
+- Editing a fixed cost rewrites past months. Recurring bills will generate dated entries; history is immutable.
+- Partner payouts are overstated (unrecorded months assumed fully paid). Distributions become explicit equity entries.
+- Payroll mixes gross pay and employer cost between pages.
+- Defaults to avoid hard-coding per tenant: $50,000 bank reserve, 12% labor target, 10% employer tax, 2 registers, 40h × 1.5 overtime — these become tenant settings.
+- UI bug: the “Add vendor” button opens the add-invoice form (duplicate action key).
+
+**Other prototype issues not to repeat:** client-only roles (A, B) and stubbed roles (C); plaintext employee PINs; check numbers assumed globally unique; fixed profit ratios; real partner names and ownership percentages built into code as defaults (C) or demo data (B) — never ship personal data as product defaults.
