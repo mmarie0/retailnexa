@@ -36,6 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <AppNav items={items} />
         <div className="mt-auto hidden flex-col gap-2 text-sm lg:flex">
           <p className="truncate text-muted" title={ctx.user.email}>{ctx.user.email}</p>
+          <Link href="/account/security" className="font-semibold text-accent-strong">Two-factor authentication</Link>
           <Link href="/onboarding?new=1" className="font-semibold text-accent-strong">Add another business</Link>
           <form action="/auth/signout" method="post"><button className="font-semibold text-muted hover:text-ink">Log out</button></form>
         </div>

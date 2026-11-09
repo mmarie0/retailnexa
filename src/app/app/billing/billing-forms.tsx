@@ -41,7 +41,7 @@ export function PlanPicker({ defaults, trialEligible }: { defaults: { retail: bo
         <p className="mt-1 text-sm text-muted">
           {trialEligible
             ? `You pay $0 today. Your first payment is taken when your ${TRIAL_DAYS}-day trial ends unless you cancel first.`
-            : 'Your first payment is taken today. This business has already used its free trial.'}
+            : 'Your first payment is taken today. The free trial is available once per owner.'}
         </p>
       </div>
       <FormMessage state={state} />

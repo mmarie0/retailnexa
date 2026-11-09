@@ -12,6 +12,7 @@ RetailNexa uses Server Actions for form mutations, Route Handlers for machine en
 | `GET /app/export` | `data.export` | JSON export of the org (RLS-scoped) | 200 attachment; 403 |
 | `GET /auth/confirm?token_hash&type&next` or `?code` | — | Email confirmation, recovery, invite links | 307 → `next` (sanitised) or `/login?error=link_expired` |
 | `POST /auth/signout` | — | Sign out, clear active-org cookie | 303 → `/` |
+| `GET /account/security` (page) | Signed in | Set up a TOTP authenticator (required before platform access) | — |
 
 ### Stripe events handled
 `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.created|updated|deleted|paused|resumed|trial_will_end`, `invoice.paid`, `invoice.payment_failed`, `invoice.payment_action_required`. All others are acknowledged and recorded as `ignored`. Enable exactly these on the Stripe webhook endpoint.

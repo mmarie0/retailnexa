@@ -17,9 +17,12 @@ Everything below needs an account or a secret only the owner can create. Never p
 5. Authentication → MFA: enable TOTP.
 6. Apply migrations: `npx supabase link --project-ref <ref>` then `npx supabase db push` (or paste each file in `supabase/migrations` into the SQL editor in order).
 7. Copy Project URL, anon key and service-role key into Vercel env vars (see `.env.example`).
-8. Create the first platform admin (owner only): sign up through the app, then in the SQL editor run
-   `insert into public.platform_admins (user_id, role) select id, 'superadmin' from auth.users where email = 'you@example.com';`
-   Then visit `/admin` and enrol your authenticator app.
+8. Create the first platform admin (owner only):
+   1. Sign up through the app and confirm your email.
+   2. Visit `/account/security` and set up your authenticator app. (The database refuses platform access for anyone without a verified authenticator, so a leaked password can never be used to enrol one.)
+   3. In the SQL editor run
+      `insert into public.platform_admins (user_id, role) select id, 'superadmin' from auth.users where email = 'you@example.com';`
+   4. Visit `/admin` and enter your 6-digit code.
 
 ## 3. Stripe
 1. Use **test mode** first.

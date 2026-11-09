@@ -14,7 +14,7 @@ export default async function MfaPage() {
       <Logo className="mb-8" />
       <Card className="w-full p-6">
         <h1 className="mb-4 text-2xl font-extrabold">Verify it’s you</h1>
-        <MfaClient />
+        <MfaClient mode="verify" returnTo="/admin" />
       </Card>
     </main>
   );

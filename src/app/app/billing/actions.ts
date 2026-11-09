@@ -49,10 +49,12 @@ export async function startCheckout(_p: ActionState, form: FormData): Promise<Ac
     });
     if (!sel.retail && !sel.wholesale) return fail('Choose Retail, Wholesale or both.');
 
+    // One free trial per owner, not per business: no trial if any business this user owns has had one.
+    const ownedIds = ctx.orgs.filter((o) => o.role === 'owner').map((o) => o.id);
     const supabase = await getSupabase();
-    const { data: org, error: orgErr } = await supabase.from('organizations').select('trial_consumed_at').eq('id', ctx.org.id).single();
+    const { data: used, error: orgErr } = await supabase.from('organizations').select('id').in('id', [...new Set([ctx.org.id, ...ownedIds])]).not('trial_consumed_at', 'is', null).limit(1);
     if (orgErr) throw orgErr;
-    const trial = !org.trial_consumed_at && !ctx.subscription;
+    const trial = (used ?? []).length === 0 && !ctx.subscription;
 
     const customer = await ensureCustomer(ctx.org.id, ctx.org.name, ctx.user.email);
     const firstCharge = new Date(Date.now() + TRIAL_DAYS * 86_400_000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -101,8 +103,8 @@ export async function openPortal(): Promise<ActionState> {
 async function setCancelAtPeriodEnd(cancel: boolean): Promise<ActionState> {
   try {
     const ctx = await billingContext();
-    const supabase = await getSupabase();
-    const { data: sub } = await supabase.from('subscriptions').select('stripe_subscription_id, status, cancel_at_period_end').eq('organization_id', ctx.org.id).maybeSingle();
+    // Stripe ids are not readable by members (column grants); read them server-side after the permission check.
+    const { data: sub } = await createAdminClient().from('subscriptions').select('stripe_subscription_id, status, cancel_at_period_end').eq('organization_id', ctx.org.id).maybeSingle();
     if (!sub || !['trialing', 'active', 'past_due'].includes(sub.status)) return fail('There is no active subscription to change.');
     if (sub.cancel_at_period_end === cancel) return ok(cancel ? 'Your subscription is already set to end.' : 'Your subscription is already active.');
     await getStripe().subscriptions.update(

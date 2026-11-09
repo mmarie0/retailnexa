@@ -22,6 +22,8 @@ export interface AccessInput {
     currentPeriodEnd: Date | null;
     trialEnd: Date | null;
     cancelAtPeriodEnd: boolean;
+    /** When the subscription first became past_due (grace anchor). */
+    pastDueSince?: Date | null;
   };
   now: Date;
 }
@@ -36,6 +38,7 @@ export interface Access {
   trialDaysLeft: number | null;
 }
 
+/** Must match the interval in private.org_is_writable (foundation migration). */
 export const PAST_DUE_GRACE_DAYS = 7;
 const DAY = 86_400_000;
 
@@ -71,7 +74,10 @@ export function computeAccess({ orgStatus, subscription: s, now }: AccessInput):
         ? { tone: 'warning', message: 'Your subscription is canceled and ends at the close of this billing period.' }
         : null);
     case 'past_due': {
-      const graceEnds = s.currentPeriodEnd ? s.currentPeriodEnd.getTime() + PAST_DUE_GRACE_DAYS * DAY : 0;
+      // Stripe advances current_period_end at renewal even when the payment fails,
+      // so grace is anchored to the first failure, not the period end.
+      const since = s.pastDueSince ?? now;
+      const graceEnds = since.getTime() + PAST_DUE_GRACE_DAYS * DAY;
       if (now.getTime() <= graceEnds) {
         return access('grace', { tone: 'warning', message: 'Your last payment failed. Update your payment method to avoid interruption.' });
       }

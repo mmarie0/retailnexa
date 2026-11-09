@@ -4,10 +4,20 @@ import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/browser';
 import { Button, Field, Input, Notice } from '@/components/ui';
 
-type Stage = { kind: 'loading' } | { kind: 'enroll'; factorId: string; qr: string; secret: string } | { kind: 'verify'; factorId: string } | { kind: 'error'; message: string };
+type Stage =
+  | { kind: 'loading' }
+  | { kind: 'enroll'; factorId: string; qr: string; secret: string }
+  | { kind: 'verify'; factorId: string }
+  | { kind: 'enrolled' }
+  | { kind: 'error'; message: string };
 
-/** TOTP two-factor enrollment and verification for platform staff (Supabase Auth MFA). */
-export function MfaClient() {
+/**
+ * TOTP two-factor (Supabase Auth MFA).
+ *  mode "enroll": account security page — set up an authenticator if none is verified.
+ *  mode "verify": admin step-up — only verifies an existing factor (no first-time enrolment
+ *  here, so a leaked password alone can never create a platform admin's first factor).
+ */
+export function MfaClient({ mode, returnTo }: { mode: 'enroll' | 'verify'; returnTo: string }) {
   const router = useRouter();
   const [stage, setStage] = useState<Stage>({ kind: 'loading' });
   const [code, setCode] = useState('');
@@ -20,12 +30,14 @@ export function MfaClient() {
       const { data, error } = await supabase.auth.mfa.listFactors();
       if (error) return setStage({ kind: 'error', message: 'Could not load your security settings. Sign in again.' });
       const verified = data.totp.find((f) => f.status === 'verified');
+      if (mode === 'enroll' && verified) return setStage({ kind: 'enrolled' });
       if (verified) return setStage({ kind: 'verify', factorId: verified.id });
+      if (mode === 'verify') return setStage({ kind: 'error', message: 'No authenticator is set up for this account. Set one up at /account/security, then ask a superadmin to grant access.' });
       const enrolled = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName: `RetailNexa admin ${new Date().toISOString().slice(0, 10)}` });
       if (enrolled.error) return setStage({ kind: 'error', message: 'Could not start two-factor setup.' });
       setStage({ kind: 'enroll', factorId: enrolled.data.id, qr: enrolled.data.totp.qr_code, secret: enrolled.data.totp.secret });
     })();
-  }, []);
+  }, [mode]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,11 +48,12 @@ export function MfaClient() {
     const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: stage.factorId, code: code.replace(/\s/g, '') });
     setBusy(false);
     if (error) return setError('That code didn’t work. Codes change every 30 seconds — try the current one.');
-    router.replace('/admin');
+    router.replace(returnTo);
     router.refresh();
   }
 
   if (stage.kind === 'loading') return <p className="text-muted">Loading…</p>;
+  if (stage.kind === 'enrolled') return <Notice tone="good">Two-factor authentication is on for this account.</Notice>;
   if (stage.kind === 'error') return <Notice tone="danger">{stage.message}</Notice>;
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">

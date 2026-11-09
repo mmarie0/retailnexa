@@ -50,8 +50,12 @@ export default async function BillingPage({ searchParams }: PageProps<'/app/bill
   const sub = ctx.subscription;
   const live = sub && ['trialing', 'active', 'past_due', 'unpaid', 'paused', 'incomplete'].includes(sub.status);
   const supabase = await getSupabase();
-  const { data: org } = await supabase.from('organizations').select('trial_consumed_at, canceled_at').eq('id', ctx.org.id).single();
-  const trialEligible = !org?.trial_consumed_at && !sub;
+  const ownedIds = [...new Set([ctx.org.id, ...ctx.orgs.filter((o) => o.role === 'owner').map((o) => o.id)])];
+  const [{ data: org }, { data: used }] = await Promise.all([
+    supabase.from('organizations').select('canceled_at').eq('id', ctx.org.id).single(),
+    supabase.from('organizations').select('id').in('id', ownedIds).not('trial_consumed_at', 'is', null).limit(1),
+  ]);
+  const trialEligible = (used ?? []).length === 0 && !sub;
   const inv = can(ctx, 'billing.view') ? await invoices(ctx.org.id) : null;
   const msg = typeof sp.checkout === 'string' ? CHECKOUT_MSG[sp.checkout] : undefined;
 

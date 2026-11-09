@@ -1,10 +1,9 @@
 'use server';
-import { createHash } from 'node:crypto';
-import { headers } from 'next/headers';
 import { leadSchema } from '@/lib/leads/schema';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isSupabaseConfigured } from '@/lib/env';
 import { fail, failFrom, ok, type ActionState } from '@/lib/actions';
+import { clientIpHash } from '@/lib/request';
 
 export async function submitLead(_prev: ActionState, form: FormData): Promise<ActionState> {
   const parsed = leadSchema.safeParse(Object.fromEntries(form));
@@ -19,9 +18,7 @@ export async function submitLead(_prev: ActionState, form: FormData): Promise<Ac
 
   if (!isSupabaseConfigured()) return fail('Our form is temporarily unavailable. Please email us instead.');
   try {
-    const h = await headers();
-    const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || 'unknown';
-    const bucket = `lead:${createHash('sha256').update(ip).digest('hex').slice(0, 32)}`;
+    const bucket = `lead:${await clientIpHash()}`;
     const admin = createAdminClient();
     const { data: allowed, error: rlError } = await admin.rpc('check_rate_limit', { p_bucket: bucket, p_max: 5, p_window_seconds: 3600 });
     if (rlError) throw rlError;

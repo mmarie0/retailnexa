@@ -28,6 +28,7 @@ declare
   v_user uuid := private.require_user();
   v_org uuid;
 begin
+  perform pg_advisory_xact_lock(hashtextextended('create_organization:' || v_user::text, 0));
   if (select count(*) from public.organizations where created_by = v_user) >= 5 then
     raise exception 'organization limit reached for this user' using errcode = '54000';
   end if;
@@ -145,6 +146,8 @@ begin
     insert into public.memberships (organization_id, user_id, role, invited_by)
     values (v_inv.organization_id, v_user, v_inv.role, v_inv.invited_by);
   elsif v_existing.status = 'disabled' then
+    -- Rejoining starts clean: extra permissions granted in a previous stint do not come back.
+    delete from public.member_permission_overrides where membership_id = v_existing.id;
     update public.memberships set status = 'active', role = v_inv.role where id = v_existing.id;
   end if;  -- already active: keep the current role; never downgrade via an invite
 
@@ -197,6 +200,10 @@ begin
     raise exception 'cannot assign a role equal to or above your own' using errcode = '42501';
   end if;
   if p_role <> 'owner' then perform private.assert_not_last_owner(v_target); end if;
+  if p_role is distinct from v_target.role then
+    -- Individual permission adjustments belonged to the old role; drop them.
+    delete from public.member_permission_overrides where membership_id = p_membership_id;
+  end if;
   update public.memberships set role = p_role where id = p_membership_id;
 end $$;
 
@@ -207,8 +214,24 @@ begin
   perform private.require_user();
   select * into v_target from public.memberships where id = p_membership_id for update;
   perform private.assert_can_manage_member(v_target, 'members.manage');
-  if p_status = 'disabled' then perform private.assert_not_last_owner(v_target); end if;
+  if p_status = 'disabled' then
+    perform private.assert_not_last_owner(v_target);
+    delete from public.member_permission_overrides where membership_id = p_membership_id;
+  end if;
   update public.memberships set status = p_status where id = p_membership_id;
+end $$;
+
+-- Replaces a member's location restriction. Empty array = all locations.
+create or replace function public.set_member_locations(p_membership_id uuid, p_location_ids uuid[])
+returns void language plpgsql security definer set search_path = '' as $$
+declare v_target public.memberships;
+begin
+  perform private.require_user();
+  select * into v_target from public.memberships where id = p_membership_id for update;
+  perform private.assert_can_manage_member(v_target, 'members.manage');
+  delete from public.member_locations where membership_id = p_membership_id;
+  insert into public.member_locations (membership_id, location_id, organization_id)
+  select p_membership_id, l, v_target.organization_id from unnest(coalesce(p_location_ids, '{}')) as l;
 end $$;
 
 -- p_granted null removes the override.
@@ -285,6 +308,10 @@ begin
   end if;
   select status into v_old from public.organizations where id = p_org for update;
   if v_old is null then raise exception 'organization not found' using errcode = 'P0002'; end if;
+  -- Reopening a closed account is superadmin-only too.
+  if v_old = 'closed' and not private.is_platform_admin(array['superadmin']::public.platform_role[]) then
+    raise exception 'permission denied' using errcode = '42501';
+  end if;
   update public.organizations set status = p_status, status_reason = btrim(p_reason) where id = p_org;
   perform private.log_audit(p_org, 'platform_admin', 'organization.status_changed', 'organization', p_org::text,
     jsonb_build_object('from', v_old, 'to', p_status, 'reason', p_reason));
@@ -422,7 +449,7 @@ begin
   insert into public.subscriptions as s (
     organization_id, stripe_subscription_id, stripe_customer_id, status, products, price_ids, extra_locations,
     trial_start, trial_end, current_period_start, current_period_end, cancel_at_period_end, cancel_at,
-    canceled_at, ended_at, stripe_synced_at)
+    canceled_at, ended_at, past_due_since, stripe_synced_at)
   values (
     p_org, v_sub_id, p ->> 'stripe_customer_id', v_status,
     coalesce(array(select jsonb_array_elements_text(p -> 'products')), '{}'),
@@ -431,14 +458,19 @@ begin
     (p ->> 'trial_start')::timestamptz, (p ->> 'trial_end')::timestamptz,
     (p ->> 'current_period_start')::timestamptz, (p ->> 'current_period_end')::timestamptz,
     coalesce((p ->> 'cancel_at_period_end')::boolean, false), (p ->> 'cancel_at')::timestamptz,
-    (p ->> 'canceled_at')::timestamptz, (p ->> 'ended_at')::timestamptz, v_synced)
+    (p ->> 'canceled_at')::timestamptz, (p ->> 'ended_at')::timestamptz,
+    case when v_status = 'past_due' then now() end, v_synced)
   on conflict (organization_id) do update set
     stripe_subscription_id = excluded.stripe_subscription_id, stripe_customer_id = excluded.stripe_customer_id,
     status = excluded.status, products = excluded.products, price_ids = excluded.price_ids,
     extra_locations = excluded.extra_locations, trial_start = excluded.trial_start, trial_end = excluded.trial_end,
     current_period_start = excluded.current_period_start, current_period_end = excluded.current_period_end,
     cancel_at_period_end = excluded.cancel_at_period_end, cancel_at = excluded.cancel_at,
-    canceled_at = excluded.canceled_at, ended_at = excluded.ended_at, stripe_synced_at = excluded.stripe_synced_at;
+    canceled_at = excluded.canceled_at, ended_at = excluded.ended_at, stripe_synced_at = excluded.stripe_synced_at,
+    past_due_since = case
+      when excluded.status <> 'past_due' then null
+      when s.stripe_subscription_id = excluded.stripe_subscription_id and s.status = 'past_due' then coalesce(s.past_due_since, now())
+      else now() end;
 
   -- History
   if v_old.id is null and v_status = 'trialing' then
@@ -505,6 +537,7 @@ grant execute on function
   public.update_member_role(uuid, public.member_role),
   public.set_member_status(uuid, public.member_status),
   public.set_member_permission(uuid, text, boolean),
+  public.set_member_locations(uuid, uuid[]),
   public.grant_support_access(uuid, int, text),
   public.revoke_support_access(uuid),
   public.admin_set_org_status(uuid, public.org_status, text),

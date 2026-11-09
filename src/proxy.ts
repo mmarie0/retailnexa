@@ -6,7 +6,7 @@ import { createServerClient } from '@supabase/ssr';
  * an *optimistic* redirect for signed-out visitors. Real authorization happens
  * in the data access layer (src/lib/auth/context.ts) and in Postgres RLS.
  */
-const PROTECTED = ['/app', '/admin', '/onboarding'];
+const PROTECTED = ['/app', '/admin', '/onboarding', '/account'];
 
 export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

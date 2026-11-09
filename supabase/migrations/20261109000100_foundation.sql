@@ -204,6 +204,7 @@ create table public.subscriptions (
   cancel_at timestamptz,
   canceled_at timestamptz,
   ended_at timestamptz,
+  past_due_since timestamptz,                      -- first time this subscription went past_due (grace anchor)
   stripe_synced_at timestamptz not null,           -- Stripe object freshness; older syncs are ignored
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -320,7 +321,7 @@ create table private.rate_limits (
 -- -----------------------------------------------------------------------------
 create table public.audit_logs (
   id bigint generated always as identity primary key,
-  organization_id uuid references public.organizations(id) on delete set null,
+  organization_id uuid,              -- intentionally no FK: history must survive org deletion
   actor_user_id uuid,
   actor_type text not null check (actor_type in ('user', 'platform_admin', 'system', 'stripe')),
   action text not null,
@@ -399,10 +400,39 @@ returns boolean language sql stable security definer set search_path = '' as $$
     )
 $$;
 
+-- Writable = org active AND billing in good standing (trialing/active, or past_due for
+-- at most 7 days). MUST match PAST_DUE_GRACE_DAYS in src/lib/billing/access.ts.
+-- Enforced here so a member calling the API directly cannot bypass billing state.
 create or replace function private.org_is_writable(p_org uuid)
 returns boolean language sql stable security definer set search_path = '' as $$
   select exists (select 1 from public.organizations o where o.id = p_org and o.status = 'active')
+     and exists (
+       select 1 from public.subscriptions s
+       where s.organization_id = p_org
+         and (s.status in ('trialing', 'active')
+              or (s.status = 'past_due' and coalesce(s.past_due_since, now()) > now() - interval '7 days')))
 $$;
+
+-- Plan limit: active stores may not exceed 1 + purchased extra locations on the Retail plan.
+create or replace function private.enforce_store_limit()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare
+  v_allowed int;
+  v_active int;
+begin
+  if new.kind <> 'store' or not new.is_active then return new; end if;
+  if tg_op = 'UPDATE' and old.kind = 'store' and old.is_active then return new; end if; -- not increasing
+  select 1 + s.extra_locations into v_allowed from public.subscriptions s
+   where s.organization_id = new.organization_id and 'retail' = any (s.products);
+  if v_allowed is null then return new; end if; -- no retail plan yet (e.g. first store at signup)
+  select count(*) into v_active from public.locations l
+   where l.organization_id = new.organization_id and l.kind = 'store' and l.is_active and l.id <> new.id;
+  if v_active + 1 > v_allowed then
+    raise exception 'your plan includes % store location(s); add locations on the billing page first', v_allowed
+      using errcode = '23514';
+  end if;
+  return new;
+end $$;
 
 create or replace function private.shares_org_with(p_user uuid)
 returns boolean language sql stable security definer set search_path = '' as $$
@@ -501,6 +531,35 @@ end $$;
 create trigger on_auth_user_created after insert on auth.users
   for each row execute function private.handle_new_user();
 
+-- Keep profiles.email in step when a user changes their sign-in email.
+create or replace function private.sync_profile_email()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  update public.profiles set email = lower(new.email) where id = new.id;
+  return new;
+end $$;
+create trigger on_auth_user_email_changed after update of email on auth.users
+  for each row when (old.email is distinct from new.email)
+  execute function private.sync_profile_email();
+
+create trigger locations_store_limit before insert or update of kind, is_active on public.locations
+  for each row execute function private.enforce_store_limit();
+
+-- Platform staff must already have a verified authenticator before being granted access,
+-- so a leaked password cannot be used to enrol the first factor (no trust-on-first-use).
+create or replace function private.require_admin_mfa_factor()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if new.mfa_required and new.is_active and not exists (
+    select 1 from auth.mfa_factors f where f.user_id = new.user_id and f.status = 'verified') then
+    raise exception 'enrol two-factor authentication at /account/security before granting platform access'
+      using errcode = '23514';
+  end if;
+  return new;
+end $$;
+create trigger platform_admins_require_mfa before insert or update on public.platform_admins
+  for each row execute function private.require_admin_mfa_factor();
+
 -- =============================================================================
 -- Row Level Security
 -- =============================================================================
@@ -567,14 +626,10 @@ create policy locations_update on public.locations for update to authenticated
   with check (private.has_permission(organization_id, 'locations.manage'));
 
 -- member_locations
-grant select, insert, delete on public.member_locations to authenticated;
+grant select on public.member_locations to authenticated;  -- writes via set_member_locations()
 create policy member_locations_select on public.member_locations for select to authenticated
   using (private.has_permission(organization_id, 'members.view')
          or exists (select 1 from public.memberships m where m.id = membership_id and m.user_id = auth.uid()));
-create policy member_locations_insert on public.member_locations for insert to authenticated
-  with check (private.has_permission(organization_id, 'members.manage') and private.org_is_writable(organization_id));
-create policy member_locations_delete on public.member_locations for delete to authenticated
-  using (private.has_permission(organization_id, 'members.manage') and private.org_is_writable(organization_id));
 
 -- permission catalog (public reference data)
 grant select on public.permissions, public.role_permissions to authenticated;
@@ -597,7 +652,9 @@ grant select on public.billing_accounts to authenticated;
 create policy billing_accounts_select on public.billing_accounts for select to authenticated
   using (private.has_permission(organization_id, 'billing.view') or private.is_platform_admin());
 
-grant select on public.subscriptions to authenticated;
+grant select (id, organization_id, status, products, extra_locations, trial_start, trial_end,
+  current_period_start, current_period_end, cancel_at_period_end, cancel_at, canceled_at, ended_at,
+  past_due_since, created_at, updated_at) on public.subscriptions to authenticated;
 create policy subscriptions_select on public.subscriptions for select to authenticated
   using (private.is_org_member(organization_id) or private.is_platform_admin());
 
@@ -644,6 +701,10 @@ create policy audit_select on public.audit_logs for select to authenticated
 grant all on all tables in schema public to service_role;
 grant all on all sequences in schema public to service_role;
 grant all on private.rate_limits to service_role;
+
+-- Future tables/sequences must be granted explicitly (Supabase defaults grant ALL to API roles).
+alter default privileges in schema public revoke all on tables from anon, authenticated;
+alter default privileges in schema public revoke all on sequences from anon, authenticated;
 
 -- Helper functions: callable by authenticated (needed inside RLS), never by anon.
 revoke all on all functions in schema private from public;

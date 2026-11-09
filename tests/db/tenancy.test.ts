@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { as, sys, createUser, createOrg, addMember, expectDenied, closeDb, type TestUser } from './helpers';
+import { as, sys, createUser, createOrg, addMember, expectDenied, closeDb, verifyMfa, type TestUser } from './helpers';
 
 let alice: TestUser, bob: TestUser, mona: TestUser, carl: TestUser, ada: TestUser, olga: TestUser;
 let orgA: string, orgB: string;
@@ -59,10 +59,8 @@ describe('tenant isolation', () => {
 
   it('member_locations cannot link a membership to another org’s location', async () => {
     const [locB] = await sys<{ id: string }>(`select id from public.locations where organization_id = $1`, [orgB]);
-    await expectDenied(
-      as(alice, `insert into public.member_locations (membership_id, location_id, organization_id) values ($1, $2, $3)`, [carlM, locB.id, orgA]),
-      /same organization|row-level/,
-    );
+    await expectDenied(as(alice, `select public.set_member_locations($1, array[$2]::uuid[])`, [carlM, locB.id]), /same organization/);
+    await expectDenied(as(alice, `insert into public.member_locations (membership_id, location_id, organization_id) values ($1, $2, $3)`, [carlM, locB.id, orgA]), /permission denied/);
   });
 
   it('anonymous visitors cannot read any table', async () => {
@@ -191,6 +189,8 @@ describe('platform admin & support access', () => {
   beforeAll(async () => {
     pat = await createUser('pat');
     bill = await createUser('bill');
+    await verifyMfa(pat);
+    await verifyMfa(bill);
     await sys(`insert into public.platform_admins (user_id, role) values ($1, 'support'), ($2, 'billing')`, [pat.id, bill.id]);
   });
 

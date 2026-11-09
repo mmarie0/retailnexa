@@ -63,6 +63,7 @@ export interface SubscriptionInfo {
   trialEnd: Date | null;
   currentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
+  pastDueSince: Date | null;
 }
 
 export interface OrgContext {
@@ -90,7 +91,7 @@ export const getOrgContext = cache(async (): Promise<OrgContext> => {
     supabase.rpc('my_permissions', { p_org: org.id }),
     supabase
       .from('subscriptions')
-      .select('status, products, extra_locations, trial_end, current_period_end, cancel_at_period_end')
+      .select('status, products, extra_locations, trial_end, current_period_end, cancel_at_period_end, past_due_since')
       .eq('organization_id', org.id)
       .maybeSingle(),
     supabase.from('feature_overrides').select('feature, enabled, expires_at').eq('organization_id', org.id),
@@ -107,6 +108,7 @@ export const getOrgContext = cache(async (): Promise<OrgContext> => {
         trialEnd: toDate(sub.data.trial_end),
         currentPeriodEnd: toDate(sub.data.current_period_end),
         cancelAtPeriodEnd: !!sub.data.cancel_at_period_end,
+        pastDueSince: toDate(sub.data.past_due_since),
       }
     : null;
 

@@ -73,9 +73,32 @@ export async function createUser(name: string) {
 
 export type TestUser = Awaited<ReturnType<typeof createUser>>;
 
-export async function createOrg(owner: TestUser, name: string, type: 'retail' | 'wholesale' | 'both' = 'retail') {
+export async function createOrg(
+  owner: TestUser, name: string, type: 'retail' | 'wholesale' | 'both' = 'retail',
+  opts: { subscribe?: boolean } = { subscribe: true },
+) {
   const [row] = await as<{ id: string }>(owner, `select public.create_organization($1, $2::public.business_type) as id`, [name, type]);
+  if (opts.subscribe !== false) await setSubscription(row.id, 'active', { products: type === 'both' ? ['retail', 'wholesale'] : [type], extraLocations: 5 });
   return row.id;
+}
+
+/** Superuser fixture: give an org a subscription in a given state (bypasses Stripe). */
+export async function setSubscription(
+  org: string, status: string,
+  opts: { products?: string[]; extraLocations?: number; pastDueSince?: string | null } = {},
+) {
+  await sys(
+    `insert into public.subscriptions (organization_id, stripe_subscription_id, stripe_customer_id, status, products, extra_locations, past_due_since, stripe_synced_at)
+     values ($1, $6, $7, $2, $3, $4, $5, now())
+     on conflict (organization_id) do update set status = excluded.status, products = excluded.products,
+       extra_locations = excluded.extra_locations, past_due_since = excluded.past_due_since`,
+    [org, status, opts.products ?? ['retail'], opts.extraLocations ?? 0, opts.pastDueSince ?? null,
+     `sub_fx_${org.replace(/-/g, '')}`, `cus_fx_${org.replace(/-/g, '')}`],
+  );
+}
+
+export async function verifyMfa(user: TestUser) {
+  await sys(`insert into auth.mfa_factors (user_id, status) values ($1, 'verified')`, [user.id]);
 }
 
 /** Invite + accept, returning the new membership id. */

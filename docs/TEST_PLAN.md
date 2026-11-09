@@ -9,7 +9,7 @@
 | Static | `npm run lint && npm run typecheck` | Types, React rules, demo data cannot be imported by tenant code |
 | Build | `npm run build` | Builds with **no credentials**; public pages static, all authenticated routes request-time |
 
-Mutation checks performed when the suites were written: deliberately broken RLS policy and deliberately wrong column/RPC parameter were each caught.
+Current totals: **91 tests** (40 unit, 51 database). Mutation checks performed: a deliberately broken RLS policy, a wrong column, a wrong RPC parameter and a wildcard select on a column-restricted table were each caught. `tests/db/review-fixes.test.ts` pins every finding from the independent security review.
 
 ## Not yet automated (needs live services)
 End-to-end browser tests against a real Supabase project and Stripe test mode. To add once credentials exist: Playwright suite in `tests/e2e` run against Vercel preview with a seeded test tenant.

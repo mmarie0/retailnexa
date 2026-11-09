@@ -8,7 +8,7 @@ let org: string;
 
 beforeAll(async () => {
   owner = await createUser('billowner');
-  org = await createOrg(owner, 'Billing Co', 'both');
+  org = await createOrg(owner, 'Billing Co', 'both', { subscribe: false });
 });
 afterAll(closeDb);
 

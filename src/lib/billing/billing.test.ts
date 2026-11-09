@@ -17,9 +17,11 @@ describe('computeAccess', () => {
     expect(a).toMatchObject({ state: 'full', canWrite: true, trialDaysLeft: 3 });
   });
   it('gives a grace period after a failed payment, then read-only', () => {
-    const inGrace = computeAccess({ orgStatus: 'active', subscription: sub('past_due', { currentPeriodEnd: new Date(now.getTime() - 3 * day) }), now });
+    // Stripe has already advanced the period end ~30 days ahead; grace must still expire.
+    const ahead = new Date(now.getTime() + 27 * day);
+    const inGrace = computeAccess({ orgStatus: 'active', subscription: sub('past_due', { currentPeriodEnd: ahead, pastDueSince: new Date(now.getTime() - 3 * day) }), now });
     expect(inGrace).toMatchObject({ state: 'grace', canWrite: true });
-    const late = computeAccess({ orgStatus: 'active', subscription: sub('past_due', { currentPeriodEnd: new Date(now.getTime() - 9 * day) }), now });
+    const late = computeAccess({ orgStatus: 'active', subscription: sub('past_due', { currentPeriodEnd: ahead, pastDueSince: new Date(now.getTime() - 8 * day) }), now });
     expect(late).toMatchObject({ state: 'read_only', canWrite: false, canUseApp: true, canExport: true });
   });
   it('keeps canceled accounts readable and exportable (never destroyed)', () => {

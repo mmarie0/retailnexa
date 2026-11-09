@@ -19,7 +19,7 @@ export default async function TenantPage({ params }: PageProps<'/admin/tenants/[
   const [members, locations, sub, events, billing, overrides, grants] = await Promise.all([
     supabase.from('memberships').select('id, user_id, role, status').eq('organization_id', id),
     supabase.from('locations').select('id, name, kind, city, is_active').eq('organization_id', id),
-    supabase.from('subscriptions').select('*').eq('organization_id', id).maybeSingle(),
+    supabase.from('subscriptions').select('status, products, extra_locations, trial_end, current_period_end, cancel_at_period_end, past_due_since').eq('organization_id', id).maybeSingle(),
     supabase.from('subscription_events').select('kind, from_status, to_status, created_at').eq('organization_id', id).order('created_at', { ascending: false }).limit(20),
     supabase.from('billing_accounts').select('stripe_customer_id, billing_email').eq('organization_id', id).maybeSingle(),
     supabase.from('feature_overrides').select('feature, enabled, reason, expires_at').eq('organization_id', id),

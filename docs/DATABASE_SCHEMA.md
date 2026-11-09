@@ -15,12 +15,12 @@ Source of truth: `supabase/migrations/*.sql` (applied in filename order). This d
 | `profiles` | One per auth user (created by trigger) | Self, co-members, platform admins read; self updates `full_name` |
 | `memberships` | user ↔ org with `role`, `status` | Self, `members.view`, platform admins read. **Writes only via RPCs.** |
 | `locations` | Stores, warehouses, offices | Members read; `locations.manage` inserts/updates (no delete — deactivate) |
-| `member_locations` | Optional per-member location restriction | `members.view` read; `members.manage` insert/delete; same-org enforced by trigger |
+| `member_locations` | Optional per-member location restriction | `members.view` read; writes only via `set_member_locations` (rank-checked); same-org enforced by trigger |
 | `permissions`, `role_permissions` | Permission catalog + role defaults | Authenticated read |
 | `member_permission_overrides` | Per-member allow/deny | `members.view` read; writes via `set_member_permission` |
 | `invitations` | Email invites; **token stored as SHA-256 only**, 7-day expiry, cannot invite owners | `members.manage` reads all columns except `token_hash` |
 | `billing_accounts` | org ↔ Stripe customer (unique both ways) | `billing.view` read; service role writes |
-| `subscriptions` | Mirror of the org's Stripe subscription | Members read; service role writes via `sync_subscription` |
+| `subscriptions` | Mirror of the org's Stripe subscription; `past_due_since` anchors the 7-day grace | Members read status/plan/date columns only (Stripe ids not granted); service role writes via `sync_subscription` |
 | `subscription_events` | trial_started / status_change / reactivated / cancel_scheduled / cancel_unscheduled | `billing.view` read |
 | `stripe_events` | Webhook idempotency ledger (no payloads stored) | Platform superadmin/billing read |
 | `feature_overrides` | Platform-granted entitlement exceptions | Members read; platform admins write via RPC |
@@ -28,13 +28,15 @@ Source of truth: `supabase/migrations/*.sql` (applied in filename order). This d
 | `support_access_grants` | Tenant-granted, ≤72h, revocable staff access | `org.manage` and platform admins read |
 | `leads` | Demo requests / contact messages | Platform admins read; service role inserts |
 | `announcements` | Platform announcements | Authenticated read while live |
-| `audit_logs` | Append-only activity log | `audit.view` per org; platform admins all |
+| `audit_logs` | Append-only activity log. `organization_id` has **no foreign key** on purpose so history survives an owner-approved org deletion | `audit.view` per org; platform admins all |
 
 ## Key functions
 
-Authorization helpers (`private`, SECURITY DEFINER, `search_path=''`): `is_org_member`, `member_role`, `has_permission`, `is_platform_admin(roles[])` (requires `aal2` when `mfa_required`), `has_support_access`, `org_is_writable` (status = active), `shares_org_with`, `role_rank`.
+Authorization helpers (`private`, SECURITY DEFINER, `search_path=''`): `is_org_member`, `member_role`, `has_permission`, `is_platform_admin(roles[])` (requires `aal2` when `mfa_required`), `has_support_access`, `org_is_writable` (org active **and** subscription trialing/active or past_due ≤ 7 days), `shares_org_with`, `role_rank`.
 
-Tenant RPCs (granted to `authenticated`): `create_organization`, `my_permissions`, `invite_member`, `revoke_invitation`, `accept_invitation`, `update_member_role`, `set_member_status`, `set_member_permission`, `grant_support_access`, `revoke_support_access`.
+Tenant RPCs (granted to `authenticated`): `create_organization`, `my_permissions`, `invite_member`, `revoke_invitation`, `accept_invitation` (requires a confirmed email), `update_member_role`, `set_member_status`, `set_member_permission`, `set_member_locations`, `grant_support_access`, `revoke_support_access`.
+
+Triggers: `set_updated_at`, row-change audit on configuration tables, same-org checks on `member_locations` / overrides, store-count plan limit on `locations`, profile creation and email sync from `auth.users`, verified-authenticator requirement on `platform_admins`, append-only guard on `audit_logs`.
 
 Platform RPCs (authenticated, re-check platform role + MFA): `admin_set_org_status`, `admin_set_feature_override`, `admin_update_lead`, `admin_create_announcement`, `admin_end_announcement`.
 

@@ -24,6 +24,7 @@ function files(dir: string): string[] {
 interface Fn { name: string; args: string[]; required: string[] }
 let functions: Map<string, Fn>;
 let columns: Map<string, Set<string>>;
+let userSelectable: Map<string, Set<string>>;
 const sources = files(join(ROOT, 'src')).map((p) => ({ path: relative(ROOT, p), text: readFileSync(p, 'utf8') }));
 
 beforeAll(async () => {
@@ -36,6 +37,14 @@ beforeAll(async () => {
   }));
   const cols = await sys<{ table_name: string; column_name: string }>(
     `select table_name, column_name from information_schema.columns where table_schema = 'public'`);
+  const granted = await sys<{ table_name: string; column_name: string }>(`
+    select table_name, column_name from information_schema.columns
+    where table_schema = 'public' and has_column_privilege('authenticated', format('public.%I', table_name), column_name, 'SELECT')`);
+  userSelectable = new Map();
+  for (const c of granted) {
+    if (!userSelectable.has(c.table_name)) userSelectable.set(c.table_name, new Set());
+    userSelectable.get(c.table_name)!.add(c.column_name);
+  }
   columns = new Map();
   for (const c of cols) {
     if (!columns.has(c.table_name)) columns.set(c.table_name, new Set());
@@ -101,12 +110,14 @@ describe('RPC calls match database functions', () => {
 
 describe('table queries match database columns', () => {
   const chains = sources.flatMap(({ path, text }) =>
-    [...text.matchAll(/\.from\(\s*'([a-z_]+)'\s*\)/g)].map((m) => {
+    [...text.matchAll(/([A-Za-z_]+(?:\(\))?)\s*\.from\(\s*'([a-z_]+)'\s*\)/g)].map((m) => {
       const start = m.index! + m[0].length;
+      // Service-role receivers bypass RLS and column grants; everything else runs as the signed-in user.
+      const serviceRole = ['createAdminClient()', 'db', 'admin'].includes(m[1]);
       // The chain ends at the end of the statement (next ';' or a new .from()).
       const rest = text.slice(start);
       const end = Math.min(...[rest.indexOf(';'), rest.search(/\.from\(/)].filter((n) => n >= 0), rest.length);
-      return { path, table: m[1], chain: rest.slice(0, end) };
+      return { path, table: m[2], chain: rest.slice(0, end), serviceRole };
     }),
   );
 
@@ -144,6 +155,11 @@ describe('table queries match database columns', () => {
       const tableCols = columns.get(c.table);
       if (!tableCols) { problems.push(`${c.path}: unknown table ${c.table}`); continue; }
       for (const s of c.chain.matchAll(/\.select\(\s*'([^']*)'/g)) {
+        if (!c.serviceRole) {
+          const allowed = userSelectable.get(c.table) ?? new Set();
+          const wanted = s[1].trim() === '*' ? [...tableCols] : selectColumns(s[1]).filter((x) => !x.table).map((x) => x.col);
+          for (const col of wanted) if (tableCols.has(col) && !allowed.has(col)) problems.push(`${c.path}: signed-in users cannot read ${c.table}.${col} (column not granted) — use explicit allowed columns or the server-side client`);
+        }
         for (const { table, col } of selectColumns(s[1])) {
           const set = table ? columns.get(table) : tableCols;
           if (!set) problems.push(`${c.path}: unknown embedded table ${table}`);

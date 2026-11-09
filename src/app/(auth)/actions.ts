@@ -5,6 +5,17 @@ import { createClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured, siteUrl } from '@/lib/env';
 import { safeNext } from '@/lib/auth/redirect';
 import { fail, ok, type ActionState } from '@/lib/actions';
+import { clientIpHash, emailKey, rateLimit } from '@/lib/request';
+
+const SLOW_DOWN = 'Too many attempts. Wait a few minutes and try again.';
+
+/** Per-IP and per-email limits (Supabase Auth only sees our server's IP). */
+async function allowed(action: string, email: string | null, ipMax: number, emailMax: number, windowSeconds: number) {
+  const ip = await clientIpHash();
+  if (!(await rateLimit(`auth:${action}:ip:${ip}`, ipMax, windowSeconds))) return false;
+  if (email && !(await rateLimit(`auth:${action}:email:${emailKey(email)}`, emailMax, windowSeconds))) return false;
+  return true;
+}
 
 const email = z.string().trim().toLowerCase().email('Enter a valid email address');
 const password = z.string().min(10, 'Use at least 10 characters').max(128);
@@ -14,6 +25,7 @@ export async function signIn(_p: ActionState, form: FormData): Promise<ActionSta
   if (!isSupabaseConfigured()) return fail(NOT_CONFIGURED);
   const parsed = z.object({ email, password: z.string().min(1, 'Enter your password') }).safeParse(Object.fromEntries(form));
   if (!parsed.success) return fail('Enter your email and password.');
+  if (!(await allowed('signin', parsed.data.email, 30, 10, 600))) return fail(SLOW_DOWN);
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) {
@@ -39,6 +51,7 @@ export async function signUp(_p: ActionState, form: FormData): Promise<ActionSta
     for (const i of parsed.error.issues) fieldErrors[String(i.path[0])] ??= i.message;
     return fail('Check the highlighted fields.', fieldErrors);
   }
+  if (!(await allowed('signup', parsed.data.email, 5, 3, 3600))) return fail(SLOW_DOWN);
   const next = safeNext(form.get('next'), '/onboarding');
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
@@ -62,10 +75,13 @@ export async function requestPasswordReset(_p: ActionState, form: FormData): Pro
   if (!isSupabaseConfigured()) return fail(NOT_CONFIGURED);
   const parsed = email.safeParse(form.get('email'));
   if (!parsed.success) return fail('Enter a valid email address.');
+  const done = ok('If an account exists for that email, we’ve sent a link to reset the password.');
+  // Silently drop over-limit requests: protects the email quota and stops inbox flooding.
+  if (!(await allowed('reset', parsed.data, 5, 3, 3600))) return done;
   const supabase = await createClient();
   await supabase.auth.resetPasswordForEmail(parsed.data, { redirectTo: `${siteUrl()}/auth/confirm?next=/reset-password` });
   // Same answer whether or not the account exists (no account enumeration).
-  return ok('If an account exists for that email, we’ve sent a link to reset the password.');
+  return done;
 }
 
 export async function updatePassword(_p: ActionState, form: FormData): Promise<ActionState> {
