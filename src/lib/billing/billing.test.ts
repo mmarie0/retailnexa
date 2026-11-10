@@ -65,3 +65,22 @@ describe('plans', () => {
     expect(() => checkoutLineItems({ retail: false, wholesale: false, extraLocations: 0 }, prices)).toThrow();
   });
 });
+
+describe('billing waiver (#32)', () => {
+  const now = new Date('2026-11-10T12:00:00Z');
+  const later = new Date('2026-11-24T00:00:00Z');
+  it('gives full access to a pre-trial org while the waiver runs', () => {
+    const a = computeAccess({ orgStatus: 'active', subscription: null, now, billingWaivedUntil: later });
+    expect(a.canWrite).toBe(true);
+    expect(a.notice?.message).toMatch(/waived .* until Nov 24, 2026/);
+  });
+  it('is ignored once expired, and never overrides suspension or closure', () => {
+    expect(computeAccess({ orgStatus: 'active', subscription: null, now, billingWaivedUntil: new Date('2026-11-01') }).canWrite).toBe(false);
+    expect(computeAccess({ orgStatus: 'suspended', subscription: null, now, billingWaivedUntil: later }).canWrite).toBe(false);
+    expect(computeAccess({ orgStatus: 'closed', subscription: null, now, billingWaivedUntil: later }).state).toBe('closed');
+  });
+  it('does not change a healthy subscription', () => {
+    const a = computeAccess({ orgStatus: 'active', subscription: { status: 'active', currentPeriodEnd: null, trialEnd: null, cancelAtPeriodEnd: false }, now, billingWaivedUntil: later });
+    expect(a.notice).toBeNull();
+  });
+});

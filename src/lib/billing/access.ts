@@ -26,6 +26,8 @@ export interface AccessInput {
     pastDueSince?: Date | null;
   };
   now: Date;
+  /** End of a staff-granted billing waiver ("billing.exempt" override), if any. Mirrors private.billing_waived. */
+  billingWaivedUntil?: Date | null;
 }
 
 export interface Access {
@@ -54,11 +56,19 @@ function access(state: AccessState, notice: Access['notice'] = null, trialDaysLe
   };
 }
 
-export function computeAccess({ orgStatus, subscription: s, now }: AccessInput): Access {
+export function computeAccess(input: AccessInput): Access {
+  const { orgStatus, now, billingWaivedUntil } = input;
   if (orgStatus === 'closed') return access('closed', { tone: 'danger', message: 'This account is closed.' });
   if (orgStatus === 'suspended') {
     return access('suspended', { tone: 'danger', message: 'This account is suspended. Contact support to restore access. You can still export your data.' });
   }
+  const billed = billingAccess(input);
+  if (billed.canWrite || !billingWaivedUntil || billingWaivedUntil.getTime() <= now.getTime()) return billed;
+  const until = billingWaivedUntil.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
+  return access('full', { tone: 'info', message: `Billing is waived by RetailNexa support until ${until}.` });
+}
+
+function billingAccess({ subscription: s, now }: AccessInput): Access {
   if (!s) return access('billing_only', { tone: 'info', message: 'Add a payment method to start your free trial.' });
 
   switch (s.status) {

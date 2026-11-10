@@ -6,6 +6,7 @@ import { formatMoney } from '@/lib/billing/plans';
 import { todayIn } from '@/lib/time';
 import { fmtDate } from '../bills/format';
 import { KIND_LABEL, MovementForm, type Kind } from './movement-form';
+import { ReadOnlyNotice } from '../read-only-notice';
 
 export const metadata: Metadata = { title: 'Deposits & payments' };
 
@@ -25,6 +26,7 @@ export default async function DepositsPage() {
   return (
     <>
       <PageHeader title="Deposits & payments" description="Money moving between the store, the bank, the state and the owner. Each entry posts to the books with the right rule." />
+      <ReadOnlyNotice show={(full || can(ctx, 'cash.create')) && !ctx.access.canWrite} />
       {canRecord && (
         <Card><MovementForm kinds={kinds} today={todayIn(orgRow?.timezone)} formKey={randomUUID()} /></Card>
       )}

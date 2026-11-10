@@ -97,7 +97,7 @@ export default async function BillingPage({ searchParams }: PageProps<'/app/bill
       {manage && !live && (
         <Card>
           <h2 className="mb-4 text-xl font-bold">{sub ? 'Reactivate your account' : 'Choose your plan'}</h2>
-          <PlanPicker defaults={defaults} trialEligible={trialEligible} />
+          <PlanPicker defaults={defaults} trialEligible={trialEligible} paymentsReady={isStripeConfigured()} />
         </Card>
       )}
       {!manage && !live && <Notice tone="info">An owner needs to choose a plan before the team can use RetailNexa.</Notice>}

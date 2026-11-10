@@ -3,6 +3,7 @@ import { can, getOrgContext, getSupabase } from '@/lib/auth/context';
 import { Card, Input, Notice, PageHeader, buttonClass } from '@/components/ui';
 import { formatMoney } from '@/lib/billing/plans';
 import { computeProfit } from '@/lib/finance/metrics';
+import { todayIn } from '@/lib/time';
 import { AccountingTabs, TYPE_LABEL, TYPE_ORDER } from '../nav';
 
 export const metadata: Metadata = { title: 'Trial balance' };
@@ -13,8 +14,9 @@ export default async function TrialBalancePage({ searchParams }: PageProps<'/app
   const ctx = await getOrgContext();
   if (!can(ctx, 'accounting.view')) return <Notice tone="warning">Only owners, admins and accountants can see the books.</Notice>;
   const sp = await searchParams;
-  const asOf = typeof sp.as_of === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(sp.as_of) ? sp.as_of : new Date().toISOString().slice(0, 10);
   const supabase = await getSupabase();
+  const { data: orgRow } = await supabase.from('organizations').select('timezone').eq('id', ctx.org.id).maybeSingle();
+  const asOf = typeof sp.as_of === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(sp.as_of) ? sp.as_of : todayIn(orgRow?.timezone);
   const { data, error } = await supabase.rpc('trial_balance', { p_org: ctx.org.id, p_as_of: asOf });
   if (error) return <Notice tone="danger">The trial balance couldn’t be loaded. Try again.</Notice>;
   const rows = ((data ?? []) as Row[]).map((r) => ({ ...r, debit_cents: Number(r.debit_cents), credit_cents: Number(r.credit_cents), balance_cents: Number(r.balance_cents) }));

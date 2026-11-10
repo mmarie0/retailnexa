@@ -6,6 +6,7 @@ import { SubmitButton } from '@/components/submit-button';
 import { formatMoney } from '@/lib/billing/plans';
 import { fmtDate } from '../bills/format';
 import { voidSalesDay } from './actions';
+import { ReadOnlyNotice } from '../read-only-notice';
 
 export const metadata: Metadata = { title: 'Sales' };
 
@@ -32,6 +33,7 @@ export default async function SalesPage() {
     <>
       <PageHeader title="Sales" description="End-of-day totals by register. Net sales exclude sales tax."
         actions={canAdd ? <LinkButton href="/app/sales/import">Add sales</LinkButton> : undefined} />
+      <ReadOnlyNotice show={can(ctx, 'sales.import') && !ctx.access.canWrite} />
       {days.length === 0 ? (
         <EmptyState title="No sales recorded yet">{canAdd ? 'Import your POS daily report or enter a day by hand.' : null}</EmptyState>
       ) : [...byDate.entries()].map(([date, rows]) => {
