@@ -21,15 +21,35 @@ const LOCATION_SHARE: Record<string, number> = { all: 1, 'Harbor Street': 0.58, 
 
 const TABS = ['Dashboard', 'Vendors', 'Bills & invoices', 'Inventory', 'Wholesale order'] as const;
 type Tab = (typeof TABS)[number];
+type Account = 'retail' | 'wholesale';
+/** Inventory and price-increase alerts are wholesale features; retail accounts don't have them. */
+const TABS_FOR: Record<Account, readonly Tab[]> = {
+  retail: ['Dashboard', 'Vendors', 'Bills & invoices'],
+  wholesale: TABS,
+};
 
 export function DemoApp({ anchor }: { anchor: string }) {
+  const [account, setAccount] = useState<Account>('retail');
   const [tab, setTab] = useState<Tab>('Dashboard');
+  const tabs = TABS_FOR[account];
+  const pick = (a: Account) => { setAccount(a); if (!TABS_FOR[a].includes(tab)) setTab('Dashboard'); };
   return (
     <div className="rounded-[22px] border border-line bg-paper p-3 sm:p-5">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <span className="text-sm font-semibold text-muted" id="demo-account">Account type</span>
+        <div role="radiogroup" aria-labelledby="demo-account" className="inline-flex rounded-full bg-soft p-1">
+          {(['retail', 'wholesale'] as const).map((a) => (
+            <button key={a} type="button" role="radio" aria-checked={account === a} onClick={() => pick(a)}
+              className={cx('rounded-full px-4 py-1.5 text-sm font-semibold', account === a ? 'bg-accent text-white' : 'text-muted hover:text-ink')}>
+              {a === 'retail' ? 'Retail store' : 'Wholesale'}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="font-bold">{DEMO_BUSINESS.name} <span className="font-normal text-muted">— fictional sample data</span></p>
+        <p className="font-bold">{DEMO_BUSINESS.name} <span className="font-normal text-muted">— fictional sample {account === 'retail' ? 'retail' : 'wholesale'} data</span></p>
         <div role="tablist" aria-label="Demo sections" className="flex gap-1 overflow-x-auto rounded-full bg-soft p-1">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button
               key={t}
               role="tab"
@@ -43,11 +63,11 @@ export function DemoApp({ anchor }: { anchor: string }) {
         </div>
       </div>
       <div role="tabpanel" aria-label={tab}>
-        {tab === 'Dashboard' && <Dashboard anchor={anchor} />}
-        {tab === 'Vendors' && <Vendors anchor={anchor} />}
+        {tab === 'Dashboard' && <Dashboard anchor={anchor} account={account} />}
+        {tab === 'Vendors' && <Vendors anchor={anchor} account={account} />}
         {tab === 'Bills & invoices' && <Invoices anchor={anchor} />}
-        {tab === 'Inventory' && <Inventory />}
-        {tab === 'Wholesale order' && <OrderBuilder />}
+        {account === 'wholesale' && tab === 'Inventory' && <Inventory />}
+        {account === 'wholesale' && tab === 'Wholesale order' && <OrderBuilder />}
       </div>
     </div>
   );
@@ -59,7 +79,7 @@ function compare(cur: number, prev: number, suffix: string) {
   return { text: `${p > 0 ? '+' : ''}${p}% ${suffix}`, direction: p > 0.05 ? 'up' : p < -0.05 ? 'down' : 'flat' } as const;
 }
 
-function Dashboard({ anchor }: { anchor: string }) {
+function Dashboard({ anchor, account }: { anchor: string; account: Account }) {
   const [location, setLocation] = useState<'all' | 'Harbor Street' | 'Westgate Plaza'>('all');
   const [day, setDay] = useState<'today' | 'yesterday'>('today');
   const share = LOCATION_SHARE[location];
@@ -77,6 +97,9 @@ function Dashboard({ anchor }: { anchor: string }) {
   const mtd = sumRange(sales, monthStart, anchor);
   const mtdPrev = sumRange(sales, comparableDate(monthStart), comparableDate(anchor));
   const projection = projectMonthEnd(sales, anchor);
+  const lastMonthEnd = addDays(monthStart, -1);
+  const lastMonth = sumRange(sales, `${lastMonthEnd.slice(0, 8)}01`, lastMonthEnd);
+  const lastMonthName = new Date(`${lastMonthEnd}T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long' });
 
   const daysElapsed = Number(anchor.slice(8, 10));
   const daysInMonth = new Date(Date.UTC(Number(anchor.slice(0, 4)), Number(anchor.slice(5, 7)), 0)).getUTCDate();
@@ -116,9 +139,12 @@ function Dashboard({ anchor }: { anchor: string }) {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <KpiTile label="Transactions" value={String(f.transactions)} comparison={fPrev ? compare(f.transactions, fPrev.transactions, 'vs last year') : null} />
-        <KpiTile label="Average sale" value={money(averageTicketCents(f.salesCents, f.transactions) ?? 0)} />
-        <KpiTile label="Inventory value (at cost)" value={money(inventoryValue)} footnote={`Vendor balances owed: ${money(vendorBalance)}`} />
+        {/* RetailNexa isn't a POS: transactions and average sale come from the monthly sales report the store uploads at month end. */}
+        <KpiTile label={`${lastMonthName} report: transactions`} value={lastMonth.transactions.toLocaleString('en-US')} footnote="From the monthly sales report you upload at month end" />
+        <KpiTile label={`${lastMonthName} report: average sale`} value={money(averageTicketCents(lastMonth.salesCents, lastMonth.transactions) ?? 0)} footnote={`${money(lastMonth.salesCents)} in sales that month`} />
+        {account === 'wholesale'
+          ? <KpiTile label="Inventory value (at cost)" value={money(inventoryValue)} footnote={`Vendor balances owed: ${money(vendorBalance)}`} />
+          : <KpiTile label="Vendor balances owed" value={money(vendorBalance)} footnote={`${DEMO_VENDORS.length} vendors`} />}
       </div>
 
       <Card>
@@ -151,7 +177,7 @@ function Dashboard({ anchor }: { anchor: string }) {
   );
 }
 
-function Vendors({ anchor }: { anchor: string }) {
+function Vendors({ anchor, account }: { anchor: string; account: Account }) {
   const [selected, setSelected] = useState(DEMO_VENDORS[0].id);
   const v = DEMO_VENDORS.find((x) => x.id === selected)!;
   const invoices = demoInvoices(anchor).filter((i) => i.vendorId === v.id);
@@ -185,7 +211,7 @@ function Vendors({ anchor }: { anchor: string }) {
           <div className="mt-1 flex flex-wrap gap-1.5">{v.aliases.map((a) => <Badge key={a}>{a}</Badge>)}</div>
         </div>
         <p className="text-[15px]">{v.terms} · {v.contact.name} · {v.contact.phone}</p>
-        {v.priceAlerts.length > 0 && (
+        {account === 'wholesale' && v.priceAlerts.length > 0 && (
           <div className="rounded-xl bg-soon-soft p-3 text-soon">
             <p className="font-semibold">Price increase flagged</p>
             {v.priceAlerts.map((p) => (

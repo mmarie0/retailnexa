@@ -149,7 +149,7 @@ export default async function OverviewPage() {
       )}
       <Card>
         <h2 className="text-lg font-bold">What’s next for RetailNexa</h2>
-        <p className="mt-1 text-muted">Sales, bills and vendors (including recurring bills), bank reconciliation and bookkeeping (including cash flow) are live. Inventory and cost of goods and wholesale arrive in the next releases and will appear in the menu when they’re available to you.</p>
+        <p className="mt-1 text-muted">Sales, bills and vendors (including recurring bills), bank reconciliation and bookkeeping (including cash flow) are live. Monthly sales reports (transactions, average sale) and staff tools come next; inventory is part of wholesale accounts.</p>
       </Card>
     </>
   );
