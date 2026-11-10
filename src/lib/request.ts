@@ -2,6 +2,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { headers } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { supabaseSecretKeyOrNull } from '@/lib/env';
 
 /**
  * Hashed client IP for rate limiting. Only platform-set headers are trusted:
@@ -28,7 +29,7 @@ export function emailKey(email: string) {
  * unavailable, because Supabase Auth applies its own limits as a backstop.
  */
 export async function rateLimit(bucket: string, max: number, windowSeconds: number): Promise<boolean> {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return true;
+  if (!supabaseSecretKeyOrNull()) return true;
   try {
     const { data, error } = await createAdminClient().rpc('check_rate_limit', { p_bucket: bucket, p_max: max, p_window_seconds: windowSeconds });
     if (error) throw error;
