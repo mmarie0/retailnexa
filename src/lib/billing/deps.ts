@@ -2,7 +2,7 @@ import 'server-only';
 import { getStripe } from './stripe';
 import { stripeEnv } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { WebhookDeps } from './webhook';
+import type { ClaimState, WebhookDeps } from './webhook';
 
 /** Production wiring of the webhook/sync dependencies (Stripe API + service-role DB). */
 export function liveWebhookDeps(): WebhookDeps {
@@ -17,7 +17,7 @@ export function liveWebhookDeps(): WebhookDeps {
     now: () => new Date(),
     retrieveSubscription: (id) => stripe.subscriptions.retrieve(id),
     claimEvent: async (id, type, createdAt) =>
-      must(await db.rpc('claim_stripe_event', { p_id: id, p_type: type, p_created: createdAt.toISOString() })) as boolean,
+      must(await db.rpc('claim_stripe_event_state', { p_id: id, p_type: type, p_created: createdAt.toISOString() })) as ClaimState,
     finishEvent: async (id, status, error) => {
       must(await db.rpc('finish_stripe_event', { p_id: id, p_status: status, p_error: error ?? null }));
     },

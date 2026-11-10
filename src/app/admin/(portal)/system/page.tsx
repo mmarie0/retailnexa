@@ -7,6 +7,8 @@ export const metadata: Metadata = { title: 'System health' };
 
 export default async function SystemPage() {
   const { supabase } = await getAdminContext();
+  const { data: dupes } = await supabase.from('audit_logs').select('id, organization_id, target_id, metadata, created_at')
+    .eq('action', 'billing.second_live_subscription').order('created_at', { ascending: false }).limit(50);
   const { data: failed } = await supabase.from('stripe_events').select('id, type, attempts, last_error, received_at').in('status', ['failed', 'processing']).order('received_at', { ascending: false }).limit(50);
   const checks = [
     ['Supabase (database and sign-in)', isSupabaseConfigured()],
@@ -29,6 +31,18 @@ export default async function SystemPage() {
           </ul>
         )}
         <p className="mt-3 text-sm text-muted">Stripe retries failed deliveries automatically for up to 3 days, and the daily reconcile job re-syncs every subscription.</p>
+      </Card>
+      <Card>
+        <h2 className="mb-2 font-bold">Duplicate subscriptions</h2>
+        {(dupes ?? []).length === 0 ? <p className="text-muted">None. Every business has at most one live subscription.</p> : (
+          <ul className="divide-y divide-line text-sm">
+            {(dupes ?? []).map((d) => {
+              const m = (d.metadata ?? {}) as { kept?: string; duplicate?: string };
+              return <li key={d.id} className="py-2">Business {d.organization_id} · kept <strong>{m.kept}</strong>, duplicate <strong>{m.duplicate}</strong> · {new Date(d.created_at).toLocaleString()}</li>;
+            })}
+          </ul>
+        )}
+        <p className="mt-3 text-sm text-muted">Cancel and refund the duplicate in Stripe. The app keeps following the first subscription.</p>
       </Card>
     </>
   );

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { getStripe } from '@/lib/billing/stripe';
 import { liveWebhookDeps } from '@/lib/billing/deps';
-import { handleStripeEvent } from '@/lib/billing/webhook';
+import { handleStripeEvent, webhookHttpStatus } from '@/lib/billing/webhook';
 import { isStripeConfigured, isSupabaseConfigured, stripeEnv } from '@/lib/env';
 
 export const runtime = 'nodejs';
@@ -24,7 +24,8 @@ export async function POST(request: Request) {
 
   try {
     const result = await handleStripeEvent(event, liveWebhookDeps());
-    return NextResponse.json({ received: true, ...result });
+    // In flight elsewhere: a non-2xx makes Stripe redeliver later, in case that attempt dies.
+    return NextResponse.json({ received: true, ...result }, { status: webhookHttpStatus(result) });
   } catch (err) {
     console.error('[stripe webhook] processing failed', event.id, event.type, err);
     // 500 makes Stripe retry; the event is marked failed so the retry is re-processed.

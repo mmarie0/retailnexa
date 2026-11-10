@@ -8,7 +8,8 @@ type Stage =
   | { kind: 'loading' }
   | { kind: 'enroll'; factorId: string; qr: string; secret: string }
   | { kind: 'verify'; factorId: string }
-  | { kind: 'enrolled' }
+  | { kind: 'enrolled'; justNow?: boolean }
+  | { kind: 'verified' }
   | { kind: 'error'; message: string };
 
 /**
@@ -46,14 +47,22 @@ export function MfaClient({ mode, returnTo }: { mode: 'enroll' | 'verify'; retur
     setError(null);
     const supabase = createBrowserSupabase();
     const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: stage.factorId, code: code.replace(/\s/g, '') });
+    if (error) {
+      setBusy(false);
+      return setError('That code didn’t work. Codes change every 30 seconds — try the current one.');
+    }
+    // Leave the form so a second submit can't start another challenge (#70).
+    setStage(stage.kind === 'enroll' ? { kind: 'enrolled', justNow: true } : { kind: 'verified' });
     setBusy(false);
-    if (error) return setError('That code didn’t work. Codes change every 30 seconds — try the current one.');
     router.replace(returnTo);
     router.refresh();
   }
 
   if (stage.kind === 'loading') return <p className="text-muted">Loading…</p>;
-  if (stage.kind === 'enrolled') return <Notice tone="good">Two-factor authentication is on for this account.</Notice>;
+  if (stage.kind === 'enrolled') {
+    return <Notice tone="good">{stage.justNow ? 'Done. ' : ''}Two-factor authentication is on for this account.{stage.justNow ? ' You’ll be asked for a code from your authenticator app when you open admin pages.' : ''}</Notice>;
+  }
+  if (stage.kind === 'verified') return <Notice tone="good">Verified. Opening…</Notice>;
   if (stage.kind === 'error') return <Notice tone="danger">{stage.message}</Notice>;
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">

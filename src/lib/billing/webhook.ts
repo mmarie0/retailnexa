@@ -6,8 +6,9 @@ import { productsFromPrices, type PriceIds } from './plans';
  * it can be unit-tested with fakes.
  *
  * Design:
- *  - Idempotent: every event id is claimed in stripe_events first; duplicates
- *    are acknowledged without reprocessing. Failed events can be retried.
+ *  - Idempotent: every event id is claimed in stripe_events first; finished
+ *    duplicates are acknowledged without reprocessing, in-flight ones get a
+ *    retryable answer, failed or stalled ones are re-processed.
  *  - Order-independent: we never trust the (possibly stale) object embedded in
  *    the event. We re-fetch the subscription from Stripe and mirror it.
  *  - Tenant-safe: subscriptions are mapped to organizations through our own
@@ -19,7 +20,8 @@ export interface WebhookDeps {
   prices: PriceIds;
   now(): Date;
   retrieveSubscription(id: string): Promise<Stripe.Subscription>;
-  claimEvent(id: string, type: string, createdAt: Date): Promise<boolean>;
+  /** claimed = process it now; done = already processed/ignored; in_flight = another attempt holds a fresh lock. */
+  claimEvent(id: string, type: string, createdAt: Date): Promise<ClaimState>;
   finishEvent(id: string, status: 'processed' | 'ignored' | 'failed', error?: string): Promise<void>;
   findOrgByCustomer(customerId: string): Promise<string | null>;
   orgExists(orgId: string): Promise<boolean>;
@@ -28,6 +30,8 @@ export interface WebhookDeps {
   syncSubscription(orgId: string, payload: SubscriptionPayload, eventId: string | null): Promise<string>;
   audit(orgId: string | null, action: string, metadata: Record<string, unknown>): Promise<void>;
 }
+
+export type ClaimState = 'claimed' | 'done' | 'in_flight';
 
 export interface SubscriptionPayload {
   stripe_subscription_id: string;
@@ -104,11 +108,19 @@ export async function syncFromStripe(deps: WebhookDeps, subscriptionId: string, 
   return { outcome: 'processed' as const, detail: result, org };
 }
 
-export type HandleResult = { outcome: 'processed' | 'ignored' | 'duplicate'; detail?: string };
+export type HandleResult = { outcome: 'processed' | 'ignored' | 'duplicate' | 'in_flight'; detail?: string };
+
+/** HTTP status for a handled event: in-flight deliveries get 409 so Stripe redelivers (#12). */
+export function webhookHttpStatus(r: HandleResult): 200 | 409 {
+  return r.outcome === 'in_flight' ? 409 : 200;
+}
 
 export async function handleStripeEvent(event: Stripe.Event, deps: WebhookDeps): Promise<HandleResult> {
-  const claimed = await deps.claimEvent(event.id, event.type, new Date(event.created * 1000));
-  if (!claimed) return { outcome: 'duplicate' };
+  const claim = await deps.claimEvent(event.id, event.type, new Date(event.created * 1000));
+  if (claim === 'done') return { outcome: 'duplicate' };
+  // Another attempt is still working on it. Don't acknowledge: if that attempt dies,
+  // Stripe's retry must reach us (#12). The route answers 409.
+  if (claim === 'in_flight') return { outcome: 'in_flight' };
 
   try {
     const result = await dispatch(event, deps);

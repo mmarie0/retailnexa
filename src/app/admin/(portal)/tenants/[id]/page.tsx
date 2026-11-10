@@ -5,11 +5,13 @@ import { ActionForm } from '@/components/action-form';
 import { Badge, Card, Field, Input, PageHeader, Select } from '@/components/ui';
 import { SubmitButton } from '@/components/submit-button';
 import { ROLE_LABELS, isMemberRole } from '@/lib/auth/permissions';
+import { addDays, FEATURE_KEYS, WAIVER_DEFAULT_DAYS, WAIVER_MAX_DAYS } from '@/lib/billing/feature-keys';
 import { sendPasswordReset, setFeatureOverride, setOrgStatus } from '../../actions';
 
 export const metadata: Metadata = { title: 'Customer' };
 
 export default async function TenantPage({ params }: PageProps<'/admin/tenants/[id]'>) {
+  const today = new Date().toISOString().slice(0, 10);
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const ctx = await getAdminContext();
@@ -99,16 +101,18 @@ export default async function TenantPage({ params }: PageProps<'/admin/tenants/[
       {adminCan(ctx.role, 'entitlements') && (
         <Card>
           <h2 className="mb-1 font-bold">Feature entitlements</h2>
-          <p className="mb-3 text-sm text-muted">Plan products grant features automatically. Overrides here add or remove a feature for this account, optionally until a date.</p>
+          <p className="mb-3 text-sm text-muted">Plan products grant features automatically. Overrides here add or remove a feature for this account, optionally until a date (end of that day, UTC).</p>
           {(overrides.data ?? []).length > 0 && (
             <ul className="mb-3 text-[15px]">{(overrides.data ?? []).map((o) => <li key={o.feature}>{o.feature}: <strong>{o.enabled ? 'on' : 'off'}</strong> — {o.reason}{o.expires_at ? ` (until ${new Date(o.expires_at).toLocaleDateString()})` : ''}</li>)}</ul>
           )}
           <ActionForm action={setFeatureOverride} className="grid gap-3 sm:grid-cols-[1fr_auto_2fr_auto_auto] sm:items-end">
             <input type="hidden" name="org" value={id} />
-            <Field label="Feature" htmlFor="feature"><Input id="feature" name="feature" placeholder="wholesale" required /></Field>
+            <Field label="Feature" htmlFor="feature"><Select id="feature" name="feature" defaultValue="billing.exempt">{FEATURE_KEYS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}</Select></Field>
             <Field label="Set" htmlFor="value"><Select id="value" name="value"><option value="on">On</option><option value="off">Off</option><option value="clear">Remove override</option></Select></Field>
             <Field label="Reason" htmlFor="ov-reason"><Input id="ov-reason" name="reason" required minLength={3} /></Field>
-            <Field label="Until (optional)" htmlFor="expires"><Input id="expires" name="expires" type="date" /></Field>
+            <Field label="Until" htmlFor="expires" hint={`Required for a billing waiver (at most ${WAIVER_MAX_DAYS} days ahead). Clear it for other overrides with no end date.`}>
+              <Input id="expires" name="expires" type="date" min={today} defaultValue={addDays(today, WAIVER_DEFAULT_DAYS)} />
+            </Field>
             <SubmitButton variant="secondary" pendingText="Saving…">Save</SubmitButton>
           </ActionForm>
         </Card>

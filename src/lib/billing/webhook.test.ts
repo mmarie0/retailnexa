@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type Stripe from 'stripe';
-import { handleStripeEvent, subscriptionPayload, type WebhookDeps } from './webhook';
+import { handleStripeEvent, subscriptionPayload, webhookHttpStatus, type WebhookDeps } from './webhook';
 
 const prices = { retail: 'price_r', retailExtraLocation: 'price_rx', wholesale: 'price_w' };
 const NOW = new Date('2026-11-09T12:00:00Z');
@@ -39,7 +39,7 @@ function deps(over: Partial<WebhookDeps> = {}) {
     prices,
     now: () => NOW,
     retrieveSubscription: vi.fn(async () => subscription()),
-    claimEvent: vi.fn(async (id) => (claimed.has(id) ? false : (claimed.add(id), true))),
+    claimEvent: vi.fn(async (id) => (claimed.has(id) ? 'done' as const : (claimed.add(id), 'claimed' as const))),
     finishEvent: vi.fn(async () => {}),
     findOrgByCustomer: vi.fn(async (c) => (c === 'cus_1' ? 'org_A' : null)),
     orgExists: vi.fn(async () => true),
@@ -78,6 +78,16 @@ describe('handleStripeEvent', () => {
     const r = await handleStripeEvent(event('customer.subscription.updated', subscription()), d);
     expect(r.outcome).toBe('duplicate');
     expect(d.syncSubscription).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not acknowledge a delivery while another attempt is still processing it (#12)', async () => {
+    const d = deps({ claimEvent: vi.fn(async () => 'in_flight' as const) });
+    const r = await handleStripeEvent(event('customer.subscription.updated', subscription()), d);
+    expect(r.outcome).toBe('in_flight');
+    expect(d.syncSubscription).not.toHaveBeenCalled();
+    expect(d.finishEvent).not.toHaveBeenCalled();
+    expect(webhookHttpStatus(r)).toBe(409);
+    expect(webhookHttpStatus({ outcome: 'duplicate' })).toBe(200);
   });
 
   it('marks failures so Stripe retries can re-process', async () => {
