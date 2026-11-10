@@ -81,6 +81,10 @@ RPCs: `record_sales_day` (sales.import; tenders must equal gross − discounts +
 
 RPCs (writes need `accounting.post`): `import_bank_lines`, `bank_match_candidates` (bank.view), `match_bank_line`, `categorize_bank_line`, `ignore_bank_line`, `unmatch_bank_line`.
 
+## Recurring bills (migration `20261110001500`)
+
+`recurring_bills`: template (vendor, store, lines, `frequency` weekly/monthly/quarterly/yearly, `day_of_month`, `next_date`, optional `end_date`, `due_days`). `bills.recurring_bill_id` + `recurring_period` with a unique index make each period bill at most once. RPCs: `save_recurring_bill` (bills.create, location-scoped), `create_due_recurring_bills(org, through)` (draft bills for every due period up to the business-local today; ≤ 60 periods per template per run; ≤ 31 days ahead). Reads: `bills.view` + store scope.
+
 ## Key functions
 
 Authorization helpers (`private`, SECURITY DEFINER, `search_path=''`): `is_org_member`, `member_role`, `has_permission`, `is_platform_admin(roles[])` (requires `aal2` when `mfa_required`), `has_support_access`, `org_is_writable` (org active **and** subscription trialing/active or past_due ≤ 7 days), `shares_org_with`, `role_rank`.
