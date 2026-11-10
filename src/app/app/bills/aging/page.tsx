@@ -29,9 +29,9 @@ export default async function AgingPage({ searchParams }: PageProps<'/app/bills/
   for (const p of payments ?? []) {
     paysByBill.set(p.bill_id, [...(paysByBill.get(p.bill_id) ?? []), { paidOn: p.paid_on, amountCents: Number(p.amount_cents), voided: voidedPayments.has(p.id) }]);
   }
-  // A voided bill's reversal is posted on the later of its bill date and the (UTC) day it was voided.
+  // A voided bill's reversal is posted on the later of its bill date and the business-local day it was voided (#59).
   const voidedOn = (b: { bill_date: string; voided_at: string | null }) =>
-    b.voided_at ? [b.bill_date, b.voided_at.slice(0, 10)].sort()[1] : null;
+    b.voided_at ? [b.bill_date, todayIn(orgRow?.timezone, Date.parse(b.voided_at))].sort()[1] : null;
   const report = agingReport((bills ?? []).map((b) => ({
     vendorId: b.vendor_id, vendorName: names.get(b.vendor_id) ?? 'Vendor', dueDate: b.due_date,
     openCents: openAsOf({ billDate: b.bill_date, totalCents: Number(b.total_cents), posted: true,

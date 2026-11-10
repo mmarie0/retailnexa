@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { can, getOrgContext, getSupabase } from '@/lib/auth/context';
 import { ActionForm } from '@/components/action-form';
 import { Badge, Card, PageHeader, Select } from '@/components/ui';
+import { ReadOnlyNotice } from '../../read-only-notice';
 import { SubmitButton } from '@/components/submit-button';
 import { ALL_PERMISSIONS, PERMISSIONS, ROLE_DEFAULTS, ROLE_LABELS, assignableRoles, canManageMember, isMemberRole, type MemberRole } from '@/lib/auth/permissions';
 import { changeMemberRole, revokeInvitation, setMemberPermission, setMemberStatus } from '../actions';
@@ -31,6 +32,7 @@ export default async function TeamPage() {
   return (
     <>
       <PageHeader title="Team" description="Who can sign in to this business and what each person can see and do." />
+      <ReadOnlyNotice show={can(ctx, 'members.manage') && !ctx.access.canWrite} />
       <ul className="flex flex-col gap-3">
         {(members ?? []).map((m) => {
           const p = byId.get(m.user_id);

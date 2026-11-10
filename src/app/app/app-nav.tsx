@@ -15,7 +15,7 @@ export function AppNav({ items }: { items: NavItem[] }) {
       {items.map((i) => (
         <li key={i.href}>
           <Link href={i.href} onClick={() => setOpen(false)} aria-current={active(i.href) ? 'page' : undefined}
-            className={cx('block rounded-[10px] px-3 py-2 font-semibold', active(i.href) ? 'bg-card text-ink shadow-[var(--shadow-card)]' : 'text-muted hover:bg-card/60 hover:text-ink')}>
+            className={cx('block rounded-[10px] px-3 py-1.5 font-semibold', active(i.href) ? 'bg-card text-ink shadow-[var(--shadow-card)]' : 'text-muted hover:bg-card/60 hover:text-ink')}>
             {i.label}
           </Link>
         </li>
