@@ -35,7 +35,7 @@ export function planFromSheet(kind: ImportKind, rows: string[][], opts: { today:
   const cell = (r: string[], i: number | undefined) => (i === undefined ? '' : (r[i] ?? '').trim());
 
   if (kind === 'sales_day') {
-    const { days, errors: e } = rowsToSalesDays(rows, guessMapping(head), 2, { timeZone: opts.timeZone });
+    const { days, errors: e } = rowsToSalesDays(body, guessMapping(head), 2, { timeZone: opts.timeZone });
     return {
       rows: days.map((d) => ({ key: `${d.businessDate}|${d.register}`, date: d.businessDate, register: d.register, gross_sales_cents: d.grossCents,
         discounts_cents: d.discountsCents, sales_tax_cents: d.taxCents, cash_cents: d.cashCents, card_cents: d.cardCents,
@@ -44,7 +44,7 @@ export function planFromSheet(kind: ImportKind, rows: string[][], opts: { today:
     };
   }
   if (kind === 'bank_line') {
-    const { lines, errors: e } = rowsToBankLines(rows, guessBankMapping(head));
+    const { lines, errors: e } = rowsToBankLines(body, guessBankMapping(head));
     return { rows: lines.map((l) => ({ date: l.date, description: l.description, amount_cents: l.amountCents, occurrence: l.occurrence })), errors: e };
   }
 

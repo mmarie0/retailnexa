@@ -123,3 +123,54 @@ describe('Excel cells and dates (#129, #130)', () => {
     expect(back.worksheets[0].getRow(1).values).toEqual([undefined, 'Vendor', 'Amount']);
   });
 });
+
+describe('everything in one file (owner request)', () => {
+  it('one CSV with a Type column fills every kind', async () => {
+    const { planFromTables, TEMPLATE_CSV } = await import('./bundle');
+    const { parseCsv } = await import('@/lib/sales/csv');
+    const plan = planFromTables([{ name: 'all.csv', rows: parseCsv(TEMPLATE_CSV) }], { today: '2026-11-10' });
+    expect(plan.errors).toEqual([]);
+    expect(Object.fromEntries(Object.entries(plan.rows).map(([k, v]) => [k, v!.length]))).toEqual({ vendor: 1, bill: 1, recurring: 1, sales_day: 1, bank_line: 1 });
+    expect(plan.rows.bill![0]).toMatchObject({ vendor: 'Hair Zone', amount_cents: 193400, bill_date: '2026-10-01' });
+    expect(plan.rows.sales_day![0]).toMatchObject({ date: '2026-10-02', gross_sales_cents: 165000, cash_cents: 70000, card_cents: 106550 });
+    expect(plan.rows.bank_line![0]).toMatchObject({ amount_cents: -193400 });
+    expect(plan.rows.recurring![0]).toMatchObject({ name: 'Rent', amount_cents: 250000, day_of_month: 1 });
+  });
+
+  it('unknown types are reported; sheets without a Type column are told apart by name or header', async () => {
+    const { planFromTables, kindFromName, kindFromHeader } = await import('./bundle');
+    expect(kindFromName('exports/2026 Bank statement Oct.xlsx')).toBe('bank_line');
+    expect(kindFromName('fixed costs.csv')).toBe('recurring');
+    expect(kindFromName('Vendors.csv')).toBe('vendor');
+    expect(kindFromHeader(['Date', 'Register', 'Gross sales', 'Cash', 'Card'])).toBe('sales_day');
+    expect(kindFromHeader(['Vendor', 'Invoice #', 'Bill date', 'Amount'])).toBe('bill');
+    const plan = planFromTables([
+      { name: 'mixed.csv', rows: [['Type', 'Name'], ['Vendor', 'A'], ['Payroll', 'B']] },
+      { name: 'x.csv', rows: [['Foo', 'Bar'], ['1', '2']] },
+      { name: 'suppliers.csv', rows: [['Name', 'Phone'], ['Hair Zone', '555']] },
+    ], { today: '2026-11-10' });
+    expect(plan.errors.map((e) => e.message)).toEqual([
+      'mixed.csv: Type “Payroll” isn’t one of: Vendor, Bill, Sales, Bank, Fixed cost',
+      'x.csv: can’t tell what this sheet holds. Add a “Type” column, or name the file vendors, bills, sales, bank or fixed costs.',
+    ]);
+    expect(plan.rows.vendor!.map((r) => r.name)).toEqual(['A', 'Hair Zone']);
+  });
+
+  it('reads a zip of sheets and a backup, skipping other files and macOS junk', async () => {
+    const JSZip = (await import('jszip')).default;
+    const { readBundle } = await import('./read-bundle');
+    const zip = new JSZip();
+    zip.file('vendors.csv', 'Name,Phone\nHair Zone,555\n');
+    zip.file('sub/bills.xlsx', 'xlsx-bytes');
+    zip.file('backup.json', '{"bills":[]}');
+    zip.file('notes.pdf', 'pdf');
+    zip.file('__MACOSX/._vendors.csv', 'junk');
+    const buf = await zip.generateAsync({ type: 'arraybuffer' });
+    const file = { name: 'all.zip', size: buf.byteLength, arrayBuffer: async () => buf, text: async () => '' };
+    const r = await readBundle(file, async (name) => [['Vendor', 'Bill date', 'Amount'], [`from ${name}`, '2026-10-01', '5']]);
+    expect(r.tables.map((t) => t.name)).toEqual(['sub/bills.xlsx', 'vendors.csv']);
+    expect(r.tables[0].rows[1][0]).toBe('from sub/bills.xlsx');
+    expect(r.backups).toEqual([{ name: 'backup.json', data: { bills: [] } }]);
+    expect(r.skipped).toEqual(['notes.pdf']);
+  });
+});

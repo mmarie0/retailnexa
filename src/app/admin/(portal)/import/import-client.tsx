@@ -4,10 +4,13 @@ import { Badge, Button, Card, Field, Notice, Select } from '@/components/ui';
 import { parseCsv } from '@/lib/sales/csv';
 import { planFromBackup, type ImportKind, type Row } from '@/lib/import/backup';
 import { planFromSheet, SHEET_KINDS } from '@/lib/import/sheet';
+import { planFromTables, TEMPLATE_CSV } from '@/lib/import/bundle';
+import { readBundle } from '@/lib/import/read-bundle';
 import { importChunk, type ChunkResult } from './actions';
 
 type Source = 'retailnexa_backup' | 'csv';
-interface Prepared { source: Source; fileName: string; rows: Partial<Record<ImportKind, Row[]>>; warnings: string[]; notYet: { name: string; count: number; why: string }[]; rowErrors: { line: number; message: string }[] }
+type Mode = Source | 'bundle';
+interface Prepared { notes?: string[]; source: Source; fileName: string; rows: Partial<Record<ImportKind, Row[]>>; warnings: string[]; notYet: { name: string; count: number; why: string }[]; rowErrors: { line: number; message: string }[] }
 type Tally = Record<string, { imported: number; skipped: number; failed: number; errors: { row: number; key?: string; error: string }[]; message?: string }>;
 
 const ORDER: ImportKind[] = ['vendor', 'recurring', 'bill', 'sales_day', 'bank_line'];
@@ -15,9 +18,18 @@ const LABEL: Record<ImportKind, string> = { vendor: 'Vendors', recurring: 'Fixed
 const CHUNK = 200;
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 
+/** Excel is read by the server route (size and zip-bomb limits live there). */
+async function excelRows(name: string, data: Blob): Promise<string[][]> {
+  const fd = new FormData(); fd.set('file', new File([data], name.split('/').pop() || 'sheet.xlsx'));
+  const res = await fetch('/admin/import/xlsx', { method: 'POST', body: fd });
+  const r = (await res.json().catch(() => ({ ok: false }))) as { ok: boolean; rows?: string[][]; message?: string };
+  if (!r.ok || !r.rows) throw new Error(`${name}: ${r.message ?? 'couldn’t be read'}`);
+  return r.rows;
+}
+
 export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] }) {
   const [org, setOrg] = useState(orgs[0]?.id ?? '');
-  const [source, setSource] = useState<Source>('retailnexa_backup');
+  const [source, setSource] = useState<Mode>('bundle');
   const [kind, setKind] = useState<ImportKind>('bill');
   const [file, setFile] = useState<File | null>(null);
   const [prep, setPrep] = useState<Prepared | null>(null);
@@ -32,17 +44,29 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
   async function prepare(): Promise<Prepared | null> {
     if (!file) { setErr('Choose a file.'); return null; }
     try {
+      if (source === 'bundle') {
+        // Everything in one file: a .zip of sheets and/or the old app's backup, or one sheet with a Type column.
+        const read = await readBundle(file, excelRows);
+        const plan = planFromTables(read.tables, { today: today() });
+        const rows: Prepared['rows'] = { ...plan.rows };
+        const warnings: string[] = [], notYet: Prepared['notYet'] = [];
+        for (const b of read.backups) {
+          const bp = planFromBackup(b.data, { today: today() });
+          for (const k of ORDER) if (bp.rows[k]?.length) rows[k] = [...(rows[k] ?? []), ...bp.rows[k]!];
+          warnings.push(...bp.warnings.map((w) => `${b.name}: ${w}`)); notYet.push(...bp.notYet);
+        }
+        if (read.skipped.length) warnings.push(`Skipped (not CSV, Excel or JSON): ${read.skipped.join(', ')}`);
+        if (!ORDER.some((k) => rows[k]?.length) && plan.errors.length === 0) { setErr('Nothing to import was found in that file.'); return null; }
+        return { source: read.backups.length && !read.tables.length ? 'retailnexa_backup' : 'csv', fileName: file.name, rows, warnings, notYet,
+          rowErrors: plan.errors, notes: [...plan.notes, ...read.backups.map((b) => `${b.name}: old app backup`)] };
+      }
       if (source === 'retailnexa_backup') {
         const plan = planFromBackup(JSON.parse(await file.text()), { today: today() });
         return { source, fileName: file.name, rows: plan.rows, warnings: plan.warnings, notYet: plan.notYet, rowErrors: [] };
       }
       let rows: string[][];
       if (/\.xlsx$/i.test(file.name)) {
-        const fd = new FormData(); fd.set('file', file);
-        const res = await fetch('/admin/import/xlsx', { method: 'POST', body: fd });
-        const r = (await res.json().catch(() => ({ ok: false }))) as { ok: boolean; rows?: string[][]; message?: string };
-        if (!r.ok || !r.rows) { setErr(r.message ?? 'That file couldn’t be read.'); return null; }
-        rows = r.rows;
+        rows = await excelRows(file.name, file);
       } else rows = parseCsv(await file.text());
       const plan = planFromSheet(kind, rows, { today: today() });
       return { source, fileName: file.name, rows: { [kind]: plan.rows }, warnings: [], notYet: [], rowErrors: plan.errors };
@@ -90,7 +114,8 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
           </Select>
         </Field>
         <Field label="What are you importing?" htmlFor="imp-src">
-          <Select id="imp-src" value={source} onChange={(e) => { setSource(e.target.value as Source); reset(); }}>
+          <Select id="imp-src" value={source} onChange={(e) => { setSource(e.target.value as Mode); reset(); }}>
+            <option value="bundle">Everything in one file (.zip, .csv or .xlsx)</option>
             <option value="retailnexa_backup">Old RetailNexa app backup (.json)</option>
             <option value="csv">Spreadsheet (.csv or .xlsx)</option>
           </Select>
@@ -102,18 +127,24 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
             </Select>
           </Field>
         )}
-        {(source === 'retailnexa_backup' || kind === 'sales_day') && (
+        {(source !== 'csv' || kind === 'sales_day') && (
           <Field label="Store for sales days" htmlFor="imp-store" hint="Type the store’s name exactly as it is in the business. Leave empty if the business has one store.">
             <input id="imp-store" value={store} maxLength={120} onChange={(e) => { setStore(e.target.value); reset(); }}
               className="w-full rounded-xl bg-soft px-3 py-2 text-[15px]" placeholder="Main store" />
           </Field>
         )}
-        <Field label="File" htmlFor="imp-file" hint={source === 'csv' ? 'One kind of record per sheet; the first row is the header.' : 'The backup downloaded from the old RetailNexa app.'}>
-          <input id="imp-file" type="file" accept={source === 'csv' ? '.csv,.txt,.xlsx' : '.json,application/json'} onChange={(e) => { setFile(e.target.files?.[0] ?? null); reset(); }}
+        <Field label="File" htmlFor="imp-file" hint={source === 'bundle'
+          ? 'A .zip with any mix of sheets (vendors, bills, sales, bank, fixed costs) and/or the old app backup, or one sheet with a “Type” column.'
+          : source === 'csv' ? 'One kind of record per sheet; the first row is the header.' : 'The backup downloaded from the old RetailNexa app.'}>
+          <input id="imp-file" type="file" accept={source === 'bundle' ? '.zip,.csv,.txt,.xlsx,.json' : source === 'csv' ? '.csv,.txt,.xlsx' : '.json,application/json'} onChange={(e) => { setFile(e.target.files?.[0] ?? null); reset(); }}
             className="w-full rounded-xl bg-soft px-3 py-2 text-sm" />
         </Field>
       </div>
 
+      {source === 'bundle' && (
+        <p className="text-sm text-muted">One sheet for everything: add a <b>Type</b> column (Vendor, Bill, Sales, Bank, Fixed cost) and the columns each type needs.{' '}
+          <a href={`data:text/csv;charset=utf-8,${encodeURIComponent(TEMPLATE_CSV)}`} download="retailnexa-import-template.csv" className="font-semibold text-accent-strong">Download a template</a></p>
+      )}
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="secondary" disabled={!!busy || !file} onClick={() => run(true)}>Check (nothing is saved)</Button>
         <Button type="button" disabled={!!busy || !checked} onClick={() => { if (confirm(`Import into ${orgName}? Rows already imported are skipped.`)) void run(false); }}>Import into {orgName}</Button>
@@ -121,11 +152,12 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
       {busy && <p className="text-sm text-muted" role="status">{busy}</p>}
       {err && <Notice tone="danger">{err}</Notice>}
 
-      {prep && (prep.warnings.length > 0 || prep.notYet.length > 0 || prep.rowErrors.length > 0) && (
+      {prep && (prep.warnings.length > 0 || prep.notYet.length > 0 || prep.rowErrors.length > 0 || (prep.notes?.length ?? 0) > 0) && (
         <div className="flex flex-col gap-2 text-sm">
-          {prep.rowErrors.slice(0, 20).map((e) => <p key={e.line} className="text-late">Line {e.line}: {e.message}</p>)}
+          {prep.rowErrors.slice(0, 20).map((e, i) => <p key={i} className="text-late">Line {e.line}: {e.message}</p>)}
           {prep.rowErrors.length > 20 && <p className="text-muted">+ {prep.rowErrors.length - 20} more lines with problems</p>}
           {prep.warnings.map((w) => <p key={w} className="text-soon">{w}</p>)}
+          {prep.notes?.map((n) => <p key={n} className="text-muted">{n}</p>)}
           {prep.notYet.length > 0 && <p className="text-muted">Not imported yet: {prep.notYet.map((n) => `${n.count} ${n.why}`).join('; ')}.</p>}
         </div>
       )}
