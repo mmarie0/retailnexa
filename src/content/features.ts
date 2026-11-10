@@ -15,14 +15,14 @@ export interface Feature {
 export const RETAIL_FEATURES: Feature[] = [
   { title: 'Daily sales at a glance', body: 'Today, yesterday, the last 7 days and month to date, compared with the same weekdays last year. Import register reports from your POS as CSV or enter a day by hand.', status: 'available' },
   { title: 'Bills and vendors', body: 'Vendors with payment terms; bills entered by managers, approved by your accountant and paid in full or in parts; an aging report of what you owe.', status: 'available' },
-  { title: 'Vendor price history', body: 'Every vendor’s invoices and prices over time, with alerts when a price goes up.', status: 'in_development' },
-  { title: 'Inventory and labels (wholesale)', body: 'For wholesale accounts: products with SKUs, UPCs and variants. Receive stock, count shelves, print barcode labels and see what needs reordering.', status: 'in_development' },
-  { title: 'Register (POS)', body: 'Scan, search or tap shortcut buttons. Cash and card, returns, discounts and drawer counts.', status: 'in_development' },
+  { title: 'Monthly sales report', body: 'Upload your POS’s month-end report to keep transactions, average sale and monthly totals. RetailNexa works with the POS you already have; it isn’t a register.', status: 'in_development' },
   { title: 'Staff, schedules and tasks', body: 'Shifts, time clock, timesheets and payroll prep. Assign tasks with photo proof and manager sign-off.', status: 'in_development' },
   { title: 'Multiple stores', body: 'Run several locations under one account and see them separately or combined.', status: 'available' },
 ];
 
 export const WHOLESALE_FEATURES: Feature[] = [
+  { title: 'Inventory and labels', body: 'Products with SKUs, UPCs and variants. Receive stock, count shelves, print barcode labels, see inventory value at cost and what needs reordering.', status: 'in_development' },
+  { title: 'Vendor price history', body: 'Every vendor’s invoices and prices over time, with alerts when a price goes up.', status: 'in_development' },
   { title: 'Catalog with case packs', body: 'Sell by piece, pack or case. Set minimums and increments such as 6, 12, 24 or 48 per item.', status: 'in_development' },
   { title: 'Customer pricing and credit', body: 'Price tiers, negotiated prices, payment terms, credit limits and statements for each customer.', status: 'in_development' },
   { title: 'Sales rep portal', body: 'Reps see their own customers and orders, place orders on the road and track commission.', status: 'in_development' },
