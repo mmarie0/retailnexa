@@ -31,6 +31,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Admin master import sends Excel files (≤4 MB) to a Server Action.
+  experimental: { serverActions: { bodySizeLimit: '5mb' } },
   turbopack: {
     rules: {
       '*.css': { loaders: ['@tailwindcss/turbopack'], as: '*.css' },
