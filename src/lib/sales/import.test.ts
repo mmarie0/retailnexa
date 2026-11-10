@@ -14,9 +14,16 @@ describe('parseCsv', () => {
 });
 
 describe('parseAmount / parseDate', () => {
-  it.each([['$1,234.56', 123456], ['(12.00)', -1200], ['-3', -300], ['', 0], ['7.5', 750], ['0.999', 99]])('%s', (s, c) =>
+  it.each([['$1,234.56', 123456], ['(12.00)', -1200], ['-3', -300], ['', 0], ['7.5', 750]])('%s', (s, c) =>
     expect(parseAmount(s)).toBe(c));
   it('rejects junk', () => { expect(parseAmount('abc')).toBeNull(); expect(parseAmount('1.2.3')).toBeNull(); });
+  it('never drops a third decimal (#27 L2)', () => {
+    expect(parseAmount('12.345')).toBeNull();
+    expect(parseAmount('0.999')).toBeNull();
+    expect(parseAmount('1.005')).toBeNull();
+    expect(parseAmount('12.500')).toBe(1250);
+    expect(parseAmount('3.10')).toBe(310);
+  });
   it.each([['2026-11-06', '2026-11-06'], ['11/6/2026', '2026-11-06'], ['11/06/26', '2026-11-06'], ['11/06/2026 11:59 PM', '2026-11-06']])('%s', (s, d) =>
     expect(parseDate(s)).toBe(d));
   it('rejects impossible dates', () => { expect(parseDate('02/30/2026')).toBeNull(); expect(parseDate('nope')).toBeNull(); });
