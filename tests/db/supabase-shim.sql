@@ -56,3 +56,38 @@ grant execute on function auth.jwt(), auth.uid(), auth.role() to anon, authentic
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+
+-- Supabase Storage (only what migrations and tests touch): buckets, objects with
+-- RLS on (like Supabase), and the storage.foldername() helper. The storage API
+-- itself isn't emulated: tests insert into storage.objects as the user, which is
+-- what the API does under that user's JWT.
+create schema if not exists storage;
+grant usage on schema storage to anon, authenticated, service_role;
+create table if not exists storage.buckets (
+  id text primary key,
+  name text not null unique,
+  owner uuid,
+  public boolean default false,
+  file_size_limit bigint,
+  allowed_mime_types text[],
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+create table if not exists storage.objects (
+  id uuid primary key default gen_random_uuid(),
+  bucket_id text references storage.buckets(id),
+  name text,
+  owner uuid,
+  owner_id text,
+  metadata jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique (bucket_id, name)
+);
+alter table storage.objects enable row level security;
+alter table storage.buckets enable row level security;
+grant all on storage.objects, storage.buckets to anon, authenticated, service_role;
+create or replace function storage.foldername(name text) returns text[] language sql immutable as $$
+  select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1]
+$$;
+grant execute on function storage.foldername(text) to anon, authenticated, service_role;

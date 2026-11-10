@@ -110,7 +110,8 @@ describe('RPC calls match database functions', () => {
 
 describe('table queries match database columns', () => {
   const chains = sources.flatMap(({ path, text }) =>
-    [...text.matchAll(/([A-Za-z_]+(?:\(\))?)\s*\.from\(\s*'([a-z_]+)'\s*\)/g)].map((m) => {
+    // `.storage.from('bucket')` is a Storage bucket, not a table.
+    [...text.matchAll(/([A-Za-z_]+(?:\(\))?)\s*\.from\(\s*'([a-z_]+)'\s*\)/g)].filter((m) => m[1] !== 'storage').map((m) => {
       const start = m.index! + m[0].length;
       // Service-role receivers bypass RLS and column grants; everything else runs as the signed-in user.
       const serviceRole = ['createAdminClient()', 'db', 'admin'].includes(m[1]);

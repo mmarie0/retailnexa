@@ -29,7 +29,7 @@ Checked against `main` @ `417f298` (after #127 and #132), plus the follow-up PR 
 | 2 | Staff: employees, schedule, payroll, paystubs, labor % | Missing | No staff tables or routes. Permission keys exist in `src/lib/auth/permissions.ts`. | #102 |
 | 3 | Sales history: monthly roll-up, multi-year, bulk import + add month, date-range lookup, year compare, CSV | Partial | `sales_days` + manual/CSV/Vela import + MTD vs last year + daily chart. `/app/sales` shows ≤120 rows with no date range. No store-card/points columns, no monthly roll-up or export. | #103 |
 | 4 | Profit partners: split %, distributions ledger, pay out, profit calculator, investor PDF, bulk import | Missing | No partner tables or routes. | #104 |
-| 5 | Invoices: upload to a private bucket, list by month with search, Needs review filter | Missing | Next PR: needs a private storage bucket and storage policies, which the test shim can't run yet. | #105 |
+| 5 | Invoices: upload to a private bucket, list by month with search, Needs review filter | Built | `/app/bills/invoices` (Bills → Invoices): photos (JPEG, PNG, WebP, HEIC) and PDFs up to 10 MB go straight from the browser to the private `invoices` bucket. The database only lets a user write to the path of their own pending upload; files open through 10-minute signed links that need invoices.view and access to the store. Listed by month, with search (vendor, invoice #, file name, note), a Needs review filter and count, review (vendor, #, date, amount, linked bill, note), and "Not an invoice" (hidden, file kept). Not copied: reading invoices with AI (AI is off), the live app's per-line items. | #105 |
 | 6 | Location balances between stores: owed to me / I owe, month-end check, mark collected, filters | Missing | No inter-store tables. | #106 |
 | 7 | Vendors page: search, sorts, next due / payment method / total spend per card, vendor calendar | Built | `/app/vendors`: You owe / Past due / Total spend tiles, search, sorts (Amount owed, Overdue first, Next due, Total spend, A–Z), per-card owed, past due or next due, payment method (`vendors.pay_method`), Orders/Bills setting (`vendors.kind`), total spend. Vendor calendar = "Calendar (.ics)": what's due for the next six months as a calendar file, as the live app's Calendar button does (`/app/vendors/calendar`). Not copied: bulk edit, merge and statement aliases. | #107 |
 | 8 | Overview: date filters, quick actions, projected profit, spend vs last year, 12-month trend, custom tiles | Partial | `src/lib/dashboard/summary.ts` covers today, yesterday, last 7 days, MTD vs last year, due in 7 days, overdue, gross profit $ and GP % (`app/page.tsx`). Missing everything else listed. | #108 |
@@ -69,7 +69,7 @@ Still open:
 - #30: leaked-password protection needs a paid plan.
 - #13, #14: repo visibility and branch protection.
 - #16: monitoring and backups.
-- Private upload buckets with signed URLs and type/size checks: none yet. They come with invoices (#105).
+- Private upload bucket with signed URLs and type/size checks: `invoices` (#105).
 - Kiosk PIN rate limits: no kiosk yet. They come with staff and time clock (#102 or later).
 - Not yet audited: that every SECURITY DEFINER function checks `auth.uid()` and the role before doing anything. All 107 set `search_path`.
 
