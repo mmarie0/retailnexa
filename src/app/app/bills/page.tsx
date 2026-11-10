@@ -4,6 +4,7 @@ import { can, getOrgContext, getSupabase } from '@/lib/auth/context';
 import { Badge, Card, EmptyState, LinkButton, Notice, PageHeader, cx } from '@/components/ui';
 import { formatMoney } from '@/lib/billing/plans';
 import { todayIn } from '@/lib/time';
+import { ReadOnlyNotice } from '../read-only-notice';
 import { STATUS_LABEL, STATUS_TONE, daysOverdue, fmtDate, type BillStatus } from './format';
 
 export const metadata: Metadata = { title: 'Bills' };
@@ -41,6 +42,7 @@ export default async function BillsPage({ searchParams }: PageProps<'/app/bills'
     <>
       <PageHeader title="Bills" description="Supplier bills: enter them as drafts, approve to post them to the books, then record payments."
         actions={<><LinkButton href="/app/bills/aging" variant="secondary">Aging</LinkButton>{canCreate && <LinkButton href="/app/bills/new">Enter a bill</LinkButton>}</>} />
+      <ReadOnlyNotice show={can(ctx, 'bills.create') && !ctx.access.canWrite} />
       {filter.key === 'open' && open.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2">
           <Card><p className="text-sm text-muted">Unpaid</p><p className="num text-2xl font-bold">{formatMoney(openTotal)}</p></Card>

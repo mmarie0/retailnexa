@@ -4,6 +4,7 @@ import { ActionForm } from '@/components/action-form';
 import { Badge, Card, EmptyState, Field, Input, Notice, PageHeader, Textarea } from '@/components/ui';
 import { SubmitButton } from '@/components/submit-button';
 import { createVendor, updateVendor } from '../bills/actions';
+import { ReadOnlyNotice } from '../read-only-notice';
 
 export const metadata: Metadata = { title: 'Vendors' };
 
@@ -40,8 +41,9 @@ export default async function VendorsPage() {
   return (
     <>
       <PageHeader title="Vendors" description="The suppliers you buy from. Vendors can be turned off but not deleted, so their bill history stays intact." />
+      <ReadOnlyNotice show={can(ctx, 'vendors.manage') && !ctx.access.canWrite} />
       {vendors.length === 0 ? (
-        <EmptyState title="No vendors yet">{editable ? 'Add your first supplier below.' : 'An owner or admin can add vendors.'}</EmptyState>
+        <EmptyState title="No vendors yet">{editable ? 'Add your first supplier below.' : can(ctx, 'vendors.manage') ? null : 'An owner or admin can add vendors.'}</EmptyState>
       ) : (
         <ul className="flex flex-col gap-3">
           {vendors.map((v) => (

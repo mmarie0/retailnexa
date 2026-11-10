@@ -87,7 +87,7 @@ export default async function OverviewPage() {
           <Card><DailySalesChart points={sales.daily} /></Card>
         </section>
       )}
-      {showSales && !sales && can(ctx, 'sales.import') && (
+      {showSales && !sales && can(ctx, 'sales.import') && ctx.access.canWrite && (
         <Card>
           <h2 className="text-lg font-bold">Bring in your sales</h2>
           <p className="mt-1 text-muted">Import your POS daily report or enter a day by hand to see sales here.</p>

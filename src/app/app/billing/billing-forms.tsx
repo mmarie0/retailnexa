@@ -6,7 +6,7 @@ import { SubmitButton } from '@/components/submit-button';
 import { formatMoney, monthlyTotalCents, normalizeSelection, PLANS, TRIAL_DAYS, MAX_EXTRA_LOCATIONS } from '@/lib/billing/plans';
 import { cancelSubscription, openPortal, resumeSubscription, startCheckout } from './actions';
 
-export function PlanPicker({ defaults, trialEligible }: { defaults: { retail: boolean; wholesale: boolean; locations: number }; trialEligible: boolean }) {
+export function PlanPicker({ defaults, trialEligible, paymentsReady = true }: { defaults: { retail: boolean; wholesale: boolean; locations: number }; trialEligible: boolean; paymentsReady?: boolean }) {
   const [state, action] = useActionState(startCheckout, initialActionState);
   const [retail, setRetail] = useState(defaults.retail);
   const [wholesale, setWholesale] = useState(defaults.wholesale);
@@ -45,7 +45,7 @@ export function PlanPicker({ defaults, trialEligible }: { defaults: { retail: bo
         </p>
       </div>
       <FormMessage state={state} />
-      <SubmitButton disabled={!retail && !wholesale} pendingText="Opening secure checkout…" className="self-start">
+      <SubmitButton disabled={!paymentsReady || (!retail && !wholesale)} pendingText="Opening secure checkout…" className="self-start">
         {trialEligible ? 'Add card and start free trial' : 'Continue to payment'}
       </SubmitButton>
       <p className="text-sm text-muted">Card details are entered on Stripe’s secure page and never reach RetailNexa.</p>

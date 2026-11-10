@@ -113,13 +113,14 @@ export const getOrgContext = cache(async (): Promise<OrgContext> => {
     : null;
 
   const now = new Date();
+  const waiver = (overrides.data ?? []).find((o) => o.feature === 'billing.exempt' && o.enabled);
   return {
     user: { id: user.id, email: user.email ?? '' },
     org,
     orgs,
     permissions: new Set(((perms.data as string[] | null) ?? []).filter(isPermission)),
     subscription,
-    access: computeAccess({ orgStatus: org.status, subscription, now }),
+    access: computeAccess({ orgStatus: org.status, subscription, now, billingWaivedUntil: toDate(waiver?.expires_at ?? null) }),
     entitlements: entitlements(
       subscription && ['trialing', 'active', 'past_due'].includes(subscription.status) ? subscription.products : [],
       (overrides.data ?? []).map((o) => ({ feature: o.feature, enabled: o.enabled, expiresAt: toDate(o.expires_at) })),

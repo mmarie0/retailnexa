@@ -12,11 +12,19 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code');
   const supabase = await createClient();
 
-  let error: unknown = null;
-  if (tokenHash && type) ({ error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash }));
-  else if (code) ({ error } = await supabase.auth.exchangeCodeForSession(code));
-  else error = new Error('missing token');
-
-  if (error) return NextResponse.redirect(`${origin}/login?error=link_expired`);
-  return NextResponse.redirect(`${origin}${next}`);
+  if (tokenHash && type) {
+    // Works from any browser or device (preferred email template form).
+    const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
+    if (error) return NextResponse.redirect(`${origin}/login?error=link_expired`);
+    return NextResponse.redirect(`${origin}${next}`);
+  }
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error) return NextResponse.redirect(`${origin}${next}`);
+    // A PKCE code only completes in the browser that started sign-up. Supabase has
+    // already confirmed the email by the time it redirects here, so opening the link
+    // elsewhere (the usual mail-app case) still confirmed the account: say so (#25).
+    return NextResponse.redirect(`${origin}/login?error=confirmed_elsewhere&next=${encodeURIComponent(next)}`);
+  }
+  return NextResponse.redirect(`${origin}/login?error=link_expired`);
 }
