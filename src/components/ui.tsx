@@ -8,16 +8,16 @@ export function cx(...parts: Array<string | false | null | undefined>) {
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 const variants: Record<Variant, string> = {
-  primary: 'bg-accent-strong text-white border-accent-strong hover:bg-indigo-2 hover:border-indigo-2',
+  primary: 'bg-accent text-white border-accent shadow-[0_6px_16px_rgba(91,127,245,.32)] hover:bg-accent-strong hover:border-accent-strong',
   secondary: 'bg-card text-ink border-line hover:border-accent',
   ghost: 'bg-transparent text-accent-strong border-transparent hover:bg-accent-soft',
   danger: 'bg-card text-late border-late-soft hover:bg-late-soft',
 };
 export const buttonClass = (variant: Variant = 'primary', size: 'sm' | 'md' | 'lg' = 'md') =>
   cx(
-    'inline-flex items-center justify-center gap-2 rounded-[10px] border font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
-    size === 'sm' && 'px-3 py-1.5 text-sm',
-    size === 'md' && 'px-4 py-2.5 text-[15px]',
+    'inline-flex items-center justify-center gap-1.5 rounded-xl border font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+    size === 'sm' && 'px-3 py-1.5 text-[13.5px]',
+    size === 'md' && 'px-3.5 py-[9px] text-[14px]',
     size === 'lg' && 'px-6 py-3.5 text-base',
     variants[variant],
   );
@@ -31,7 +31,7 @@ export function LinkButton({ variant = 'primary', size = 'md', className, ...res
 }
 
 export function Card({ className, ...rest }: ComponentProps<'div'>) {
-  return <div className={cx('rounded-[var(--radius-card)] border border-line bg-card p-5', className)} {...rest} />;
+  return <div className={cx('rounded-[18px] bg-card p-4 shadow-[var(--shadow-card)]', className)} {...rest} />;
 }
 
 export function Field({ label, htmlFor, hint, error, children }: { label: string; htmlFor: string; hint?: string; error?: string; children: ReactNode }) {
@@ -42,7 +42,7 @@ export function Field({ label, htmlFor, hint, error, children }: { label: string
     : children;
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={htmlFor} className="text-sm font-semibold">{label}</label>
+      <label htmlFor={htmlFor} className="text-[13px] font-medium text-muted">{label}</label>
       {control}
       {hint && !error && <p id={`${htmlFor}-hint`} className="text-sm text-muted">{hint}</p>}
       {error && <p id={`${htmlFor}-error`} className="text-sm text-late" role="alert">{error}</p>}
@@ -50,7 +50,7 @@ export function Field({ label, htmlFor, hint, error, children }: { label: string
   );
 }
 
-const inputBase = 'rounded-[10px] border border-line bg-card px-3 py-2.5 text-[15px] text-ink placeholder:text-muted/70 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft disabled:bg-soft';
+const inputBase = 'rounded-xl border border-transparent bg-soft px-[11px] py-2.5 text-base text-ink placeholder:text-muted/70 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft disabled:opacity-60';
 /** Full width unless the caller sets its own width (w-*, flex-1, max-w-*). */
 const widthDefault = (className?: string) => (/(^|\s)(w-|flex-1)/.test(className ?? '') ? null : 'w-full');
 
@@ -73,12 +73,12 @@ const tones: Record<Tone, string> = {
   danger: 'bg-late-soft text-late',
 };
 export function Badge({ tone = 'neutral', children }: { tone?: Tone; children: ReactNode }) {
-  return <span className={cx('inline-flex items-center rounded-full px-2.5 py-0.5 text-[13px] font-semibold', tones[tone])}>{children}</span>;
+  return <span className={cx('inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold', tones[tone])}>{children}</span>;
 }
 
 export function Notice({ tone = 'info', children, action }: { tone?: Exclude<Tone, 'neutral'>; children: ReactNode; action?: ReactNode }) {
   return (
-    <div role={tone === 'danger' ? 'alert' : 'status'} className={cx('flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3 text-[15px] font-medium', tones[tone])}>
+    <div role={tone === 'danger' ? 'alert' : 'status'} className={cx('flex flex-wrap items-center justify-between gap-3 rounded-2xl px-3.5 py-2.5 text-[14px] font-medium', tones[tone])}>
       <p>{children}</p>
       {action}
     </div>
@@ -89,8 +89,8 @@ export function PageHeader({ title, description, actions }: { title: string; des
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-[26px] font-bold leading-tight">{title}</h1>
-        {description && <p className="mt-1 max-w-2xl text-muted">{description}</p>}
+        <h1 className="text-[24px] font-extrabold leading-tight tracking-[-.02em]">{title}</h1>
+        {description && <p className="mt-1 max-w-2xl text-[13.5px] text-muted">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </div>
@@ -99,10 +99,10 @@ export function PageHeader({ title, description, actions }: { title: string; des
 
 export function EmptyState({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="rounded-[var(--radius-card)] border border-dashed border-line bg-card/60 px-6 py-10 text-center">
-      <p className="font-semibold">{title}</p>
-      {children && <div className="mx-auto mt-1 max-w-md text-muted">{children}</div>}
-      {action && <div className="mt-4">{action}</div>}
+    <div className="flex flex-col items-center gap-2.5 rounded-[18px] bg-card px-4 py-[22px] text-center text-muted shadow-[var(--shadow-card)]">
+      <p className="text-[17px] font-bold text-ink">{title}</p>
+      {children && <div className="mx-auto max-w-md">{children}</div>}
+      {action && <div className="mt-1">{action}</div>}
     </div>
   );
 }
@@ -110,7 +110,7 @@ export function EmptyState({ title, children, action }: { title: string; childre
 export function FormMessage({ state }: { state: { ok: boolean; message: string | null } }) {
   if (!state.message) return null;
   return (
-    <p role={state.ok ? 'status' : 'alert'} className={cx('rounded-lg px-3 py-2 text-sm font-medium', state.ok ? 'bg-paid-soft text-paid' : 'bg-late-soft text-late')}>
+    <p role={state.ok ? 'status' : 'alert'} className={cx('rounded-xl px-3 py-2 text-sm font-medium', state.ok ? 'bg-paid-soft text-paid' : 'bg-late-soft text-late')}>
       {state.message}
     </p>
   );
@@ -128,4 +128,14 @@ export function Logo({ className }: { className?: string }) {
       RetailNexa
     </span>
   );
+}
+
+/** Bold gradient block for headline numbers, as in the RetailNexa app. */
+export function Block({ tone = 'blue', className, ...rest }: ComponentProps<'div'> & { tone?: 'blue' | 'indigo' | 'lav' | 'coral' | 'sunset' }) {
+  return <div className={cx('blk', tone, 'rounded-[18px] p-4', className)} {...rest} />;
+}
+
+/** Small uppercase label used above numbers and sections. */
+export function Eyebrow({ className, ...rest }: ComponentProps<'span'>) {
+  return <span className={cx('text-[11px] font-semibold uppercase tracking-[.08em] text-muted', className)} {...rest} />;
 }

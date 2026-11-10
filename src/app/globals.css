@@ -45,7 +45,7 @@
   body {
     @apply bg-paper text-ink font-sans antialiased;
     font-size: 15px;
-    line-height: 1.5;
+    line-height: 1.45;
   }
   h1, h2, h3 {
     text-wrap: balance;
@@ -60,6 +60,19 @@
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
   }
+}
+
+/* Colour blocks for headline numbers (copied from the RetailNexa app). */
+@layer components {
+  .blk { color: #fff; box-shadow: 0 10px 24px rgba(70, 84, 160, 0.18); }
+  .blk .text-muted, .blk .eyebrow { color: rgba(255, 255, 255, 0.85) !important; }
+  .blk .delta, .blk .delta * { color: #fff !important; }
+  .blk.blue { background: linear-gradient(135deg, #7e99fa, #5b7ff5); }
+  .blk.indigo { background: linear-gradient(135deg, #4b489e, #38357f); }
+  .blk.lav { background: linear-gradient(135deg, #9ea2e6, #7f83d2); }
+  .blk.coral { background: linear-gradient(135deg, #ff9b91, #f57a72); }
+  .blk.sunset { background: linear-gradient(110deg, #5b7ff5, #9ea2e6 55%, #ff9b91); }
+  table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-muted); font-weight: 600; }
 }
 
 @media (prefers-reduced-motion: reduce) {
