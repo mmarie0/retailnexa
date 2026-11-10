@@ -1,5 +1,5 @@
 import { unstable_rethrow } from 'next/navigation';
-import { ConfigError } from '@/lib/env';
+import { ConfigError } from '@/lib/env-public';
 
 export type ActionState = { ok: boolean; message: string | null; fieldErrors?: Record<string, string>; data?: Record<string, string> };
 export const initialActionState: ActionState = { ok: false, message: null };

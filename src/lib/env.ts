@@ -1,17 +1,12 @@
-import { z } from 'zod';
+import 'server-only';
 
 /**
- * Environment access. Values are read lazily so that public marketing pages
- * build and render without any credentials. Each integration exposes an
- * `isXConfigured()` check; calling a getter for an unconfigured integration
- * throws a ConfigError naming the exact variable that is missing.
+ * Server-only environment access: secret keys, Stripe and cron settings, plus
+ * everything from the client-safe module. Importing this from a client
+ * component fails the build (#19); client code uses '@/lib/env-public'.
  */
-export class ConfigError extends Error {
-  constructor(public readonly missing: string[]) {
-    super(`Missing configuration: ${missing.join(', ')}. See docs/SETUP.md.`);
-    this.name = 'ConfigError';
-  }
-}
+export * from './env-public';
+import { ConfigError } from './env-public';
 
 function read(names: string[]) {
   const values: Record<string, string> = {};
@@ -24,38 +19,8 @@ function read(names: string[]) {
   return { values, missing };
 }
 
-export function siteUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-  return raw.replace(/\/$/, '');
-}
-
-/**
- * Supabase keys. Accepts the current names set by the Supabase ↔ Vercel
- * integration (publishable / secret keys) and the legacy names (anon /
- * service_role). NEXT_PUBLIC_* must be referenced literally so Next.js can
- * inline them into browser code.
- */
-export function supabaseUrl(): string | undefined {
-  return process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || undefined;
-}
-export function supabasePublishableKey(): string | undefined {
-  return process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || undefined;
-}
 export function supabaseSecretKeyOrNull(): string | null {
   return process.env.SUPABASE_SECRET_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || null;
-}
-
-export function isSupabaseConfigured() {
-  return !!supabaseUrl() && !!supabasePublishableKey();
-}
-
-export function supabasePublicEnv() {
-  const url = supabaseUrl();
-  const anonKey = supabasePublishableKey();
-  const missing = [...(url ? [] : ['NEXT_PUBLIC_SUPABASE_URL']), ...(anonKey ? [] : ['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'])];
-  if (missing.length) throw new ConfigError(missing);
-  z.string().url().parse(url);
-  return { url: url!, anonKey: anonKey! };
 }
 
 export function supabaseServiceKey(): string {
