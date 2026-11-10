@@ -77,28 +77,55 @@ export async function startCheckout(_p: ActionState, form: FormData): Promise<Ac
     const supabase = await getSupabase();
     const { data: used, error: orgErr } = await supabase.from('organizations').select('id').in('id', [...new Set([ctx.org.id, ...ownedIds])]).not('trial_consumed_at', 'is', null).limit(1);
     if (orgErr) throw orgErr;
-    const trial = (used ?? []).length === 0 && !ctx.subscription;
+    let trial = (used ?? []).length === 0 && !ctx.subscription;
+    let claimedTrial = false;
+    if (trial) {
+      // Claim the owner's one trial now, so a second business's Checkout started at the same time gets none (#17).
+      const { data: holder, error: claimErr } = await createAdminClient().rpc('claim_trial', { p_user: ctx.user.id, p_org: ctx.org.id });
+      if (claimErr) throw claimErr;
+      claimedTrial = holder === ctx.org.id;
+      if (!claimedTrial && form.get('skip_trial') !== 'on') {
+        // Don't silently charge on day one: say why there's no trial and let the owner choose (#73).
+        const other = ctx.orgs.find((o) => o.id === holder)?.name ?? 'another business';
+        return { ...fail(`Your free trial is reserved by a checkout started for ${other} in the last day. Finish that checkout, or pay now without the trial.`), data: { trialReserved: '1' } };
+      }
+      trial = claimedTrial;
+    }
 
-    const customer = await ensureCustomer(ctx.org.id, ctx.org.name, ctx.user.email);
-    const firstCharge = new Date(Date.now() + TRIAL_DAYS * 86_400_000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    const session = await guardedCheckout(checkoutGuardDeps(), ctx.org.id, customer, () => getStripe().checkout.sessions.create({
-      mode: 'subscription',
-      customer,
-      client_reference_id: ctx.org.id,
-      line_items: checkoutLineItems(sel, stripeEnv().prices),
-      payment_method_collection: 'always',
-      subscription_data: {
+    const releaseClaim = async () => {
+      if (!claimedTrial) return;
+      const { error } = await createAdminClient().rpc('release_trial_claim', { p_user: ctx.user.id, p_org: ctx.org.id });
+      if (error) console.error('[checkout] could not release trial claim', error.message);
+    };
+    let session: { url: string | null };
+    try {
+      const customer = await ensureCustomer(ctx.org.id, ctx.org.name, ctx.user.email);
+      const firstCharge = new Date(Date.now() + TRIAL_DAYS * 86_400_000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      session = await guardedCheckout(checkoutGuardDeps(), ctx.org.id, customer, () => getStripe().checkout.sessions.create({
+        mode: 'subscription',
+        customer,
+        client_reference_id: ctx.org.id,
+        line_items: checkoutLineItems(sel, stripeEnv().prices),
+        payment_method_collection: 'always',
+        subscription_data: {
+          metadata: { organization_id: ctx.org.id },
+          ...(trial ? { trial_period_days: TRIAL_DAYS, trial_settings: { end_behavior: { missing_payment_method: 'cancel' } } } : {}),
+        },
         metadata: { organization_id: ctx.org.id },
-        ...(trial ? { trial_period_days: TRIAL_DAYS, trial_settings: { end_behavior: { missing_payment_method: 'cancel' } } } : {}),
-      },
-      metadata: { organization_id: ctx.org.id },
-      customer_update: { address: 'auto', name: 'auto' },
-      billing_address_collection: 'auto',
-      allow_promotion_codes: true,
-      ...(trial ? { custom_text: { submit: { message: `You won’t be charged today. Your first payment of ${formatMoney(monthlyTotalCents(sel))} plus any applicable tax is on ${firstCharge} unless you cancel before then.` } } } : {}),
-      success_url: `${siteUrl()}/app/billing/return?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl()}/app/billing?checkout=canceled`,
-    }));
+        customer_update: { address: 'auto', name: 'auto' },
+        billing_address_collection: 'auto',
+        allow_promotion_codes: true,
+        ...(trial ? { custom_text: { submit: { message: `You won’t be charged today. Your first payment of ${formatMoney(monthlyTotalCents(sel))} plus any applicable tax is on ${firstCharge} unless you cancel before then.` } } } : {}),
+        success_url: `${siteUrl()}/app/billing/return?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${siteUrl()}/app/billing?checkout=canceled`,
+      }));
+    } catch (e) {
+      // This attempt never opened a Checkout, so its trial isn't spoken for (#73). A blocked
+      // attempt (another checkout in progress, or already subscribed) must not release a
+      // claim that may back a still-open session (#80); the database also refuses then.
+      if (!(e instanceof CheckoutBlockedError)) await releaseClaim();
+      throw e;
+    }
     await auditUser(ctx.org.id, ctx.user.id, trial ? 'billing.checkout_started_trial' : 'billing.checkout_started', { products: [sel.retail && 'retail', sel.wholesale && 'wholesale'].filter(Boolean), extra_locations: sel.extraLocations });
     url = session.url;
   } catch (e) {

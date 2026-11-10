@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { supabasePublishableKey, supabaseUrl } from '@/lib/env';
+import { supabasePublishableKey, supabaseUrl } from '@/lib/env-public';
 
 /**
  * Refreshes the Supabase session cookie on every matched request and performs

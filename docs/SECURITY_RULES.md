@@ -14,7 +14,7 @@ These rules are binding for every change, human or AI. A PR that breaks one is n
 
 ## Service role
 5. `SUPABASE_SECRET_KEY` (legacy name `SUPABASE_SERVICE_ROLE_KEY`) bypasses RLS. Allowed uses only: Stripe webhook and billing sync, scheduled jobs, public lead intake (after validation + rate limiting), linking a Stripe customer, and writing audit entries for actions already authorized. It is imported only via `src/lib/supabase/admin.ts` (`server-only`).
-6. Never expose secrets to the client. Only `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY`) and `NEXT_PUBLIC_SITE_URL` may be public.
+6. Never expose secrets to the client. Secret getters live in `src/lib/env.ts`, which starts with `import 'server-only'`, so importing it from client code fails the build; client code uses `src/lib/env-public.ts`. Without `SUPABASE_SECRET_KEY` the auth rate limiter logs an error on every call in production (and /admin/system shows the key as Missing) but still allows requests, so a misconfigured deploy can't lock everyone out of sign-in; Supabase Auth's own limits are the backstop. Only `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY`) and `NEXT_PUBLIC_SITE_URL` may be public.
 
 ## Roles and permissions
 7. Nobody changes their own role, status or permissions. Non-owners can only invite/assign roles strictly below their own and can only modify members below them. Every org keeps at least one active owner. Owners cannot be invited (only promoted). Permission overrides cannot grant what the granter lacks. All enforced in SQL and tested.
