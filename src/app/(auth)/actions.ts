@@ -24,7 +24,11 @@ const NOT_CONFIGURED = 'Sign-in isn’t available yet: the authentication servic
 export async function signIn(_p: ActionState, form: FormData): Promise<ActionState> {
   if (!isSupabaseConfigured()) return fail(NOT_CONFIGURED);
   const parsed = z.object({ email, password: z.string().min(1, 'Enter your password') }).safeParse(Object.fromEntries(form));
-  if (!parsed.success) return fail('Enter your email and password.');
+  if (!parsed.success) {
+    const fe: Record<string, string> = {};
+    for (const i of parsed.error.issues) fe[String(i.path[0])] ??= i.path[0] === 'email' ? 'Enter a valid email address' : i.message;
+    return fail('Check the highlighted fields.', fe);
+  }
   if (!(await allowed('signin', parsed.data.email, 30, 10, 600))) return fail(SLOW_DOWN);
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);

@@ -13,8 +13,9 @@ export interface Feature {
 }
 
 export const RETAIL_FEATURES: Feature[] = [
-  { title: 'Daily sales at a glance', body: 'Today, yesterday and month to date, compared with the same weekday last year. Import register reports from your POS as CSV.', status: 'in_development' },
-  { title: 'Bills and vendors', body: 'Every vendor’s balance, terms, invoices and price history in one profile. Match the names that show up on your bank statement.', status: 'in_development' },
+  { title: 'Daily sales at a glance', body: 'Today, yesterday, the last 7 days and month to date, compared with the same weekdays last year. Import register reports from your POS as CSV or enter a day by hand.', status: 'available' },
+  { title: 'Bills and vendors', body: 'Vendors with payment terms; bills entered by managers, approved by your accountant and paid in full or in parts; an aging report of what you owe.', status: 'available' },
+  { title: 'Vendor price history', body: 'Every vendor’s invoices and prices over time, with alerts when a price goes up.', status: 'in_development' },
   { title: 'Inventory and labels', body: 'Products with SKUs, UPCs and variants. Receive stock, count shelves, print barcode labels and see what needs reordering.', status: 'in_development' },
   { title: 'Register (POS)', body: 'Scan, search or tap shortcut buttons. Cash and card, returns, discounts and drawer counts.', status: 'in_development' },
   { title: 'Staff, schedules and tasks', body: 'Shifts, time clock, timesheets and payroll prep. Assign tasks with photo proof and manager sign-off.', status: 'in_development' },
@@ -31,9 +32,11 @@ export const WHOLESALE_FEATURES: Feature[] = [
 ];
 
 export const ACCOUNTING_FEATURES: Feature[] = [
-  { title: 'Double-entry ledger', body: 'Chart of accounts, journal entries and a trial balance that always balances.', status: 'in_development' },
-  { title: 'Real financial statements', body: 'Profit and loss, balance sheet and cash flow, on a cash or accrual basis.', status: 'in_development' },
-  { title: 'Payables and receivables', body: 'Partial payments, credit memos, refunds and aging reports.', status: 'in_development' },
+  { title: 'Double-entry ledger', body: 'Chart of accounts, journal entries and a trial balance that always balances. Posted entries can’t be edited, only reversed.', status: 'available' },
+  { title: 'Real financial statements', body: 'Profit and loss for any period and a balance sheet for any date (accrual basis), plus a sales tax summary.', status: 'available' },
+  { title: 'Cash flow and cash-basis reports', body: 'A cash flow statement and every report on a cash basis as well as accrual.', status: 'in_development' },
+  { title: 'Payables', body: 'Partial payments, an aging report by vendor, and deposits, tax payments and owner draws recorded with the right accounting.', status: 'available' },
+  { title: 'Receivables and credit memos', body: 'Customer invoices, credit memos, refunds and receivables aging.', status: 'in_development' },
   { title: 'Bank reconciliation', body: 'Import statements and match every line to a bill, deposit or transfer.', status: 'in_development' },
   { title: 'Accountant access', body: 'Invite your accountant with their own role. Every change is recorded in the audit log.', status: 'available' },
 ];
