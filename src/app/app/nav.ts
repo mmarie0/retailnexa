@@ -50,7 +50,7 @@ export const AREAS: NavArea[] = [
     pages: [
       { key: 'due', label: 'Due', href: '/app/bills', icon: 'bills', perm: 'bills.view', match: ['/app/bills/new', '/app/bills/list'] },
       { key: 'vendors', label: 'Vendors', href: '/app/vendors', icon: 'invoice', perm: 'vendors.view' },
-      { key: 'invoices', label: 'Invoices', icon: 'invoice' },
+      { key: 'invoices', label: 'Invoices', href: '/app/bills/invoices', icon: 'invoice', perm: 'invoices.view' },
       { key: 'more', label: 'More', href: '/app/bills/more', icon: 'doc', perm: 'bills.view',
         match: ['/app/bills/recurring', '/app/bills/reps', '/app/bills/aging', '/app/bank', '/app/deposits'] },
     ],

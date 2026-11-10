@@ -11,6 +11,7 @@ describe('app navigation (copied from the RetailNexa app)', () => {
     expect(locate('/app/bills/recurring')).toEqual({ area: 'bills', page: 'more' });
     expect(locate('/app/bills/list')).toEqual({ area: 'bills', page: 'due' });
     expect(locate('/app/bills/reps')).toEqual({ area: 'bills', page: 'more' });
+    expect(locate('/app/bills/invoices')).toEqual({ area: 'bills', page: 'invoices' });
     expect(locate('/app/bank')).toEqual({ area: 'bills', page: 'more' });
     expect(locate('/app/vendors')).toEqual({ area: 'bills', page: 'vendors' });
     expect(locate('/app/sales/import')).toEqual({ area: 'sales', page: 'daily' });
@@ -25,7 +26,7 @@ describe('app navigation (copied from the RetailNexa app)', () => {
     const cashier = (p: string) => ['sales.view', 'sales.import', 'cash.create'].includes(p);
     const areas = visibleAreas(cashier);
     expect(areas.filter((a) => a.bottom).map((a) => a.key)).toEqual(['home', 'bills', 'sales', 'staff', 'upkeep']);
-    expect(areas.find((a) => a.key === 'bills')!.pages.map((p) => p.key)).toEqual(['invoices']);
+    expect(areas.find((a) => a.key === 'bills')!.pages.map((p) => p.key)).toEqual([]);
     expect(areas.find((a) => a.key === 'sales')!.pages.map((p) => p.key)).toEqual(['daily', 'history', 'categories']);
     expect(areas.some((a) => a.key === 'books')).toBe(false);
     expect(visibleMore(cashier).map((p) => p.key)).toEqual(['statements', 'deposits']);
