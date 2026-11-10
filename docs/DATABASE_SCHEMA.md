@@ -30,6 +30,19 @@ Source of truth: `supabase/migrations/*.sql` (applied in filename order). This d
 | `announcements` | Platform announcements | Authenticated read while live |
 | `audit_logs` | Append-only activity log. `organization_id` has **no foreign key** on purpose so history survives an owner-approved org deletion | `audit.view` per org; platform admins all |
 
+## Phase 2 ledger tables (migration `20261110000100_ledger.sql`)
+
+| Table | Purpose | Client access |
+|---|---|---|
+| `accounts` | Chart of accounts; 25 system accounts seeded per org with a semantic `role` (cash_on_hand, inventory, accounts_payable, sales, cogs, rent …) | `accounting.view` (or support grant) reads; `accounting.post` adds/renames non-system accounts |
+| `accounting_periods` | “Books closed through date” markers | `accounting.view` reads; `close_books_through()` writes |
+| `journal_entries` | Posted entries: date, memo, source, idempotency key + payload hash, `reverses_entry_id` | read-only; **immutable** (trigger) |
+| `journal_lines` | Debit or credit lines in cents, account of the same org | read-only; **immutable** (trigger) |
+
+RPCs: `post_journal_entry` (accounting.post; balanced, ≥2 lines, same-org active accounts, open period, idempotent), `system_post_journal_entry` (service role, for imports/POS sync), `reverse_journal_entry` (once, mirrored lines, reason required), `close_books_through` (accounting.close; past dates only, monotonic), `trial_balance(org, as_of)` (accounting.view).
+
+Posting rules from business events to lines live in `src/lib/accounting/postings.ts` (inventory purchase → asset, COGS at sale, bill payment settles AP, sales tax → liability, owner draws → equity, card deposits split fees).
+
 ## Key functions
 
 Authorization helpers (`private`, SECURITY DEFINER, `search_path=''`): `is_org_member`, `member_role`, `has_permission`, `is_platform_admin(roles[])` (requires `aal2` when `mfa_required`), `has_support_access`, `org_is_writable` (org active **and** subscription trialing/active or past_due ≤ 7 days), `shares_org_with`, `role_rank`.
