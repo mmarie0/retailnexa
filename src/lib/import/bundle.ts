@@ -31,7 +31,8 @@ export function kindFromWord(v: string): ImportKind | null {
 
 /** From a file name like "2026 bills.csv" or "Bank statement Oct.xlsx". */
 export function kindFromName(fileName: string): ImportKind | null {
-  const n = norm(fileName.replace(/\.[a-z0-9]+$/i, '').split('/').pop() ?? '');
+  // "data.xlsx › Bills" (a workbook tab) is named by the tab.
+  const n = norm((fileName.split('›').pop() ?? '').replace(/\.[a-z0-9]+$/i, '').split('/').pop() ?? '');
   if (/\bvendors?\b|\bsuppliers?\b/.test(n)) return 'vendor';
   if (/\bfixed\b|\brecurring\b/.test(n)) return 'recurring';
   if (/\bbank\b|\bstatement\b|\btransactions\b/.test(n)) return 'bank_line';

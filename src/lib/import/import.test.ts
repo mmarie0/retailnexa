@@ -142,6 +142,8 @@ describe('everything in one file (owner request)', () => {
     expect(kindFromName('exports/2026 Bank statement Oct.xlsx')).toBe('bank_line');
     expect(kindFromName('fixed costs.csv')).toBe('recurring');
     expect(kindFromName('Vendors.csv')).toBe('vendor');
+    expect(kindFromName('all data.xlsx › Bank')).toBe('bank_line');
+    expect(kindFromName('all data.xlsx › Fixed costs')).toBe('recurring');
     expect(kindFromHeader(['Date', 'Register', 'Gross sales', 'Cash', 'Card'])).toBe('sales_day');
     expect(kindFromHeader(['Vendor', 'Invoice #', 'Bill date', 'Amount'])).toBe('bill');
     const plan = planFromTables([
@@ -167,10 +169,36 @@ describe('everything in one file (owner request)', () => {
     zip.file('__MACOSX/._vendors.csv', 'junk');
     const buf = await zip.generateAsync({ type: 'arraybuffer' });
     const file = { name: 'all.zip', size: buf.byteLength, arrayBuffer: async () => buf, text: async () => '' };
-    const r = await readBundle(file, async (name) => [['Vendor', 'Bill date', 'Amount'], [`from ${name}`, '2026-10-01', '5']]);
+    const r = await readBundle(file, async (name) => [{ name, rows: [['Vendor', 'Bill date', 'Amount'], [`from ${name}`, '2026-10-01', '5']] }]);
     expect(r.tables.map((t) => t.name)).toEqual(['sub/bills.xlsx', 'vendors.csv']);
     expect(r.tables[0].rows[1][0]).toBe('from sub/bills.xlsx');
     expect(r.backups).toEqual([{ name: 'backup.json', data: { bills: [] } }]);
     expect(r.skipped).toEqual(['notes.pdf']);
+  });
+});
+
+describe('one .xlsx with a tab per kind (owner: "this is for if i upload csv or xlsx")', () => {
+  it('each tab is classified by its name and every kind imports', async () => {
+    const { Workbook } = await import('exceljs');
+    const { cellText } = await import('./cell');
+    const { planFromTables } = await import('./bundle');
+    const wb = new Workbook();
+    wb.addWorksheet('Vendors').addRows([['Name', 'Phone'], ['Hair Zone', '555']]);
+    wb.addWorksheet('Bills').addRows([['Vendor', 'Bill date', 'Amount'], ['Hair Zone', '2026-10-01', 19.34]]);
+    wb.addWorksheet('Sales').addRows([['Date', 'Gross sales', 'Tax', 'Cash', 'Card'], ['2026-10-02', 100, 7, 50, 57]]);
+    wb.addWorksheet('Bank').addRows([['Date', 'Description', 'Amount'], ['2026-10-05', 'ACH HAIR ZONE', -19.34]]);
+    wb.addWorksheet('Fixed costs').addRows([['Name', 'Amount', 'Day of month'], ['Rent', 2500, 1]]);
+    // Same reading as the /admin/import/xlsx route.
+    const back = new Workbook();
+    await back.xlsx.load((await wb.xlsx.writeBuffer()) as ArrayBuffer);
+    const tables = back.worksheets.map((ws) => {
+      const rows: string[][] = [];
+      ws.eachRow({ includeEmpty: false }, (row) => rows.push((row.values as unknown[]).slice(1).map(cellText)));
+      return { name: `all.xlsx › ${ws.name}`, rows };
+    });
+    const plan = planFromTables(tables, { today: '2026-11-10' });
+    expect(plan.errors).toEqual([]);
+    expect(Object.fromEntries(Object.entries(plan.rows).map(([k, v]) => [k, v!.length]))).toEqual({ vendor: 1, bill: 1, sales_day: 1, bank_line: 1, recurring: 1 });
+    expect(plan.rows.bill![0]).toMatchObject({ amount_cents: 1934 });
   });
 });

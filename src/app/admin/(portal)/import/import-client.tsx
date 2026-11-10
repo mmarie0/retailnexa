@@ -19,13 +19,15 @@ const CHUNK = 200;
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 
 /** Excel is read by the server route (size and zip-bomb limits live there). */
-async function excelRows(name: string, data: Blob): Promise<string[][]> {
+async function excelSheets(name: string, data: Blob): Promise<{ name: string; rows: string[][] }[]> {
   const fd = new FormData(); fd.set('file', new File([data], name.split('/').pop() || 'sheet.xlsx'));
   const res = await fetch('/admin/import/xlsx', { method: 'POST', body: fd });
-  const r = (await res.json().catch(() => ({ ok: false }))) as { ok: boolean; rows?: string[][]; message?: string };
-  if (!r.ok || !r.rows) throw new Error(`${name}: ${r.message ?? 'couldn’t be read'}`);
-  return r.rows;
+  const r = (await res.json().catch(() => ({ ok: false }))) as { ok: boolean; sheets?: { name: string; rows: string[][] }[]; message?: string };
+  if (!r.ok || !r.sheets) throw new Error(`${name}: ${r.message ?? 'couldn’t be read'}`);
+  // A tab's own name ("Bills", "Bank") decides what it holds; one-tab workbooks keep the file name.
+  return r.sheets.length === 1 ? [{ name, rows: r.sheets[0].rows }] : r.sheets.map((s) => ({ name: `${name} › ${s.name}`, rows: s.rows }));
 }
+const excelRows = async (name: string, data: Blob) => (await excelSheets(name, data))[0]?.rows ?? [];
 
 export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] }) {
   const [org, setOrg] = useState(orgs[0]?.id ?? '');
@@ -48,7 +50,7 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
     try {
       if (all) {
         // Everything in one file: a .zip of sheets and/or the old app's backup, or one sheet with a Type column.
-        const read = await readBundle(file, excelRows);
+        const read = await readBundle(file, excelSheets);
         const plan = planFromTables(read.tables, { today: today() });
         const rows: Prepared['rows'] = { ...plan.rows };
         const warnings: string[] = [], notYet: Prepared['notYet'] = [];
@@ -136,7 +138,7 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
           </Field>
         )}
         <Field label="File" htmlFor="imp-file" hint={all
-          ? 'One sheet with a “Type” column, or a .zip with any mix of sheets (vendors, bills, sales, bank, fixed costs) and the old app backup.'
+          ? 'One .csv or .xlsx with a “Type” column, an .xlsx with one tab per kind (Vendors, Bills, Sales, Bank, Fixed costs), or a .zip of sheets and the old app backup.'
           : source === 'csv' ? 'One kind of record per sheet; the first row is the header.' : 'The backup downloaded from the old RetailNexa app.'}>
           <input id="imp-file" type="file" accept={all ? '.zip,.csv,.txt,.xlsx,.json' : source === 'csv' ? '.csv,.txt,.xlsx' : '.json,application/json'} onChange={(e) => { setFile(e.target.files?.[0] ?? null); reset(); }}
             className="w-full rounded-xl bg-soft px-3 py-2 text-sm" />

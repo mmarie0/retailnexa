@@ -33,13 +33,17 @@ export async function POST(req: Request) {
     const { Workbook } = await import('exceljs');
     const wb = new Workbook();
     await wb.xlsx.load(buf);
-    const ws = wb.worksheets[0];
-    if (!ws) return json({ ok: false, message: 'The workbook has no sheets.' }, 400);
-    const rows: string[][] = [];
-    ws.eachRow({ includeEmpty: false }, (row) => {
-      if (rows.length < MAX_ROWS + 1) rows.push((row.values as unknown[]).slice(1).map(cellText));
+    if (!wb.worksheets.length) return json({ ok: false, message: 'The workbook has no sheets.' }, 400);
+    // Every tab (a workbook can hold vendors, bills, sales… on separate tabs); `rows` is the first tab.
+    let total = 0;
+    const sheets = wb.worksheets.filter((ws) => ws.state !== 'hidden' && ws.state !== 'veryHidden').map((ws) => {
+      const rows: string[][] = [];
+      ws.eachRow({ includeEmpty: false }, (row) => {
+        if (total < MAX_ROWS + 1) { rows.push((row.values as unknown[]).slice(1).map(cellText)); total++; }
+      });
+      return { name: ws.name, rows };
     });
-    return json({ ok: true, rows });
+    return json({ ok: true, rows: sheets[0]?.rows ?? [], sheets });
   } catch {
     return json({ ok: false, message: 'That Excel file couldn’t be read. Try saving it as CSV.' }, 400);
   }
