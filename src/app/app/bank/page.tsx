@@ -8,6 +8,7 @@ import { formatMoney } from '@/lib/billing/plans';
 import { fmtDate } from '../bills/format';
 import { categorizeBankLine, ignoreBankLine, matchBankLine, unmatchBankLine } from './actions';
 import { StatementImporter } from './statement-importer';
+import { ReadOnlyNotice } from '../read-only-notice';
 
 export const metadata: Metadata = { title: 'Bank' };
 type Line = { id: string; posted_on: string; description: string; amount_cents: number; status: string; journal_entry_id: string | null; note: string | null };
@@ -40,6 +41,7 @@ export default async function BankPage({ searchParams }: PageProps<'/app/bank'>)
   return (
     <>
       <PageHeader title="Bank" description="Import your bank statement and tick off each line against the books. Anything the books don’t have yet can be posted from here." />
+      <ReadOnlyNotice show={can(ctx, 'accounting.post') && !ctx.access.canWrite} />
       {canAct && <Card><StatementImporter /></Card>}
       <nav aria-label="Bank lines" className="flex gap-1 self-start rounded-full bg-soft p-1">
         {[['', `To do (${lines.length})`], ['done', 'Done']].map(([k, label]) => (
@@ -48,7 +50,7 @@ export default async function BankPage({ searchParams }: PageProps<'/app/bank'>)
         ))}
       </nav>
 
-      {!showDone && (lines.length === 0 ? <EmptyState title="Nothing to reconcile">Import a statement to start.</EmptyState> : (
+      {!showDone && (lines.length === 0 ? <EmptyState title="Nothing to reconcile">{canAct ? 'Import a statement to start.' : null}</EmptyState> : (
         <>
           <p className="text-[15px] text-muted">Unreconciled lines net to <strong className="num text-ink">{formatMoney(outstanding)}</strong>.</p>
           <ul className="flex flex-col gap-3">

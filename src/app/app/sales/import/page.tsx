@@ -16,10 +16,10 @@ export default async function ImportSalesPage() {
   if (!ctx.access.canWrite) return <Notice tone="warning">Your account is read-only right now. Check the billing page.</Notice>;
   const supabase = await getSupabase();
   const [{ data: locs }, { data: orgRow }] = await Promise.all([
-    supabase.from('locations').select('id, name, kind').eq('organization_id', ctx.org.id).eq('is_active', true).order('name'),
+    supabase.rpc('my_locations', { p_org: ctx.org.id }),
     supabase.from('organizations').select('timezone').eq('id', ctx.org.id).maybeSingle(),
   ]);
-  const locations = (locs ?? []).filter((l) => l.kind === 'store').map((l) => ({ id: l.id, label: l.name }));
+  const locations = ((locs ?? []) as { id: string; name: string; kind: string }[]).filter((l) => l.kind === 'store').map((l) => ({ id: l.id, label: l.name }));
   if (!locations.length) return <Notice tone="info">Add a store under Locations first.</Notice>;
   const money = (name: string, label: string) => (
     <Field label={label} htmlFor={`m-${name}`}><Input id={`m-${name}`} name={name} inputMode="decimal" placeholder="0.00" className="num w-full" /></Field>

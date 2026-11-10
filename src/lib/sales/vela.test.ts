@@ -81,3 +81,24 @@ describe('parseDate with time zones and weekdays (#40)', () => {
     expect(parseDate('Monday, 11/09/2026')).toBe('2026-11-09');
   });
 });
+
+describe('Vela payments grand total (#58)', () => {
+  // Same numbers as #39, plus per-tender TOTAL rows and the grand TOTAL Vela writes at the end of PAYMENTS.
+  const WITH_GRAND = CSV.replace(',SALES/REFUNDS,,316.50', ',SALES/REFUNDS,,316.50\n,TOTAL,,316.50')
+    .replace(',TOTAL,,700.00', ',TOTAL,,700.00\n,TOTAL,,"1,016.50"');
+  it('ignores the grand total instead of adding it to card', () => {
+    const r = parseVelaSummary(WITH_GRAND);
+    expect(r.errors).toEqual([]);
+    expect(r.day).toMatchObject(expected);
+    expect(r.warnings).toEqual([]);
+  });
+  it('also works in the HTML form', () => {
+    expect(parseVelaSummary(toHtml(WITH_GRAND)).day).toMatchObject(expected);
+  });
+  it('warns when the grand total disagrees with the tenders', () => {
+    const r = parseVelaSummary(WITH_GRAND.replace('"1,016.50"\nSALES SUBTOTAL', '"1,000.00"\nSALES SUBTOTAL'));
+    expect(r.day).toMatchObject(expected);
+    expect(r.warnings.join()).toMatch(/payments TOTAL/);
+  });
+});
+

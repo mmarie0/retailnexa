@@ -108,3 +108,23 @@ describe('aging as of a past date ties to balance-sheet AP (#37)', () => {
     }
   });
 });
+
+describe('business-local dates in void_bill and record_sales_day (#59)', () => {
+  it('dates a bill-void reversal on the business’s today and refuses tomorrow’s sales', async () => {
+    const u = await createUser('tz59-owner');
+    const o = await createOrg(u, 'TZ59 Co', 'retail');
+    await sys(`update public.organizations set timezone = 'Pacific/Kiritimati' where id = $1`, [o]);
+    const [{ d: today }] = await sys<{ d: string }>(`select to_char(private.org_today($1), 'YYYY-MM-DD') as d`, [o]);
+    const [{ id: loc }] = await sys<{ id: string }>(`select id from public.locations where organization_id = $1 limit 1`, [o]);
+    const [{ id: rentAcct }] = await sys<{ id: string }>(`select id from public.accounts where organization_id = $1 and role = 'rent'`, [o]);
+    const [{ id: v }] = await as<{ id: string }>(u, `insert into public.vendors (organization_id, name) values ($1, 'V') returning id`, [o]);
+    const [{ id: b }] = await as<{ id: string }>(u, `select public.create_bill($1, $2, 'T-1', '2026-11-01'::date, null, $3::jsonb) as id`,
+      [o, v, JSON.stringify([{ account_id: rentAcct, amount_cents: 100 }])]);
+    const [{ id: entry }] = await as<{ id: string }>(u, `select public.approve_bill($1) as id`, [b]);
+    await as(u, `select public.void_bill($1, 'test void')`, [b]);
+    const [{ d }] = await sys<{ d: string }>(`select to_char(entry_date, 'YYYY-MM-DD') as d from public.journal_entries where reverses_entry_id = $1`, [entry]);
+    expect(d).toBe(today);
+    await as(u, `select public.record_sales_day($1, $2, $3::date, 100, 0, 0, 100, 0, 0, 'R1')`, [o, loc, today]);
+    await expectDenied(as(u, `select public.record_sales_day($1, $2, ($3::date + 1), 100, 0, 0, 100, 0, 0, 'R2')`, [o, loc, today]), /future/);
+  });
+});

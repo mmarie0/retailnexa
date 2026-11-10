@@ -39,8 +39,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         ) : (
           <p className="font-bold leading-tight">{ctx.org.name}<span className="block text-sm font-medium text-muted">{ROLE_LABELS[ctx.org.role]}</span></p>
         )}
-        <AppNav items={items} />
-        <div className="mt-auto hidden flex-col gap-2 text-sm lg:flex">
+        {/* The nav scrolls inside the sticky column so the account links and Log out stay on screen on short laptops (#63). */}
+        <div className="lg:-mx-1 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-1">
+          <AppNav items={items} />
+        </div>
+        <div className="hidden shrink-0 flex-col gap-2 border-t border-line pt-3 text-sm lg:flex">
           <p className="truncate text-muted" title={ctx.user.email}>{ctx.user.email}</p>
           <Link href="/account/security" className="font-semibold text-accent-strong">Two-factor authentication</Link>
           <Link href="/onboarding?new=1" className="font-semibold text-accent-strong">Add another business</Link>

@@ -60,6 +60,7 @@ export function parseVelaSummary(text: string, opts: { timeZone?: string; line?:
   const tenders: Record<string, Record<string, number>> = {};
   let count: number | null = null;
   let firstTxn: string | null = null;
+  let grandTotal: number | null = null;
 
   for (const r of rows) {
     const cells = r.map((c) => (c ?? '').trim());
@@ -83,10 +84,13 @@ export function parseVelaSummary(text: string, opts: { timeZone?: string; line?:
     }
     if (section === 'PAYMENTS') {
       if (rest.length === 1) { tender = label; tenders[tender] ??= {}; continue; } // tender heading row
-      if (!tender) continue;
       if (isCount(value)) continue;
       const v = parseAmount(value);
-      if (v === null) { errors.push(`PAYMENTS ${tender} ${label}: “${value}” is not an amount`); continue; }
+      if (v === null) { errors.push(`PAYMENTS ${tender || ''} ${label}: “${value}” is not an amount`); continue; }
+      // Vela ends PAYMENTS with a grand TOTAL after the tender blocks (#58). A TOTAL with no
+      // tender heading, or a second TOTAL under a tender that already has one, is that grand total.
+      if (label === 'TOTAL' && (!tender || tenders[tender].TOTAL !== undefined)) { grandTotal = v; tender = ''; continue; }
+      if (!tender) continue;
       tenders[tender][label] = v;
     }
   }
@@ -114,6 +118,9 @@ export function parseVelaSummary(text: string, opts: { timeZone?: string; line?:
   const expected = gross - discounts + tax;
   if (totals['SALES TOTAL'] !== undefined && totals['SALES TOTAL'] !== expected) {
     warnings.push(`Vela’s SALES TOTAL (${(totals['SALES TOTAL'] / 100).toFixed(2)}) differs from sales − discounts − returns + tax (${(expected / 100).toFixed(2)}).`);
+  }
+  if (grandTotal !== null && grandTotal !== cash + card + credit) {
+    warnings.push(`Vela’s payments TOTAL (${(grandTotal / 100).toFixed(2)}) differs from the sum of the payment types (${((cash + card + credit) / 100).toFixed(2)}).`);
   }
   if (cash + card + credit !== expected) {
     errors.push(`Payments ${(cash + card + credit) / 100} don’t equal sales − discounts + tax ${(expected / 100).toFixed(2)}.`);

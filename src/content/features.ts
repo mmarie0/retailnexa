@@ -34,10 +34,11 @@ export const WHOLESALE_FEATURES: Feature[] = [
 export const ACCOUNTING_FEATURES: Feature[] = [
   { title: 'Double-entry ledger', body: 'Chart of accounts, journal entries and a trial balance that always balances. Posted entries can’t be edited, only reversed.', status: 'available' },
   { title: 'Real financial statements', body: 'Profit and loss for any period and a balance sheet for any date (accrual basis), plus a sales tax summary.', status: 'available' },
-  { title: 'Cash flow and cash-basis reports', body: 'A cash flow statement and every report on a cash basis as well as accrual.', status: 'in_development' },
+  { title: 'Cash flow statement', body: 'Where cash came from and went for any period, tied out to your cash and bank balances.', status: 'available' },
+  { title: 'Cash-basis reports', body: 'Every report on a cash basis as well as accrual.', status: 'in_development' },
   { title: 'Payables', body: 'Partial payments, an aging report by vendor, and deposits, tax payments and owner draws recorded with the right accounting.', status: 'available' },
   { title: 'Receivables and credit memos', body: 'Customer invoices, credit memos, refunds and receivables aging.', status: 'in_development' },
-  { title: 'Bank reconciliation', body: 'Import statements and match every line to a bill, deposit or transfer.', status: 'in_development' },
+  { title: 'Bank reconciliation', body: 'Import your bank statement and match every line to a bill payment, deposit or entry, or post it straight to an account.', status: 'available' },
   { title: 'Accountant access', body: 'Invite your accountant with their own role. Every change is recorded in the audit log.', status: 'available' },
 ];
 

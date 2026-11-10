@@ -14,7 +14,7 @@ export default async function NewBillPage() {
   const [{ data: vendors }, { data: accounts }, { data: locations }, { data: orgRow }] = await Promise.all([
     supabase.from('vendors').select('id, name, payment_terms_days').eq('organization_id', ctx.org.id).eq('is_active', true).order('name'),
     supabase.rpc('bill_account_options', { p_org: ctx.org.id }),
-    supabase.from('locations').select('id, name').eq('organization_id', ctx.org.id).eq('is_active', true).order('name'),
+    supabase.rpc('my_locations', { p_org: ctx.org.id }),
     supabase.from('organizations').select('timezone').eq('id', ctx.org.id).maybeSingle(),
   ]);
   const vendorList = (vendors ?? []).map((v) => ({ id: v.id, label: v.name, terms: v.payment_terms_days }));
@@ -31,7 +31,7 @@ export default async function NewBillPage() {
           <BillForm
             vendors={vendorList}
             accounts={((accounts ?? []) as { id: string; code: string; name: string }[]).map((a) => ({ id: a.id, label: `${a.code} · ${a.name}` }))}
-            locations={(locations ?? []).map((l) => ({ id: l.id, label: l.name }))}
+            locations={((locations ?? []) as { id: string; name: string }[]).map((l) => ({ id: l.id, label: l.name }))}
             today={todayIn(orgRow?.timezone)}
           />
         </Card>
