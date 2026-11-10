@@ -70,6 +70,8 @@ RPCs: `record_sales_day` (sales.import; tenders must equal gross − discounts +
 
 `record_money_movement(org, kind, date, amount, key, fees, account, memo, location)` and `recent_money_movements(org, limit)` (migration `20261110000600`): guided card/cash deposits, sales-tax payments, owner draws and contributions posted straight to the journal (`source_type` = kind). No extra table — the journal is the record; reversals go through `reverse_journal_entry`.
 
+`sales_tax_summary(org, from, to)` (migration `20261110000700`): opening, collected, paid and closing balance of Sales tax payable for a period; accounting.view or profit.view.
+
 ## Key functions
 
 Authorization helpers (`private`, SECURITY DEFINER, `search_path=''`): `is_org_member`, `member_role`, `has_permission`, `is_platform_admin(roles[])` (requires `aal2` when `mfa_required`), `has_support_access`, `org_is_writable` (org active **and** subscription trialing/active or past_due ≤ 7 days), `shares_org_with`, `role_rank`.

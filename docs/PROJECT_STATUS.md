@@ -14,6 +14,8 @@ _Last updated: 2026-11-10 — Phase 1 merged and migrations live on Supabase. Ph
 
 - **2.6 Deposits & payments** (branch `feat/phase-2-money-movements`, stacked on 2.5): guided entries with fixed posting rules — card processor deposit (bank gets gross − fees, fees expensed, card clearing settled), cash taken to the bank, sales tax paid to the state (reduces the liability), owner draw (equity, never an expense), owner contribution. Store managers/employees with `cash.create` can record cash deposits only; everything else needs `accounting.post`. Idempotent per form submission. 8 DB tests. **Not verified:** screen in a browser.
 
+- **2.7 Reports: bills aging and sales tax** (branch `feat/phase-2-reports`, stacked on 2.6): Bills aging (approved unpaid bills by vendor in not-yet-due / 1–30 / 31–60 / 61–90 / 90+ day buckets, any as-of date) and Sales tax (owed at start + collected − paid = owed at end, period presets or custom dates; warns when payments exceed collections; states that it doesn't file returns). New `sales_tax_summary` RPC. 1 DB + 10 unit tests. **Not verified:** screens in a browser.
+
 ## Phase 1 — what exists and how it was verified
 
 | Area | Built | Verified how | Not yet verified |
