@@ -12,6 +12,8 @@ _Last updated: 2026-11-10 — Phase 1 merged and migrations live on Supabase. Ph
 
 - **2.5 Financial statements** (branch `feat/phase-2-statements`, stacked on 2.4): Profit & loss for this month / last month / quarter / year to date / last year / custom dates (revenue net of discounts, COGS, gross profit, operating expenses, operating profit, other income and expenses, net income) and Balance sheet as of any date (net income to date shown in equity; the page flags any imbalance). Accrual basis. Warns when COGS is $0 because inventory isn’t tracked yet. New `account_activity_detail` RPC. DB test proves the balance sheet balances and P&L net income equals equity growth on real postings (sales, bill, payment). **Not yet:** cash-basis view, cash-flow statement, sales tax report.
 
+- **2.6 Deposits & payments** (branch `feat/phase-2-money-movements`, stacked on 2.5): guided entries with fixed posting rules — card processor deposit (bank gets gross − fees, fees expensed, card clearing settled), cash taken to the bank, sales tax paid to the state (reduces the liability), owner draw (equity, never an expense), owner contribution. Store managers/employees with `cash.create` can record cash deposits only; everything else needs `accounting.post`. Idempotent per form submission. 8 DB tests. **Not verified:** screen in a browser.
+
 ## Phase 1 — what exists and how it was verified
 
 | Area | Built | Verified how | Not yet verified |

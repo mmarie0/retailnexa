@@ -68,6 +68,8 @@ RPCs: `record_sales_day` (sales.import; tenders must equal gross − discounts +
 
 `account_activity_detail(org, from, to)` (migration `20261110000500`): every account with its net movement in the range; accounting.view or profit.view. Feeds the Profit & loss page via `incomeStatement()`; the Balance sheet uses `trial_balance` + `balanceSheet()` (`src/lib/accounting/statements.ts`).
 
+`record_money_movement(org, kind, date, amount, key, fees, account, memo, location)` and `recent_money_movements(org, limit)` (migration `20261110000600`): guided card/cash deposits, sales-tax payments, owner draws and contributions posted straight to the journal (`source_type` = kind). No extra table — the journal is the record; reversals go through `reverse_journal_entry`.
+
 ## Key functions
 
 Authorization helpers (`private`, SECURITY DEFINER, `search_path=''`): `is_org_member`, `member_role`, `has_permission`, `is_platform_admin(roles[])` (requires `aal2` when `mfa_required`), `has_support_access`, `org_is_writable` (org active **and** subscription trialing/active or past_due ≤ 7 days), `shares_org_with`, `role_rank`.
