@@ -81,7 +81,7 @@ function serialToDate(v: number): string | null {
   return new Date(Math.round((v - 25569) * 86_400_000)).toISOString().slice(0, 10);
 }
 
-export async function readXlsxLite(data: ArrayBuffer | Uint8Array, maxRows = 20_000): Promise<LiteSheet[]> {
+export async function readXlsxLite(data: ArrayBuffer | Uint8Array, maxRows = 20_000, maxCells = LITE_LIMITS.maxCells): Promise<LiteSheet[]> {
   const deadline = Date.now() + LITE_LIMITS.timeBudgetMs;
   const zip = await JSZip.loadAsync(data);
   const read = async (p: string) => {
@@ -178,7 +178,7 @@ export async function readXlsxLite(data: ArrayBuffer | Uint8Array, maxRows = 20_
           else if (ty === 'e') val = '';
           else if (v !== undefined) val = (dateStyle[cell.s] && serialToDate(Number(v))) || unescape(v);
           totalCells += Math.max(1, cell.i - row.length + 1);
-          if (totalCells > LITE_LIMITS.maxCells) throw new LiteLimitError('the workbook has too many cells');
+          if (totalCells > maxCells) throw new LiteLimitError('the workbook has too many cells');
           while (row.length < cell.i) row.push('');
           row[cell.i] = val;
           cell = null;

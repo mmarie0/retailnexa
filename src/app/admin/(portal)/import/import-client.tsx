@@ -19,7 +19,27 @@ const CHUNK = 200;
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 
 /** Excel is read by the server route (size and zip-bomb limits live there). */
+/**
+ * Excel is read here in the browser first (no upload size limit: the hosting
+ * platform refuses request bodies over ~4.5 MB with a 413). The server route is
+ * only a fallback for small files the browser reader can't handle.
+ */
 async function excelSheets(name: string, data: Blob): Promise<{ name: string; rows: string[][] }[]> {
+  const named = (sheets: { name: string; rows: string[][] }[]) =>
+    // A tab's own name ("Bills", "Bank") decides what it holds; one-tab workbooks keep the file name.
+    sheets.length === 1 ? [{ name, rows: sheets[0].rows }] : sheets.map((s) => ({ name: `${name} › ${s.name}`, rows: s.rows }));
+  if (data.size > 50 * 1024 * 1024) throw new Error(`${name}: Excel files up to 50 MB. Split it or save it as CSV.`);
+  const head = new Uint8Array(await data.slice(0, 4).arrayBuffer());
+  if (head[0] === 0xd0 && head[1] === 0xcf) throw new Error(`${name}: this is an old .xls file (or it has a password). Open it in Excel and use Save As → Excel Workbook (.xlsx) or CSV.`);
+  try {
+    const { readXlsxLite } = await import('@/lib/import/xlsx-lite');
+    const sheets = await readXlsxLite(await data.arrayBuffer(), 200_000, 6_000_000);
+    if (sheets.some((s) => s.rows.length)) return named(sheets);
+  } catch (e) {
+    const { LiteLimitError } = await import('@/lib/import/xlsx-lite');
+    if (e instanceof LiteLimitError) throw new Error(`${name}: can’t be read safely (${e.message}). Save it as CSV or split it.`);
+    if (data.size > 4 * 1024 * 1024) throw new Error(`${name}: couldn’t be read. Open it in Excel and use Save As → CSV, then upload the CSV.`);
+  }
   const fd = new FormData(); fd.set('file', new File([data], name.split('/').pop() || 'sheet.xlsx'));
   const res = await fetch('/admin/import/xlsx', { method: 'POST', body: fd });
   const isJson = (res.headers.get('content-type') ?? '').includes('application/json');
@@ -28,8 +48,7 @@ async function excelSheets(name: string, data: Blob): Promise<{ name: string; ro
     : `${name}: the server couldn’t read it (error ${res.status}). Try again, or save it as CSV.`);
   const r = (await res.json().catch(() => ({ ok: false }))) as { ok: boolean; sheets?: { name: string; rows: string[][] }[]; message?: string };
   if (!r.ok || !r.sheets) throw new Error(`${name}: ${r.message ?? 'couldn’t be read'}`);
-  // A tab's own name ("Bills", "Bank") decides what it holds; one-tab workbooks keep the file name.
-  return r.sheets.length === 1 ? [{ name, rows: r.sheets[0].rows }] : r.sheets.map((s) => ({ name: `${name} › ${s.name}`, rows: s.rows }));
+  return named(r.sheets);
 }
 const excelRows = async (name: string, data: Blob) => (await excelSheets(name, data))[0]?.rows ?? [];
 

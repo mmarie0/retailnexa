@@ -323,3 +323,20 @@ describe('#148 #150 the fallback reader is safe on hostile files', () => {
     } finally { LITE_LIMITS.maxCells = keep; }
   });
 });
+
+describe('browser Excel reading (owner hit a 413 on a large all-data .xlsx)', () => {
+  it('the browser reader reads normal Excel files (written by exceljs) with every tab, dates and numbers', async () => {
+    const { Workbook } = await import('exceljs');
+    const { readXlsxLite } = await import('./xlsx-lite');
+    const wb = new Workbook();
+    wb.addWorksheet('Vendors').addRows([['Name', 'Phone'], ['Hair Zone', '555-0100']]);
+    const bills = wb.addWorksheet('Bills');
+    bills.addRow(['Vendor', 'Bill date', 'Amount']);
+    for (let i = 0; i < 3000; i++) bills.addRow([`Vendor ${i % 40}`, new Date(Date.UTC(2026, 9, 1 + (i % 28))), 12.5 + i]);
+    bills.getColumn(2).numFmt = 'mm/dd/yyyy';
+    const sheets = await readXlsxLite((await wb.xlsx.writeBuffer()) as ArrayBuffer, 200_000, 6_000_000);
+    expect(sheets.map((s) => [s.name, s.rows.length])).toEqual([['Vendors', 2], ['Bills', 3001]]);
+    expect(sheets[1].rows[1]).toEqual(['Vendor 0', '2026-10-01', '12.5']);
+    expect(sheets[0].rows[1]).toEqual(['Hair Zone', '555-0100']);
+  });
+});
