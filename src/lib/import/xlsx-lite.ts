@@ -152,9 +152,12 @@ export async function readXlsxLite(data: ArrayBuffer | Uint8Array, maxRows = 20_
           row = [];
           if (t.selfClose) row = null;
         } else if (row) {
-          if (row.some((c) => c.trim() !== '')) { rows.push(row); totalRows++; }
+          if (row.some((c) => c.trim() !== '')) {
+            // Never cut a workbook short without saying so (#155).
+            if (totalRows >= maxRows + 1) throw new LiteLimitError(`more than ${maxRows.toLocaleString('en-US')} rows`);
+            rows.push(row); totalRows++;
+          }
           row = null;
-          if (totalRows >= maxRows + 1) break;
         }
       } else if (t.name === 'c' && row) {
         if (!t.close) {
@@ -190,7 +193,6 @@ export async function readXlsxLite(data: ArrayBuffer | Uint8Array, maxRows = 20_
       }
     }
     out.push({ name: unescape(attr(st.attrs, 'name') ?? `Sheet${out.length + 1}`), rows });
-    if (totalRows >= maxRows + 1) break;
   }
   return out;
 }

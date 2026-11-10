@@ -40,6 +40,8 @@ async function excelSheets(name: string, data: Blob): Promise<{ name: string; ro
     if (e instanceof LiteLimitError) throw new Error(`${name}: can’t be read safely (${e.message}). Save it as CSV or split it.`);
     if (data.size > 4 * 1024 * 1024) throw new Error(`${name}: couldn’t be read. Open it in Excel and use Save As → CSV, then upload the CSV.`);
   }
+  // The server can only take files under ~4 MB (#155).
+  if (data.size > 4 * 1024 * 1024) throw new Error(`${name}: no data found in this workbook. Check it opens in Excel, or save it as CSV.`);
   const fd = new FormData(); fd.set('file', new File([data], name.split('/').pop() || 'sheet.xlsx'));
   const res = await fetch('/admin/import/xlsx', { method: 'POST', body: fd });
   const isJson = (res.headers.get('content-type') ?? '').includes('application/json');
@@ -106,8 +108,11 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
   async function run(dryRun: boolean) {
     setErr(null);
     if (!org) { setErr('Choose a business.'); return; }
+    // Reading a big workbook can take a while: say so and lock the buttons first (#155).
+    setBusy('Reading the file…');
+    await new Promise((r) => setTimeout(r, 0));
     const p = dryRun || !prep ? await prepare() : prep;
-    if (!p) return;
+    if (!p) { setBusy(null); return; }
     setPrep(p);
     const t: Tally = {};
     for (const k of ORDER) {

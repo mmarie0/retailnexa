@@ -340,3 +340,37 @@ describe('browser Excel reading (owner hit a 413 on a large all-data .xlsx)', ()
     expect(sheets[0].rows[1]).toEqual(['Hair Zone', '555-0100']);
   });
 });
+
+describe('#146 tab names and #155 limits', () => {
+  it('“Vendor bills” tabs are bills, not vendors', async () => {
+    const { kindFromName } = await import('./bundle');
+    expect(kindFromName('all.xlsx › Vendor bills')).toBe('bill');
+    expect(kindFromName('all.xlsx › Vendor invoices')).toBe('bill');
+    expect(kindFromName('all.xlsx › Fixed bills')).toBe('recurring');
+    expect(kindFromName('all.xlsx › Vendors')).toBe('vendor');
+    expect(kindFromName('all.xlsx › Suppliers list')).toBe('vendor');
+    expect(kindFromName('all.xlsx › Bank statements')).toBe('bank_line');
+  });
+
+  it('too many rows is an error, never a silent cut', async () => {
+    const JSZip = (await import('jszip')).default;
+    const { readXlsxLite } = await import('./xlsx-lite');
+    const z = new JSZip();
+    z.file('xl/workbook.xml', '<workbook><sheets><sheet name="A" r:id="rId1"/><sheet name="B" r:id="rId2"/></sheets></workbook>');
+    z.file('xl/_rels/workbook.xml.rels', '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Target="worksheets/sheet2.xml"/></Relationships>');
+    const rows = (n: number) => '<worksheet><sheetData>' + Array.from({ length: n }, (_, i) => `<row r="${i + 1}"><c r="A${i + 1}" t="str"><v>x</v></c></row>`).join('') + '</sheetData></worksheet>';
+    z.file('xl/worksheets/sheet1.xml', rows(8));
+    z.file('xl/worksheets/sheet2.xml', rows(8));
+    const buf = await z.generateAsync({ type: 'arraybuffer' });
+    await expect(readXlsxLite(buf, 10)).rejects.toThrow(/more than 10 rows/);
+    expect((await readXlsxLite(buf, 20)).map((s) => s.rows.length)).toEqual([8, 8]);
+  });
+
+  it('oversized sheets are refused before reading', async () => {
+    const { readBundle } = await import('./read-bundle');
+    let read = false;
+    const file = { name: 'big.xlsx', size: 60 * 1024 * 1024, arrayBuffer: async () => { read = true; return new ArrayBuffer(0); }, text: async () => '' };
+    await expect(readBundle(file, async () => [])).rejects.toThrow(/up to 50 MB/);
+    expect(read).toBe(false);
+  });
+});
