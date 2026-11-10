@@ -80,3 +80,41 @@ describe('vendors.pay_method', () => {
     expect((await sys<{ pay_method: string }>(`select pay_method from public.vendors where id = $1`, [id]))[0].pay_method).toBe('check');
   });
 });
+
+describe('#134 #135 budget follow-ups and vendors.kind', () => {
+  it('rejects non-finite and out-of-range months', async () => {
+    for (const m of ['infinity', '-infinity', '9999-12-31', '0001-01-01', '1999-12-01']) {
+      await expectDenied(as(owner, `select public.set_bill_budget($1, $2::date, 100)`, [org, m]), /2000 to 2100/);
+    }
+    await expectDenied(sys(`insert into public.bill_budgets (organization_id, month, amount_cents) values ($1, '9999-12-01', 1)`, [org]), /bill_budgets_month_range/);
+  });
+
+  it('"every month" sets the default and drops the month’s own budget in one call', async () => {
+    await as(owner, `select public.set_bill_budget($1, '2027-03-01', 111)`, [org]);
+    await as(owner, `select public.set_bill_budget($1, '2027-03-01', 222, true)`, [org]);
+    const rows = await budgets(owner);
+    expect(rows.find((b) => b.month === null)?.amount_cents).toBe('222');
+    expect(rows.find((b) => b.month === '2027-03-01')).toBeUndefined();
+  });
+
+  it('store-limited members don’t see or set the business-wide budget', async () => {
+    const acct = await createUser('due-acct-a');
+    const [{ id: A }] = await sys<{ id: string }>(`select id from public.locations where organization_id = $1 order by created_at limit 1`, [org]);
+    await as(owner, `insert into public.locations (organization_id, name, kind) values ($1, 'Due Store B', 'store')`, [org]);
+    const m = await addMember(owner, org, acct, 'accountant');
+    await as(owner, `select public.set_member_locations($1, $2::uuid[])`, [m, [A]]);
+    expect(await budgets(acct)).toEqual([]);
+    await expectDenied(as(acct, `select public.set_bill_budget($1, null, 100)`, [org]));
+    expect((await as<{ s: boolean }>(acct, `select public.sees_all_stores($1) as s`, [org]))[0].s).toBe(false);
+    expect((await as<{ s: boolean }>(accountant, `select public.sees_all_stores($1) as s`, [org]))[0].s).toBe(true);
+    expect((await as<{ s: boolean }>(outsider, `select public.sees_all_stores($1) as s`, [org]))[0].s).toBe(false);
+    expect((await budgets(accountant)).length).toBeGreaterThan(0);
+  });
+
+  it('vendors.kind: Orders / Bills override, managed like the other vendor fields', async () => {
+    const [{ id }] = await as<{ id: string }>(owner, `insert into public.vendors (organization_id, name, kind) values ($1, 'Acme Supply', 'bill') returning id`, [org]);
+    await as(owner, `update public.vendors set kind = 'order' where id = $1`, [id]);
+    await expect(as(owner, `update public.vendors set kind = 'expense' where id = $1`, [id])).rejects.toThrow(/check constraint/);
+    expect((await sys<{ kind: string }>(`select kind from public.vendors where id = $1`, [id]))[0].kind).toBe('order');
+  });
+});

@@ -14,7 +14,7 @@ import { ReadOnlyNotice } from '../read-only-notice';
 
 export const metadata: Metadata = { title: 'Vendors' };
 
-type Vendor = { id: string; name: string; contact_name: string | null; email: string | null; phone: string | null; payment_terms_days: number; pay_method: string | null; notes: string | null; is_active: boolean };
+type Vendor = { id: string; name: string; contact_name: string | null; email: string | null; phone: string | null; payment_terms_days: number; pay_method: string | null; kind: string | null; notes: string | null; is_active: boolean };
 type Bill = { vendor_id: string; bill_date: string; due_date: string; status: 'draft' | 'approved' | 'paid' | 'void'; total_cents: number; paid_cents: number; recurring_bill_id: string | null };
 const PAY_METHODS: Record<string, string> = { check: 'Check', ach: 'ACH / bank transfer', card: 'Credit card', cash: 'Cash', other: 'Other' };
 const SORTS = [['owed', 'Amount owed'], ['late', 'Overdue first'], ['next', 'Next due'], ['total', 'Total spend'], ['name', 'A–Z']] as const;
@@ -36,6 +36,11 @@ function VendorFields({ v }: { v?: Vendor }) {
           <option value="">Not set</option>{Object.entries(PAY_METHODS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </Select>
       </Field>
+      <Field label="Put under" htmlFor={`${p}-kind`} hint="Where this vendor's bills go in the Due view.">
+        <Select id={`${p}-kind`} name="kind" defaultValue={v?.kind ?? ''}>
+          <option value="">Automatic (from the name)</option><option value="order">Orders (merchandise)</option><option value="bill">Bills (rent, utilities, services)</option>
+        </Select>
+      </Field>
       <div className="sm:col-span-2">
         <Field label="Notes" htmlFor={`${p}-notes`}><Textarea id={`${p}-notes`} name="notes" defaultValue={v?.notes ?? ''} maxLength={2000} className="min-h-20" /></Field>
       </div>
@@ -53,7 +58,7 @@ export default async function VendorsPage({ searchParams }: PageProps<'/app/vend
   const supabase = await getSupabase();
   const [{ data }, { data: billRows }, { data: orgRow }] = await Promise.all([
     supabase.from('vendors')
-      .select('id, name, contact_name, email, phone, payment_terms_days, pay_method, notes, is_active')
+      .select('id, name, contact_name, email, phone, payment_terms_days, pay_method, kind, notes, is_active')
       .eq('organization_id', ctx.org.id).order('name'),
     showMoney
       ? supabase.from('bills').select('vendor_id, bill_date, due_date, status, total_cents, paid_cents, recurring_bill_id')
@@ -101,7 +106,8 @@ export default async function VendorsPage({ searchParams }: PageProps<'/app/vend
 
   return (
     <>
-      <PageHeader title="Vendors" description="The suppliers you buy from. Vendors can be turned off but not deleted, so their bill history stays intact." />
+      <PageHeader title="Vendors" description="The suppliers you buy from. Vendors can be turned off but not deleted, so their bill history stays intact."
+        actions={showMoney ? <a href="/app/vendors/calendar" download className="rounded-full bg-card px-3.5 py-2 text-sm font-semibold text-accent-strong shadow-[var(--shadow-card)]">Calendar (.ics)</a> : undefined} />
       <ReadOnlyNotice show={can(ctx, 'vendors.manage') && !ctx.access.canWrite} />
       {showMoney && vendors.length > 0 && (
         <div className="grid grid-cols-3 gap-2.5">

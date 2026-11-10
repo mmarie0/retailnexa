@@ -32,6 +32,7 @@ const vendorSchema = z.object({
   phone: opt(40),
   payment_terms_days: z.coerce.number().int().min(0, '0–365 days').max(365, '0–365 days'),
   pay_method: z.enum(['', 'check', 'ach', 'card', 'cash', 'other']).optional().transform((v) => v || null),
+  kind: z.enum(['', 'order', 'bill']).optional().transform((v) => v || null),
   notes: opt(2000),
 });
 
@@ -225,22 +226,16 @@ export async function setBillBudget(_p: ActionState, form: FormData): Promise<Ac
   try {
     const ctx = await guard('bills.approve');
     if (isState(ctx)) return ctx;
-    const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).parse(form.get('month'));
+    const month = z.string().regex(/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/).parse(form.get('month'));
     const raw = String(form.get('amount') ?? '').trim();
     const cents = raw === '' ? null : parseDollarsToCents(raw);
     if (raw !== '' && !cents) return fail('Enter an amount like 4500.00, or leave it empty to remove the budget.', { amount: 'Enter an amount' });
-    const everyMonth = form.get('every_month') === 'on';
     const supabase = await getSupabase();
-    // "Every month" sets the default and drops this month's own budget so the default applies.
-    if (everyMonth) {
-      const { error: e1 } = await supabase.rpc('set_bill_budget', { p_org: ctx.org.id, p_month: null, p_amount_cents: cents });
-      if (e1) throw e1;
-      const { error: e2 } = await supabase.rpc('set_bill_budget', { p_org: ctx.org.id, p_month: `${month}-01`, p_amount_cents: null });
-      if (e2) throw e2;
-    } else {
-      const { error } = await supabase.rpc('set_bill_budget', { p_org: ctx.org.id, p_month: `${month}-01`, p_amount_cents: cents });
-      if (error) throw error;
-    }
+    // One call, so "every month" (set the default, drop this month's own budget) saves all-or-nothing (#134).
+    const { error } = await supabase.rpc('set_bill_budget', {
+      p_org: ctx.org.id, p_month: `${month}-01`, p_amount_cents: cents, p_every_month: form.get('every_month') === 'on',
+    });
+    if (error) throw error;
     revalidatePath('/app/bills');
     revalidatePath('/app');
     return ok(cents ? 'Budget saved.' : 'Budget removed.');

@@ -44,7 +44,7 @@ export function DueCalendar({ ym, today, items, showKind, canAdd }: { ym: string
       if (sd >= rowStart && sd <= d) {
         const dl = byDay.get(sd) ?? [];
         cells.push(
-          <div key={`p${d}`} className="col-span-7 my-1 flex flex-col gap-2 rounded-xl bg-soft p-3">
+          <div key={`p${d}`} data-fab-hide className="col-span-7 my-1 flex flex-col gap-2 rounded-xl bg-soft p-3">
             <div className="flex items-center justify-between gap-2"><b>{longDay(sel)}</b><span className="num text-sm">{dl.length ? `${usd(dl.reduce((a, b) => a + b.amountCents, 0))} due` : ''}</span></div>
             {dl.length ? <ul className="flex flex-col gap-1.5">{dl.map((b) => <li key={b.id}><ItemLine item={b} showKind={showKind} /></li>)}</ul> : <p className="text-sm text-muted">Nothing due this day.</p>}
             <div className="flex flex-wrap gap-2">

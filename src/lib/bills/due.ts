@@ -40,7 +40,9 @@ export interface Budget { month: string | null; amount_cents: number }
 /** Same list as the live app: names that mean a fixed bill, not merchandise. */
 export const BILL_WORDS = /\b(rent|lease|landlord|electric|power|energy|utilit|water|sewer|gas co|natural gas|waste|trash|garbage|insurance|phone|wireless|mobile|internet|cable|comcast|verizon|at&t|spectrum|xfinity|t-mobile|alarm|security|adt|software|subscription|pos\b|card processing|merchant|processing fee|credit card fee|bank fee|loan|mortgage|tax|irs|payroll|accountant|cpa|cleaning|pest|license|permit|hoa|cam\b|common area)/i;
 
-export function kindOf(name: string, recurring: boolean): Kind {
+/** The vendor's own setting wins (as in the live app); otherwise recurring or bill-like names are Bills. */
+export function kindOf(name: string, recurring: boolean, override?: Kind | null): Kind {
+  if (override) return override;
   return recurring || BILL_WORDS.test(name) ? 'bill' : 'order';
 }
 
@@ -71,14 +73,14 @@ export function dotFor(dueDate: string, leftCents: number, today: string): DotSt
 }
 
 /** Bills due in `ym` (void ones left out) plus recurring bills that will fall due in it. */
-export function monthItems(ym: string, bills: BillRow[], templates: TemplateRow[], vendorName: Map<string, string>, today: string): DueItem[] {
+export function monthItems(ym: string, bills: BillRow[], templates: TemplateRow[], vendorName: Map<string, string>, today: string, vendorKind?: Map<string, Kind>): DueItem[] {
   const out: DueItem[] = [];
   for (const b of bills) {
     if (b.status === 'void' || !b.due_date.startsWith(ym)) continue;
     const total = Number(b.total_cents), paid = Number(b.paid_cents), left = Math.max(0, total - paid);
     const name = vendorName.get(b.vendor_id) ?? 'Vendor';
     out.push({
-      id: b.id, billId: b.id, templateId: b.recurring_bill_id, kind: kindOf(name, b.recurring_bill_id !== null),
+      id: b.id, billId: b.id, templateId: b.recurring_bill_id, kind: kindOf(name, b.recurring_bill_id !== null, vendorKind?.get(b.vendor_id)),
       name, detail: `#${b.bill_number}`, dueDate: b.due_date, amountCents: total, paidCents: paid, leftCents: left,
       stage: b.status === 'draft' ? 'draft' : left === 0 ? 'paid' : 'open', dot: dotFor(b.due_date, left, today),
     });
@@ -94,7 +96,7 @@ export function monthItems(ym: string, bills: BillRow[], templates: TemplateRow[
       if (due > monthEnd) break;
       if (due.startsWith(ym)) {
         out.push({
-          id: `tpl:${t.id}:${billDate}`, billId: null, templateId: t.id, kind: 'bill',
+          id: `tpl:${t.id}:${billDate}`, billId: null, templateId: t.id, kind: vendorKind?.get(t.vendor_id) ?? 'bill',
           name: t.name, detail: vendorName.get(t.vendor_id) ?? 'Recurring', dueDate: due,
           amountCents: t.amount_cents, paidCents: 0, leftCents: t.amount_cents, stage: 'scheduled', dot: dotFor(due, t.amount_cents, today),
         });
@@ -120,10 +122,10 @@ export function budgetFor(ym: string, budgets: Budget[]): { cents: number; own: 
 }
 
 /** Bills due vs budget for `months` months starting at `ym`. */
-export function forecast(ym: string, months: number, bills: BillRow[], templates: TemplateRow[], vendorName: Map<string, string>, budgets: Budget[], today: string) {
+export function forecast(ym: string, months: number, bills: BillRow[], templates: TemplateRow[], vendorName: Map<string, string>, budgets: Budget[], today: string, vendorKind?: Map<string, Kind>) {
   return Array.from({ length: months }, (_, i) => {
     const m = ymAdd(ym, i);
-    const t = totals(monthItems(m, bills, templates, vendorName, today));
+    const t = totals(monthItems(m, bills, templates, vendorName, today, vendorKind));
     return { ym: m, total: t.total, left: t.left, budget: budgetFor(m, budgets)?.cents ?? null };
   });
 }

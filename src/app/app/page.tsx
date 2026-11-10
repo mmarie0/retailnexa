@@ -32,7 +32,7 @@ export default async function OverviewPage() {
   const w = salesWindows(today);
   const salesSel = 'business_date, gross_sales_cents, discounts_cents, transaction_count';
   const ym = today.slice(0, 7);
-  const [recent, lastYear, bills, activity, monthBills, tpls, budgetRows, vendorRows] = await Promise.all([
+  const [recent, lastYear, bills, activity, monthBills, tpls, budgetRows, vendorRows, seesAll] = await Promise.all([
     showSales ? supabase.from('sales_days').select(salesSel).eq('organization_id', ctx.org.id).is('voided_at', null)
       .gte('business_date', w.recent.from).lte('business_date', w.recent.to).limit(2000) : Promise.resolve({ data: null }),
     showSales ? supabase.from('sales_days').select(salesSel).eq('organization_id', ctx.org.id).is('voided_at', null)
@@ -46,13 +46,14 @@ export default async function OverviewPage() {
     showBills ? supabase.from('recurring_bills').select('id, vendor_id, name, frequency, day_of_month, next_date, end_date, due_days, is_active, lines')
       .eq('organization_id', ctx.org.id).eq('is_active', true) : Promise.resolve({ data: null }),
     showBills ? supabase.from('bill_budgets').select('month, amount_cents').eq('organization_id', ctx.org.id) : Promise.resolve({ data: null }),
-    showBills ? supabase.from('vendors').select('id, name').eq('organization_id', ctx.org.id) : Promise.resolve({ data: null }),
+    showBills ? supabase.from('vendors').select('id, name, kind').eq('organization_id', ctx.org.id) : Promise.resolve({ data: null }),
+    showBills ? supabase.rpc('sees_all_stores', { p_org: ctx.org.id }) : Promise.resolve({ data: false }),
   ]);
   const billMonth = showBills ? (() => {
     const templates = ((tpls.data ?? []) as (Omit<TemplateRow, 'amount_cents'> & { lines: { amount_cents: number }[] })[])
       .map(({ lines, ...t }) => ({ ...t, amount_cents: lines.reduce((a, l) => a + Number(l.amount_cents), 0) }));
     const items = monthItems(ym, (monthBills.data ?? []) as BillRow[], templates, new Map((vendorRows.data ?? []).map((v) => [v.id as string, v.name as string])), today);
-    return { ...totals(items), budget: budgetFor(ym, (budgetRows.data ?? []) as Budget[])?.cents ?? null };
+    return { ...totals(items), budget: seesAll.data === true ? budgetFor(ym, (budgetRows.data ?? []) as Budget[])?.cents ?? null : null };
   })() : null;
   const salesRows = [...(recent.data ?? []), ...(lastYear.data ?? [])].map((r) => ({
     date: r.business_date as string, netCents: Number(r.gross_sales_cents) - Number(r.discounts_cents), transactions: r.transaction_count as number | null,

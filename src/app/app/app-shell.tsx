@@ -145,7 +145,7 @@ export function AppShell({ areas, more, orgName, orgSwitcher, email, today, fabP
       <main id="main" className="flex min-w-0 flex-col gap-[18px] pt-4">{children}</main>
 
       {fab && (
-        <Link href={fab.href} className="fixed bottom-[calc(84px+env(safe-area-inset-bottom,0px))] right-4 z-30 flex items-center gap-2 rounded-full bg-accent px-[18px] py-3.5 text-[15px] font-semibold text-white shadow-[0_10px_24px_rgba(91,127,245,.45)]">
+        <Link href={fab.href} data-fab className="fixed bottom-[calc(84px+env(safe-area-inset-bottom,0px))] right-4 z-30 flex items-center gap-2 rounded-full bg-accent px-[18px] py-3.5 text-[15px] font-semibold text-white shadow-[0_10px_24px_rgba(91,127,245,.45)]">
           <Icon k="plus" className="size-[18px]" />{fab.label}
         </Link>
       )}
