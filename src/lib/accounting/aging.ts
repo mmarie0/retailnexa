@@ -30,3 +30,26 @@ export function agingReport(bills: OpenBill[], asOf: string) {
   const rows = [...byVendor.values()].sort((a, b) => b.total - a.total || a.vendorName.localeCompare(b.vendorName));
   return { rows, totals, total: rows.reduce((a, r) => a + r.total, 0) };
 }
+
+export interface BillAsOfInput {
+  billDate: string;
+  totalCents: number;
+  /** True once approved (posted to AP on the bill date). */
+  posted: boolean;
+  /** Business date the bill's void reversal was posted, if voided. */
+  voidedOn: string | null;
+  payments: { paidOn: string; amountCents: number; voided: boolean }[];
+}
+
+/**
+ * What was still owed on a bill at the end of `asOf`, matching Accounts payable
+ * on the balance sheet for that date (#37): only posted bills dated on/before
+ * as-of, not yet voided by then, less non-voided payments dated on/before as-of.
+ * (Voided payments are reversed on their own payment date, so they never count.)
+ */
+export function openAsOf(b: BillAsOfInput, asOf: string): number {
+  if (!b.posted || b.billDate > asOf) return 0;
+  if (b.voidedOn && b.voidedOn <= asOf) return 0;
+  const paid = b.payments.filter((p) => !p.voided && p.paidOn <= asOf).reduce((a, p) => a + p.amountCents, 0);
+  return Math.max(0, b.totalCents - paid);
+}

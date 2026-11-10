@@ -6,8 +6,7 @@ import { ROLE_LABELS } from '@/lib/auth/permissions';
 import { formatMoney } from '@/lib/billing/plans';
 import { todayIn } from '@/lib/time';
 import { salesWindows, summarizeBills, summarizeSales } from '@/lib/dashboard/summary';
-import { computeProfit } from '@/lib/finance/metrics';
-import { profitInputsFromBalances, type AccountRole } from '@/lib/accounting/postings';
+import { incomeStatement, type LedgerRow } from '@/lib/accounting/statements';
 import { DailySalesChart } from './_dashboard/daily-sales-chart';
 import { Change, Stat } from './_dashboard/tiles';
 
@@ -38,7 +37,7 @@ export default async function OverviewPage() {
       .gte('business_date', w.lastYear.from).lte('business_date', w.lastYear.to).limit(2000) : Promise.resolve({ data: null }),
     showBills ? supabase.from('bills').select('status, due_date, total_cents, paid_cents').eq('organization_id', ctx.org.id)
       .in('status', ['draft', 'approved']).limit(2000) : Promise.resolve({ data: null }),
-    showProfit ? supabase.rpc('account_activity', { p_org: ctx.org.id, p_from: monthStart, p_to: today }) : Promise.resolve({ data: null }),
+    showProfit ? supabase.rpc('account_activity_detail', { p_org: ctx.org.id, p_from: monthStart, p_to: today }) : Promise.resolve({ data: null }),
   ]);
   const salesRows = [...(recent.data ?? []), ...(lastYear.data ?? [])].map((r) => ({
     date: r.business_date as string, netCents: Number(r.gross_sales_cents) - Number(r.discounts_cents), transactions: r.transaction_count as number | null,
@@ -47,17 +46,10 @@ export default async function OverviewPage() {
   const ap = showBills ? summarizeBills((bills.data ?? []).map((b) => ({
     status: b.status as string, dueDate: b.due_date as string, openCents: Number(b.total_cents) - Number(b.paid_cents),
   })), today) : null;
-  const balances = Object.fromEntries(((activity.data ?? []) as { role: string; net_cents: number }[]).map((r) => [r.role, Number(r.net_cents)])) as Partial<Record<AccountRole, number>>;
-  const pi = profitInputsFromBalances(balances);
-  const profit = showProfit && activity.data ? computeProfit({
-    netSalesCents: pi.netSalesCents, cogsCents: pi.cogsCents,
-    operatingExpensesCents: {
-      payroll: pi.operatingExpensesCents.payroll, rent: pi.operatingExpensesCents.rent, utilities: pi.operatingExpensesCents.utilities,
-      cardFees: pi.operatingExpensesCents.card_fees,
-      other: (pi.operatingExpensesCents.other_operating ?? 0) + (pi.operatingExpensesCents.inventory_adjustments ?? 0),
-    },
-    otherIncomeCents: pi.otherIncomeCents, otherExpensesCents: pi.otherExpensesCents, interestCents: pi.interestCents, taxesCents: pi.taxesCents,
-  }) : null;
+  // Same rows and builder as the Profit & loss page, so the tiles always agree with it (#47).
+  const pl = showProfit && activity.data ? incomeStatement(((activity.data ?? []) as { account_id: string; code: string; name: string; type: LedgerRow['type']; role: string | null; net_cents: number }[])
+    .map((r) => ({ id: r.account_id, code: r.code, name: r.name, type: r.type, role: r.role, net: Number(r.net_cents) }))) : null;
+  const marginPct = pl && pl.revenue.total ? Math.round((pl.grossProfit / pl.revenue.total) * 10_000) / 100 : null;
   const monthName = new Date(`${today}T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long' });
 
   const steps = [
@@ -94,13 +86,13 @@ export default async function OverviewPage() {
           <Link href="/app/sales/import" className="mt-3 inline-block font-semibold text-accent-strong">Add sales</Link>
         </Card>
       )}
-      {(ap || profit) && (
+      {(ap || pl) && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {ap && <Stat label="Bills to pay" value={formatMoney(ap.unpaidCents)} sub={ap.drafts ? `${ap.drafts} draft${ap.drafts === 1 ? '' : 's'} awaiting approval` : `${formatMoney(ap.dueNext7Cents)} due this week`} href="/app/bills" />}
           {ap && <Stat label="Overdue bills" value={formatMoney(ap.overdueCents)} tone={ap.overdueCents > 0 ? 'late' : undefined} sub={ap.overdueCount ? `${ap.overdueCount} bill${ap.overdueCount === 1 ? '' : 's'} past due` : 'Nothing overdue'} href="/app/bills" />}
-          {profit && <Stat label={`${monthName} gross profit`} value={formatMoney(profit.grossProfitCents)}
-            sub={pi.cogsCents === 0 && profit.netSalesCents > 0 ? 'Cost of goods not tracked yet' : profit.grossMarginPct === null ? 'No sales yet' : `${profit.grossMarginPct}% margin`} />}
-          {profit && <Stat label={`${monthName} operating profit`} value={formatMoney(profit.operatingProfitCents)} sub={`After ${formatMoney(profit.operatingExpensesCents)} expenses`} />}
+          {pl && <Stat label={`${monthName} gross profit`} value={formatMoney(pl.grossProfit)} href={can(ctx, 'accounting.view') ? '/app/accounting/profit-loss' : undefined}
+            sub={pl.cogs.total === 0 && pl.revenue.total > 0 ? 'Cost of goods not tracked yet' : marginPct === null ? 'No sales yet' : `${marginPct.toFixed(2)}% margin`} />}
+          {pl && <Stat label={`${monthName} operating profit`} value={formatMoney(pl.operatingProfit)} sub={`After ${formatMoney(pl.operatingExpenses.total)} expenses`} />}
         </div>
       )}
       {steps.length > 0 && (

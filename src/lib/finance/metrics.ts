@@ -46,7 +46,7 @@ export function computeProfit(i: ProfitInputs): ProfitResult {
   return {
     netSalesCents: i.netSalesCents,
     grossProfitCents: gross,
-    grossMarginPct: i.netSalesCents ? Math.round((gross / i.netSalesCents) * 1000) / 10 : null,
+    grossMarginPct: i.netSalesCents ? Math.round((gross / i.netSalesCents) * 10_000) / 100 : null,
     operatingExpensesCents: opex,
     operatingProfitCents: operating,
     netIncomeCents: net,

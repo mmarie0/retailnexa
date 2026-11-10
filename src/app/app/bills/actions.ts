@@ -196,3 +196,22 @@ export async function voidBill(_p: ActionState, form: FormData): Promise<ActionS
     return failFrom(e);
   }
 }
+
+export async function voidBillPayment(_p: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const ctx = await guard('bills.pay');
+    if (isState(ctx)) return ctx;
+    const payment = uuid.parse(form.get('payment'));
+    const bill = uuid.parse(form.get('bill'));
+    const reason = String(form.get('reason') ?? '').trim();
+    if (reason.length < 3) return fail('Say why this payment is being voided.', { reason: 'Required' });
+    const supabase = await getSupabase();
+    const { error } = await supabase.rpc('void_bill_payment', { p_payment: payment, p_reason: reason.slice(0, 500) });
+    if (error) throw error;
+    revalidatePath(`/app/bills/${bill}`);
+    revalidatePath('/app/bills');
+    return ok('Payment voided. The bill is open again for that amount.');
+  } catch (e) {
+    return failFrom(e);
+  }
+}

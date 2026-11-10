@@ -9,7 +9,7 @@ import { SubmitButton } from '@/components/submit-button';
 import { formatMoney } from '@/lib/billing/plans';
 import { centsToInput } from '@/lib/money';
 import { todayIn } from '@/lib/time';
-import { approveBill, recordBillPayment, voidBill } from '../actions';
+import { approveBill, recordBillPayment, voidBill, voidBillPayment } from '../actions';
 import { STATUS_LABEL, STATUS_TONE, daysOverdue, fmtDate, type BillStatus } from '../format';
 
 export const metadata: Metadata = { title: 'Bill' };
@@ -26,13 +26,15 @@ export default async function BillPage({ params }: PageProps<'/app/bills/[id]'>)
     .select('id, vendor_id, bill_number, bill_date, due_date, memo, status, total_cents, paid_cents, journal_entry_id, approved_at, void_reason')
     .eq('organization_id', ctx.org.id).eq('id', id).maybeSingle();
   if (!bill) notFound();
-  const [{ data: vendor }, { data: lines }, { data: payments }, { data: accounts }, { data: orgRow }] = await Promise.all([
+  const [{ data: vendor }, { data: lines }, { data: payments }, { data: accounts }, { data: orgRow }, { data: voids }] = await Promise.all([
     supabase.from('vendors').select('name').eq('id', bill.vendor_id).maybeSingle(),
     supabase.from('bill_lines').select('id, account_id, description, amount_cents').eq('bill_id', id).order('id'),
     supabase.from('bill_payments').select('id, paid_on, amount_cents, source, reference').eq('bill_id', id).order('paid_on'),
     supabase.rpc('bill_account_options', { p_org: ctx.org.id }),
     supabase.from('organizations').select('timezone').eq('id', ctx.org.id).maybeSingle(),
+    supabase.from('bill_payment_voids').select('payment_id, reason').eq('organization_id', ctx.org.id),
   ]);
+  const voided = new Map((voids ?? []).map((v) => [v.payment_id, v.reason]));
   const acct = new Map(((accounts ?? []) as { id: string; code: string; name: string }[]).map((a) => [a.id, a]));
   const status = bill.status as BillStatus;
   const total = Number(bill.total_cents);
@@ -81,9 +83,22 @@ export default async function BillPage({ params }: PageProps<'/app/bills/[id]'>)
           <h2 className="mb-3 text-lg font-bold">Payments</h2>
           <ul className="divide-y divide-line">
             {(payments ?? []).map((p) => (
-              <li key={p.id} className="flex flex-wrap justify-between gap-2 py-2">
-                <span>{fmtDate(p.paid_on)} · {SOURCE_LABEL[p.source] ?? p.source}{p.reference ? ` · ${p.reference}` : ''}</span>
-                <span className="num font-semibold">{formatMoney(Number(p.amount_cents))}</span>
+              <li key={p.id} className="py-2">
+                <div className="flex flex-wrap justify-between gap-2">
+                  <span className={voided.has(p.id) ? 'text-muted line-through' : ''}>{fmtDate(p.paid_on)} · {SOURCE_LABEL[p.source] ?? p.source}{p.reference ? ` · ${p.reference}` : ''}</span>
+                  <span className="flex items-center gap-2">{voided.has(p.id) && <Badge tone="warning">Voided</Badge>}<span className="num font-semibold">{formatMoney(Number(p.amount_cents))}</span></span>
+                </div>
+                {voided.has(p.id) && <p className="text-sm text-muted">Voided: {voided.get(p.id)}</p>}
+                {!voided.has(p.id) && canPay && (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-sm font-semibold text-late">Void this payment</summary>
+                    <ActionForm action={voidBillPayment} className="mt-2 flex flex-wrap items-end gap-2">
+                      <input type="hidden" name="payment" value={p.id} /><input type="hidden" name="bill" value={bill.id} />
+                      <Field label="Reason" htmlFor={`vp-${p.id}`}><Input id={`vp-${p.id}`} name="reason" required minLength={3} maxLength={500} className="w-72" /></Field>
+                      <SubmitButton size="sm" variant="danger" pendingText="Voiding…">Void payment</SubmitButton>
+                    </ActionForm>
+                  </details>
+                )}
               </li>
             ))}
           </ul>
@@ -105,7 +120,8 @@ export default async function BillPage({ params }: PageProps<'/app/bills/[id]'>)
       {status === 'approved' && canPay && (
         <Card>
           <h2 className="mb-3 text-lg font-bold">Record a payment</h2>
-          <ActionForm action={recordBillPayment} className="flex flex-col gap-3">
+          {/* Remount after each payment so the next one gets a fresh one-time key (#46). */}
+          <ActionForm key={`pay-${bill.paid_cents}`} action={recordBillPayment} className="flex flex-col gap-3">
             <input type="hidden" name="id" value={bill.id} />
             <input type="hidden" name="idempotency_key" value={randomUUID()} />
             <div className="grid gap-3 sm:grid-cols-2">

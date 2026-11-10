@@ -1,9 +1,16 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { can, getOrgContext, getSupabase } from '@/lib/auth/context';
-import { Badge, Card, EmptyState, Notice, PageHeader, buttonClass } from '@/components/ui';
+import { Badge, Card, EmptyState, Field, Input, Notice, PageHeader, buttonClass } from '@/components/ui';
 import { formatMoney } from '@/lib/billing/plans';
+import { ActionForm } from '@/components/action-form';
+import { SubmitButton } from '@/components/submit-button';
+import { todayIn } from '@/lib/time';
 import { AccountingTabs } from '../nav';
+import { reverseJournalEntry } from '../actions';
+
+// Entries owned by another record (a sale, bill, payment or bank line) are undone from that record's page.
+const REVERSIBLE_HERE = new Set(['manual', 'card_deposit', 'cash_deposit', 'sales_tax_payment', 'owner_draw', 'owner_contribution']);
 
 export const metadata: Metadata = { title: 'Journal' };
 const PAGE = 50;
@@ -26,6 +33,9 @@ export default async function JournalPage({ searchParams }: PageProps<'/app/acco
   ]);
   const acct = new Map((accounts ?? []).map((a) => [a.id, a]));
   const reversed = new Set(list.map((e) => e.reverses_entry_id).filter(Boolean));
+  const canReverse = can(ctx, 'accounting.post') && ctx.access.canWrite;
+  const { data: orgRow } = canReverse ? await supabase.from('organizations').select('timezone').eq('id', ctx.org.id).maybeSingle() : { data: null };
+  const today = todayIn(orgRow?.timezone);
 
   return (
     <>
@@ -66,6 +76,17 @@ export default async function JournalPage({ searchParams }: PageProps<'/app/acco
                       })}
                     </tbody>
                   </table>
+                  {canReverse && !e.reverses_entry_id && !reversed.has(e.id) && REVERSIBLE_HERE.has(e.source_type ?? 'manual') && (
+                    <details className="px-5 pb-3 pt-1">
+                      <summary className="cursor-pointer text-sm font-semibold text-late">Reverse this entry</summary>
+                      <ActionForm action={reverseJournalEntry} className="mt-2 flex flex-wrap items-end gap-2">
+                        <input type="hidden" name="entry" value={e.id} />
+                        <Field label="Reversal date" htmlFor={`rd-${e.id}`}><Input id={`rd-${e.id}`} name="date" type="date" defaultValue={today} className="w-auto" required /></Field>
+                        <Field label="Reason" htmlFor={`rr-${e.id}`}><Input id={`rr-${e.id}`} name="reason" required minLength={3} maxLength={480} className="w-72" /></Field>
+                        <SubmitButton size="sm" variant="danger" pendingText="Reversing…">Reverse</SubmitButton>
+                      </ActionForm>
+                    </details>
+                  )}
                 </Card>
               </li>
             );

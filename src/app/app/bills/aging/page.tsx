@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { can, getOrgContext, getSupabase } from '@/lib/auth/context';
 import { Card, EmptyState, Input, Notice, PageHeader, buttonClass, cx } from '@/components/ui';
 import { formatMoney } from '@/lib/billing/plans';
-import { AGING_BUCKETS, agingReport } from '@/lib/accounting/aging';
+import { AGING_BUCKETS, agingReport, openAsOf } from '@/lib/accounting/aging';
 import { todayIn } from '@/lib/time';
 
 export const metadata: Metadata = { title: 'Bills aging' };
@@ -14,21 +14,34 @@ export default async function AgingPage({ searchParams }: PageProps<'/app/bills/
   if (!can(ctx, 'bills.view')) return <Notice tone="warning">You don’t have access to bills.</Notice>;
   const sp = await searchParams;
   const supabase = await getSupabase();
-  const [{ data: bills }, { data: vendors }, { data: orgRow }] = await Promise.all([
-    supabase.from('bills').select('vendor_id, due_date, total_cents, paid_cents').eq('organization_id', ctx.org.id).eq('status', 'approved').limit(5000),
+  const [{ data: bills }, { data: vendors }, { data: orgRow }, { data: payments }, { data: voids }] = await Promise.all([
+    supabase.from('bills').select('id, vendor_id, bill_date, due_date, total_cents, status, journal_entry_id, voided_at')
+      .eq('organization_id', ctx.org.id).not('journal_entry_id', 'is', null).limit(5000),
     supabase.from('vendors').select('id, name').eq('organization_id', ctx.org.id),
     supabase.from('organizations').select('timezone').eq('id', ctx.org.id).maybeSingle(),
+    supabase.from('bill_payments').select('id, bill_id, paid_on, amount_cents').eq('organization_id', ctx.org.id).limit(20000),
+    supabase.from('bill_payment_voids').select('payment_id').eq('organization_id', ctx.org.id),
   ]);
   const asOf = typeof sp.as_of === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(sp.as_of) ? sp.as_of : todayIn(orgRow?.timezone);
   const names = new Map((vendors ?? []).map((v) => [v.id, v.name]));
+  const voidedPayments = new Set((voids ?? []).map((v) => v.payment_id));
+  const paysByBill = new Map<string, { paidOn: string; amountCents: number; voided: boolean }[]>();
+  for (const p of payments ?? []) {
+    paysByBill.set(p.bill_id, [...(paysByBill.get(p.bill_id) ?? []), { paidOn: p.paid_on, amountCents: Number(p.amount_cents), voided: voidedPayments.has(p.id) }]);
+  }
+  // A voided bill's reversal is posted on the later of its bill date and the (UTC) day it was voided.
+  const voidedOn = (b: { bill_date: string; voided_at: string | null }) =>
+    b.voided_at ? [b.bill_date, b.voided_at.slice(0, 10)].sort()[1] : null;
   const report = agingReport((bills ?? []).map((b) => ({
-    vendorId: b.vendor_id, vendorName: names.get(b.vendor_id) ?? 'Vendor', dueDate: b.due_date, openCents: Number(b.total_cents) - Number(b.paid_cents),
+    vendorId: b.vendor_id, vendorName: names.get(b.vendor_id) ?? 'Vendor', dueDate: b.due_date,
+    openCents: openAsOf({ billDate: b.bill_date, totalCents: Number(b.total_cents), posted: true,
+      voidedOn: b.status === 'void' ? voidedOn(b) : null, payments: paysByBill.get(b.id) ?? [] }, asOf),
   })), asOf);
   const late = report.total - report.totals.current;
 
   return (
     <>
-      <PageHeader title="Bills aging" description="What you owe each vendor, grouped by how late it is. Approved, unpaid bills only."
+      <PageHeader title="Bills aging" description="What you owed each vendor at the end of the chosen day, grouped by how late it was. Matches Accounts payable on the balance sheet for that date."
         actions={<Link href="/app/bills" className="font-semibold text-accent-strong">All bills</Link>} />
       <form className="flex items-end gap-2">
         <label className="flex flex-col gap-1 text-sm font-semibold">As of<Input type="date" name="as_of" defaultValue={asOf} className="w-auto" /></label>
