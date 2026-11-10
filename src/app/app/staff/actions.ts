@@ -172,27 +172,28 @@ export async function createPayRun(_p: ActionState, form: FormData): Promise<Act
       pay_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick a date'),
       period_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), period_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
       note: z.string().trim().max(300).optional(),
+      idempotency_key: z.string().regex(/^[A-Za-z0-9-]{8,100}$/),
     }).safeParse(Object.fromEntries(form));
     if (!head.success) return fail('Check the highlighted fields.', issues(head.error));
     const ids = form.getAll('employee_id').map(String).filter((id) => z.string().uuid().safeParse(id).success);
     const lines = [];
     for (const id of ids) {
       if (form.get(`inc-${id}`) !== 'on') continue;
-      const money = (f: string) => { const v = String(form.get(`${f}-${id}`) ?? '').trim(); return v ? parseDollarsToCents(v) : 0; };
+      // Only hours, overtime hours and a bonus come from the form; the database computes the pay (#156).
+      const bonusRaw = String(form.get(`bonus-${id}`) ?? '').trim();
+      const bonus = bonusRaw ? parseDollarsToCents(bonusRaw) : 0;
       const hours = Number(form.get(`hours-${id}`) ?? 0), ot = Number(form.get(`ot-${id}`) ?? 0);
-      const regular = money('regular'), overtime = money('overtime'), bonus = money('bonus'), tax = money('tax');
-      if ([regular, overtime, bonus, tax].some((v) => v === null) || !(hours >= 0 && hours <= 400) || !(ot >= 0 && ot <= 400)) {
-        return fail(`Check the amounts for ${String(form.get(`name-${id}`) ?? 'an employee')}.`);
+      if (bonus === null || bonus > 1_000_000 || !(hours >= 0 && hours <= 400) || !(ot >= 0 && ot <= hours)) {
+        return fail(`Check ${String(form.get(`name-${id}`) ?? 'an employee')}: hours 0–400, overtime no more than hours, bonus up to $10,000.`);
       }
-      lines.push({ employee_id: id, pay_type: form.get(`type-${id}`) === 'salary' ? 'salary' : 'hourly', hours, overtime_hours: ot,
-        rate_cents: Number(form.get(`rate-${id}`) ?? 0) || 0, regular_cents: regular, overtime_cents: overtime, bonus_cents: bonus,
-        employer_tax_cents: tax, pay_method: String(form.get(`method-${id}`) ?? '') || null,
+      lines.push({ employee_id: id, hours, overtime_hours: ot, bonus_cents: bonus, pay_method: String(form.get(`method-${id}`) ?? '') || null,
         advance_ids: form.getAll(`adv-${id}`).map(String).filter((a) => z.string().uuid().safeParse(a).success) });
     }
     if (!lines.length) return fail('Tick at least one employee.');
     const h = head.data;
     const { error } = await (await getSupabase()).rpc('create_pay_run', {
       p_org: g.ctx.org.id, p_pay_date: h.pay_date, p_period_start: h.period_start, p_period_end: h.period_end, p_lines: lines, p_note: h.note || null,
+      p_idempotency_key: `${g.ctx.org.id.slice(0, 8)}-${h.idempotency_key}`,
     });
     if (error) throw error;
     revalidatePath('/app/staff', 'layout');

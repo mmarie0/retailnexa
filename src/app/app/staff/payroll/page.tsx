@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { randomUUID } from 'node:crypto';
 import { can, getOrgContext } from '@/lib/auth/context';
 import { ActionForm } from '@/components/action-form';
 import { SubmitButton } from '@/components/submit-button';
@@ -56,7 +57,6 @@ export default async function PayrollPage({ searchParams }: PageProps<'/app/staf
   const open = (advances ?? []) as Adv[];
   const name = new Map(s.employees.map((e) => [e.id, e.name]));
   const manage = can(ctx, 'payroll.manage') && ctx.access.canWrite;
-  const money = (c: number) => (c / 100).toFixed(2);
   const runTotal = (id: string) => ((lines ?? []) as Line[]).filter((l) => l.run_id === id);
 
   return (
@@ -107,9 +107,11 @@ export default async function PayrollPage({ searchParams }: PageProps<'/app/staf
             <ActionForm action={createPayRun} className="flex flex-col gap-3">
               <input type="hidden" name="period_start" value={period.start} />
               <input type="hidden" name="period_end" value={period.end} />
+              {/* One key per form: a double click or retry saves the run once. */}
+              <input type="hidden" name="idempotency_key" value={randomUUID()} />
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[860px] text-[14px]">
-                  <thead className="text-left"><tr><th className="py-1">Pay</th><th>Employee</th><th>Hours</th><th>OT hrs</th><th>Regular</th><th>Overtime</th><th>Bonus</th><th>Employer tax</th><th>Take back advances</th><th>Paid by</th></tr></thead>
+                  <thead className="text-left"><tr><th className="py-1">Pay</th><th>Employee</th><th>Hours</th><th>OT hrs</th><th>Bonus</th><th>Pay (from schedule)</th><th>Take back advances</th><th>Paid by</th></tr></thead>
                   <tbody>
                     {suggested.map((l) => {
                       const advs = open.filter((a) => a.employee_id === l.employee_id);
@@ -117,14 +119,12 @@ export default async function PayrollPage({ searchParams }: PageProps<'/app/staf
                       return (
                         <tr key={id} className="border-t border-line align-top">
                           <td className="py-2"><input type="hidden" name="employee_id" value={id} /><input type="checkbox" name={`inc-${id}`} defaultChecked aria-label={`Pay ${l.name}`} className="size-4 accent-[#3f63de]" /></td>
-                          <td className="py-2 pr-2 font-semibold">{l.name}<input type="hidden" name={`name-${id}`} value={l.name} /><input type="hidden" name={`type-${id}`} value={l.pay_type} /><input type="hidden" name={`rate-${id}`} value={l.rate_cents} />
+                          <td className="py-2 pr-2 font-semibold">{l.name}<input type="hidden" name={`name-${id}`} value={l.name} />
                             <span className="block text-xs font-normal text-muted">{l.pay_type === 'salary' ? 'Salary' : `${formatMoney(l.rate_cents)}/hr`}</span></td>
                           <td><input name={`hours-${id}`} inputMode="decimal" defaultValue={l.hours} aria-label={`${l.name} hours`} className="num w-16 rounded-lg bg-soft px-2 py-1" /></td>
                           <td><input name={`ot-${id}`} inputMode="decimal" defaultValue={l.overtime_hours} aria-label={`${l.name} overtime hours`} className="num w-14 rounded-lg bg-soft px-2 py-1" /></td>
-                          <td><input name={`regular-${id}`} inputMode="decimal" defaultValue={money(l.regular_cents)} aria-label={`${l.name} regular pay`} className="num w-24 rounded-lg bg-soft px-2 py-1" /></td>
-                          <td><input name={`overtime-${id}`} inputMode="decimal" defaultValue={money(l.overtime_cents)} aria-label={`${l.name} overtime pay`} className="num w-20 rounded-lg bg-soft px-2 py-1" /></td>
                           <td><input name={`bonus-${id}`} inputMode="decimal" defaultValue="0.00" aria-label={`${l.name} bonus`} className="num w-20 rounded-lg bg-soft px-2 py-1" /></td>
-                          <td><input name={`tax-${id}`} inputMode="decimal" defaultValue={money(l.employer_tax_cents)} aria-label={`${l.name} employer tax`} className="num w-20 rounded-lg bg-soft px-2 py-1" /></td>
+                          <td className="num py-2 text-[13px]">{formatMoney(l.regular_cents + l.overtime_cents)}<span className="block text-xs text-muted">+ {formatMoney(l.employer_tax_cents)} employer tax</span></td>
                           <td className="text-xs">{advs.length ? advs.map((a) => (
                             <label key={a.id} className="flex items-center gap-1.5"><input type="checkbox" name={`adv-${id}`} value={a.id} defaultChecked className="size-3.5 accent-[#3f63de]" />{formatMoney(Number(a.amount_cents))} · {dl(a.advance_date)}</label>
                           )) : <span className="text-muted">None</span>}</td>
@@ -140,7 +140,7 @@ export default async function PayrollPage({ searchParams }: PageProps<'/app/staf
                 <Field label="Note (optional)" htmlFor="pay-note"><Input id="pay-note" name="note" maxLength={300} /></Field>
                 <SubmitButton pendingText="Saving…">Save pay run</SubmitButton>
               </div>
-              <p className="text-xs text-muted">Pay runs are your payroll record and paystubs. They are not posted to the books yet.</p>
+              <p className="text-xs text-muted">Pay is worked out from each person’s rate when you save (change hours, overtime hours or the bonus to adjust it). Someone already in an open pay run for these dates can’t be paid again until that run is voided. Pay runs are your payroll record and paystubs; they are not posted to the books yet.</p>
             </ActionForm>
           )}
         </Card>

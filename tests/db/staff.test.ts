@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { as, sys, createUser, createOrg, addMember, setSubscription, expectDenied, closeDb, type TestUser } from './helpers';
+import { Client } from 'pg';
+import { as, sys, createUser, createOrg, addMember, setSubscription, expectDenied, closeDb, adminUrl, TEST_DB, type TestUser } from './helpers';
 
 // Batch B (#102): employees, pay, schedule, payroll.
 let owner: TestUser, mgrA: TestUser, acct: TestUser, emp: TestUser, outsider: TestUser;
@@ -68,7 +69,7 @@ describe('#102 staff', () => {
     const [{ id: run }] = await as<{ id: string }>(owner, `select public.create_pay_run($1, '2026-11-14', '2026-11-08', '2026-11-14', $2::jsonb) as id`, [org, JSON.stringify([line])]);
     const [l] = await sys<{ gross_cents: string; advance_cents: string; net_cents: string }>(`select gross_cents, advance_cents, net_cents from public.pay_run_lines where run_id = $1`, [run]);
     expect(l).toEqual({ gross_cents: '23500', advance_cents: '5000', net_cents: '18500' });
-    await expectDenied(as(owner, `select public.create_pay_run($1, '2026-11-14', '2026-11-08', '2026-11-14', $2::jsonb)`, [org, JSON.stringify([line])]), /already repaid/);
+    await expectDenied(as(owner, `select public.create_pay_run($1, '2026-11-14', '2026-11-08', '2026-11-14', $2::jsonb)`, [org, JSON.stringify([line])]), /already in a pay run|already repaid/);
     await expectDenied(as(mgrA, `select public.create_pay_run($1, '2026-11-14', '2026-11-08', '2026-11-14', $2::jsonb)`, [org, JSON.stringify([{ ...line, advance_ids: [] }])]));
     await expectDenied(as(owner, `select public.create_pay_run($1, 'infinity', '2026-11-08', '2026-11-14', $2::jsonb)`, [org, JSON.stringify([{ ...line, advance_ids: [] }])]), /pay date/);
     await expectDenied(as(owner, `select public.create_pay_run($1, '2026-11-14', '2026-10-01', '2026-11-14', $2::jsonb)`, [org, JSON.stringify([{ ...line, advance_ids: [] }])]), /up to a month/);
@@ -89,5 +90,74 @@ describe('#102 staff', () => {
     const ro = await createOrg(u, 'RO Staff Co', 'retail');
     await setSubscription(ro, 'canceled');
     await expectDenied(as(u, `select public.save_employee($1, null, 'X')`, [ro]));
+  });
+
+  describe('#153 #154 #156 payroll audit fixes', () => {
+    const run = (u: TestUser, lines: object[], key: string | null = null, period = ['2026-10-04', '2026-10-10']) =>
+      as<{ id: string }>(u, `select public.create_pay_run($1, '2026-10-12', $2, $3, $4::jsonb, null, $5) as id`, [org, period[0], period[1], JSON.stringify(lines), key]);
+
+    it('#156 pay is computed from the stored rate, not the request', async () => {
+      const [{ id }] = await run(owner, [{ employee_id: ana, hours: 1, overtime_hours: 0, regular_cents: 99000, overtime_cents: 1000, bonus_cents: 500, employer_tax_cents: 0 }]);
+      const [l] = await sys<{ regular_cents: string; gross_cents: string; employer_tax_cents: string; rate_cents: string }>(
+        `select regular_cents, gross_cents, employer_tax_cents, rate_cents from public.pay_run_lines where run_id = $1`, [id]);
+      expect(l).toEqual({ regular_cents: '1500', gross_cents: '2000', employer_tax_cents: '150', rate_cents: '1500' });
+      await expectDenied(run(owner, [{ employee_id: ben, hours: 1, overtime_hours: 2 }], null, ['2026-09-06', '2026-09-12']), /overtime no more than hours/);
+      await expectDenied(run(owner, [{ employee_id: ben, hours: 1, bonus_cents: 2_000_000 }], null, ['2026-09-06', '2026-09-12']), /bonus/);
+    });
+
+    it('#156 nobody is paid twice for the same days; a retry with the same key returns the first run', async () => {
+      await expectDenied(run(owner, [{ employee_id: ana, hours: 2 }], null, ['2026-10-08', '2026-10-14']), /already in a pay run/);
+      const [{ id: a }] = await run(owner, [{ employee_id: ben, hours: 0 }], 'retry-key-0001', ['2026-08-02', '2026-08-08']);
+      const [{ id: b }] = await run(owner, [{ employee_id: ben, hours: 0 }], 'retry-key-0001', ['2026-08-02', '2026-08-08']);
+      expect(b).toBe(a);
+      // Salary: 7 of 365 days of $36,500.
+      expect((await sys<{ g: string }>(`select gross_cents as g from public.pay_run_lines where run_id = $1`, [a]))[0].g).toBe('70000');
+    });
+
+    it('#154 two overlapping pay runs can’t take back the same advance', async () => {
+      const [{ id: adv }] = await as<{ id: string }>(owner, `select public.add_advance($1, $2, '2026-07-01', 1000) as id`, [org, ana]);
+      const open = async () => {
+        const c = new Client({ connectionString: adminUrl(TEST_DB) });
+        await c.connect();
+        await c.query('begin');
+        await c.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: owner.id, role: 'authenticated', aal: 'aal1' })]);
+        await c.query('set local role authenticated');
+        return c;
+      };
+      const c1 = await open(), c2 = await open();
+      const call = (c: Client, period: [string, string]) => c.query(`select public.create_pay_run($1, '2026-07-10', $2, $3, $4::jsonb)`,
+        [org, period[0], period[1], JSON.stringify([{ employee_id: ana, hours: 5, advance_ids: [adv] }])]);
+      await call(c1, ['2026-06-28', '2026-07-04']);
+      const second = call(c2, ['2026-07-05', '2026-07-11']).then(() => 'ok', (e: Error) => e.message);
+      await c1.query('commit');
+      const r2 = await second;
+      await c2.query('rollback').catch(() => {});
+      await c1.end(); await c2.end();
+      expect(r2).toMatch(/already repaid/);
+      const runs = await sys<{ n: string }>(`select count(*) as n from public.pay_run_lines l join public.pay_runs r on r.id = l.run_id where l.advance_cents > 0 and r.pay_date = '2026-07-10'`);
+      expect(runs[0].n).toBe('1');
+    });
+
+    it('#153 a store-limited payroll manager can’t see or void another store’s run', async () => {
+      // Owners and admins always see every store, so use a manager given payroll rights and limited to store A.
+      const adminA = await createUser('st-adminA');
+      const m = await addMember(owner, org, adminA, 'manager');
+      await as(owner, `select public.set_member_locations($1, $2::uuid[])`, [m, [A]]);
+      await sys(`insert into public.member_permission_overrides (organization_id, membership_id, permission, granted) values ($1, $2, 'payroll.view', true), ($1, $2, 'payroll.manage', true)`, [org, m]);
+      const [{ id: benRun }] = await run(owner, [{ employee_id: ben, hours: 0 }], null, ['2026-05-03', '2026-05-09']);
+      expect(await as(adminA, `select 1 from public.pay_runs where id = $1`, [benRun])).toHaveLength(0);
+      await expectDenied(as(adminA, `select public.void_pay_run($1)`, [benRun]), /store you don.t have access to/);
+      expect((await sys<{ v: string | null }>(`select voided_at as v from public.pay_runs where id = $1`, [benRun]))[0].v).toBeNull();
+    });
+
+    it('deleting a business with payroll works', async () => {
+      const u = await createUser('st-del');
+      const o = await createOrg(u, 'Delete Me Payroll Co', 'retail');
+      const [{ id: e }] = await as<{ id: string }>(u, `select public.save_employee($1, null, 'Zed', null, null, null, null, true, null, null, $2::jsonb) as id`, [o, JSON.stringify({ pay_type: 'hourly', rate_cents: 1000 })]);
+      const [{ id: adv }] = await as<{ id: string }>(u, `select public.add_advance($1, $2, '2026-11-01', 500) as id`, [o, e]);
+      await as(u, `select public.create_pay_run($1, '2026-11-08', '2026-11-01', '2026-11-07', $2::jsonb)`, [o, JSON.stringify([{ employee_id: e, hours: 10, advance_ids: [adv] }])]);
+      await sys(`delete from public.organizations where id = $1`, [o]);
+      expect(await sys(`select 1 from public.pay_runs where organization_id = $1`, [o])).toHaveLength(0);
+    });
   });
 });
