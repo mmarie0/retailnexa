@@ -9,7 +9,7 @@ import { readBundle } from '@/lib/import/read-bundle';
 import { importChunk, type ChunkResult } from './actions';
 
 type Source = 'retailnexa_backup' | 'csv';
-type Mode = Source | 'bundle';
+type SheetKind = ImportKind | 'all';
 interface Prepared { notes?: string[]; source: Source; fileName: string; rows: Partial<Record<ImportKind, Row[]>>; warnings: string[]; notYet: { name: string; count: number; why: string }[]; rowErrors: { line: number; message: string }[] }
 type Tally = Record<string, { imported: number; skipped: number; failed: number; errors: { row: number; key?: string; error: string }[]; message?: string }>;
 
@@ -29,8 +29,10 @@ async function excelRows(name: string, data: Blob): Promise<string[][]> {
 
 export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] }) {
   const [org, setOrg] = useState(orgs[0]?.id ?? '');
-  const [source, setSource] = useState<Mode>('bundle');
-  const [kind, setKind] = useState<ImportKind>('bill');
+  const [source, setSource] = useState<Source>('csv');
+  // "Everything" (the default) takes one sheet with a Type column, or a .zip of sheets and backups.
+  const [kind, setKind] = useState<SheetKind>('all');
+  const all = source === 'csv' && kind === 'all';
   const [file, setFile] = useState<File | null>(null);
   const [prep, setPrep] = useState<Prepared | null>(null);
   const [tally, setTally] = useState<Tally | null>(null);
@@ -44,7 +46,7 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
   async function prepare(): Promise<Prepared | null> {
     if (!file) { setErr('Choose a file.'); return null; }
     try {
-      if (source === 'bundle') {
+      if (all) {
         // Everything in one file: a .zip of sheets and/or the old app's backup, or one sheet with a Type column.
         const read = await readBundle(file, excelRows);
         const plan = planFromTables(read.tables, { today: today() });
@@ -68,7 +70,7 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
       if (/\.xlsx$/i.test(file.name)) {
         rows = await excelRows(file.name, file);
       } else rows = parseCsv(await file.text());
-      const plan = planFromSheet(kind, rows, { today: today() });
+      const plan = planFromSheet(kind as ImportKind, rows, { today: today() });
       return { source, fileName: file.name, rows: { [kind]: plan.rows }, warnings: [], notYet: [], rowErrors: plan.errors };
     } catch (e) {
       setErr(e instanceof SyntaxError ? 'That file isn’t valid JSON.' : e instanceof Error ? e.message : 'That file couldn’t be read.');
@@ -114,34 +116,34 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
           </Select>
         </Field>
         <Field label="What are you importing?" htmlFor="imp-src">
-          <Select id="imp-src" value={source} onChange={(e) => { setSource(e.target.value as Mode); reset(); }}>
-            <option value="bundle">Everything in one file (.zip, .csv or .xlsx)</option>
+          <Select id="imp-src" value={source} onChange={(e) => { setSource(e.target.value as Source); reset(); }}>
+            <option value="csv">Spreadsheets (.csv, .xlsx or a .zip of them)</option>
             <option value="retailnexa_backup">Old RetailNexa app backup (.json)</option>
-            <option value="csv">Spreadsheet (.csv or .xlsx)</option>
           </Select>
         </Field>
         {source === 'csv' && (
-          <Field label="This sheet has" htmlFor="imp-kind" hint={SHEET_KINDS.find((s) => s.kind === kind)?.columns}>
-            <Select id="imp-kind" value={kind} onChange={(e) => { setKind(e.target.value as ImportKind); reset(); }}>
-              {SHEET_KINDS.map((s) => <option key={s.kind} value={s.kind}>{s.label}</option>)}
+          <Field label="This sheet has" htmlFor="imp-kind" hint={all ? 'Vendors, bills, sales, bank and fixed costs together: a “Type” column on each row, or a .zip with one sheet per kind.' : SHEET_KINDS.find((s) => s.kind === kind)?.columns}>
+            <Select id="imp-kind" value={kind} onChange={(e) => { setKind(e.target.value as SheetKind); reset(); }}>
+              <option value="all">Everything (all in one shot)</option>
+              {SHEET_KINDS.map((s) => <option key={s.kind} value={s.kind}>Only {s.label.toLowerCase()}</option>)}
             </Select>
           </Field>
         )}
-        {(source !== 'csv' || kind === 'sales_day') && (
+        {(source !== 'csv' || kind === 'all' || kind === 'sales_day') && (
           <Field label="Store for sales days" htmlFor="imp-store" hint="Type the store’s name exactly as it is in the business. Leave empty if the business has one store.">
             <input id="imp-store" value={store} maxLength={120} onChange={(e) => { setStore(e.target.value); reset(); }}
               className="w-full rounded-xl bg-soft px-3 py-2 text-[15px]" placeholder="Main store" />
           </Field>
         )}
-        <Field label="File" htmlFor="imp-file" hint={source === 'bundle'
-          ? 'A .zip with any mix of sheets (vendors, bills, sales, bank, fixed costs) and/or the old app backup, or one sheet with a “Type” column.'
+        <Field label="File" htmlFor="imp-file" hint={all
+          ? 'One sheet with a “Type” column, or a .zip with any mix of sheets (vendors, bills, sales, bank, fixed costs) and the old app backup.'
           : source === 'csv' ? 'One kind of record per sheet; the first row is the header.' : 'The backup downloaded from the old RetailNexa app.'}>
-          <input id="imp-file" type="file" accept={source === 'bundle' ? '.zip,.csv,.txt,.xlsx,.json' : source === 'csv' ? '.csv,.txt,.xlsx' : '.json,application/json'} onChange={(e) => { setFile(e.target.files?.[0] ?? null); reset(); }}
+          <input id="imp-file" type="file" accept={all ? '.zip,.csv,.txt,.xlsx,.json' : source === 'csv' ? '.csv,.txt,.xlsx' : '.json,application/json'} onChange={(e) => { setFile(e.target.files?.[0] ?? null); reset(); }}
             className="w-full rounded-xl bg-soft px-3 py-2 text-sm" />
         </Field>
       </div>
 
-      {source === 'bundle' && (
+      {all && (
         <p className="text-sm text-muted">One sheet for everything: add a <b>Type</b> column (Vendor, Bill, Sales, Bank, Fixed cost) and the columns each type needs.{' '}
           <a href={`data:text/csv;charset=utf-8,${encodeURIComponent(TEMPLATE_CSV)}`} download="retailnexa-import-template.csv" className="font-semibold text-accent-strong">Download a template</a></p>
       )}
