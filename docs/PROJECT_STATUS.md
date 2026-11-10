@@ -1,9 +1,10 @@
 # Project status
 
-_Last updated: 2026-11-09 — Phase 1 code complete on branch `feat/phase-1-foundation`; awaiting accounts/credentials for live verification._
+_Last updated: 2026-11-10 — Phase 1 merged and migrations live on Supabase. Phase 2 in progress on stacked feature branches (PR #3 ledger, then vendors/bills)._
 
 ## Phase 2 — in progress
-- **2.1 Ledger core** (branch `feat/phase-2-ledger`, PR open): chart of accounts seeded per business, immutable double-entry journal, idempotent posting, single reversal, period close, trial balance, posting rules that fix the prototype’s accounting errors. 65 DB tests + 49 unit tests pass locally. Not yet: UI screens, applied to the live database (needs merge approval).
+- **2.1 Ledger core** (branch `feat/phase-2-ledger`, PR open): chart of accounts seeded per business, immutable double-entry journal, idempotent posting, single reversal, period close, trial balance, posting rules that fix the prototype’s accounting errors. 65 DB tests + 49 unit tests pass locally. Accounting screens (chart of accounts, journal, trial balance) added. Not yet applied to the live database (needs merge approval).
+- **2.2 Vendors and bills / accounts payable** (branch `feat/phase-2-vendors-bills`, stacked on 2.1): vendors (with payment terms), bills as draft → approved → paid/void, duplicate invoice-number guard per vendor, approval posts Dr expense/inventory / Cr AP, partial and full payments from bank or cash post Dr AP / Cr bank|cash, idempotent payment retries, voiding an approved bill posts a reversal, bill entries can’t be reversed behind the bill’s back. Screens: Vendors, Bills (to pay / paid / void, unpaid and overdue totals), Enter a bill, Bill detail with approve / pay / void. Role split: managers enter, accountants approve, owners/admins pay. 22 DB tests + 13 unit tests. **Verified:** DB tests, typecheck, lint, production build. **Not verified:** the screens in a browser against a live Supabase (no preview deployment yet).
 
 ## Phase 1 — what exists and how it was verified
 
