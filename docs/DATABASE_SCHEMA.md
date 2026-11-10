@@ -97,6 +97,11 @@ Platform RPCs (authenticated, re-check platform role + MFA): `admin_set_org_stat
 
 System RPCs (`service_role` only): `claim_stripe_event`, `finish_stripe_event`, `link_billing_customer`, `sync_subscription`, `check_rate_limit`.
 
+Migration `20261110001700` (Stripe guards):
+- `claim_stripe_event_state` returns `claimed` | `done` | `in_flight`. The webhook answers in-flight deliveries with 409 so Stripe retries them (#12).
+- `sync_subscription` never replaces a live subscription with a different live one. It returns `conflict_second_live_subscription` and records the conflict once (`subscription_events` kind `second_live_subscription` plus an audit entry, both shown on /admin/system) (#11).
+- `begin_checkout` / `finish_checkout` keep a 60-second per-business lock and the last open Checkout session (`billing_accounts.pending_checkout_session`). A new start expires the previous open session (#11).
+
 ## Conventions for new tables (Phase 2+)
 - `id uuid default gen_random_uuid()`, `organization_id uuid not null references organizations on delete cascade`, `created_at`, `updated_at` + `private.set_updated_at` trigger.
 - Money as `bigint` cents with a `currency char(3)`; quantities as `numeric(14,3)` where fractional units exist.

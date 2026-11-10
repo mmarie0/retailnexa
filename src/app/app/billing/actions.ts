@@ -8,6 +8,29 @@ import { checkoutLineItems, formatMoney, monthlyTotalCents, normalizeSelection, 
 import { siteUrl, stripeEnv } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { fail, failFrom, ok, type ActionState } from '@/lib/actions';
+import { CheckoutBlockedError, guardedCheckout, type CheckoutGuardDeps } from '@/lib/billing/checkout-guard';
+
+function checkoutGuardDeps(): CheckoutGuardDeps {
+  const stripe = getStripe();
+  const admin = createAdminClient();
+  return {
+    listSubscriptionStatuses: async (customer) =>
+      (await stripe.subscriptions.list({ customer, status: 'all', limit: 20 })).data.map((s) => s.status),
+    beginCheckout: async (org) => {
+      const { data, error } = await admin.rpc('begin_checkout', { p_org: org });
+      if (error) throw error;
+      return (data as string | null) ?? null;
+    },
+    finishCheckout: async (org, session) => {
+      const { error } = await admin.rpc('finish_checkout', { p_org: org, p_session: session });
+      if (error) console.error('[checkout] finish failed', error.message);
+    },
+    expireSessionIfOpen: async (id) => {
+      const s = await stripe.checkout.sessions.retrieve(id);
+      if (s.status === 'open') await stripe.checkout.sessions.expire(id);
+    },
+  };
+}
 
 const LIVE = ['trialing', 'active', 'past_due', 'unpaid', 'paused', 'incomplete'];
 
@@ -58,7 +81,7 @@ export async function startCheckout(_p: ActionState, form: FormData): Promise<Ac
 
     const customer = await ensureCustomer(ctx.org.id, ctx.org.name, ctx.user.email);
     const firstCharge = new Date(Date.now() + TRIAL_DAYS * 86_400_000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    const session = await getStripe().checkout.sessions.create({
+    const session = await guardedCheckout(checkoutGuardDeps(), ctx.org.id, customer, () => getStripe().checkout.sessions.create({
       mode: 'subscription',
       customer,
       client_reference_id: ctx.org.id,
@@ -75,10 +98,11 @@ export async function startCheckout(_p: ActionState, form: FormData): Promise<Ac
       ...(trial ? { custom_text: { submit: { message: `You won’t be charged today. Your first payment of ${formatMoney(monthlyTotalCents(sel))} plus any applicable tax is on ${firstCharge} unless you cancel before then.` } } } : {}),
       success_url: `${siteUrl()}/app/billing/return?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl()}/app/billing?checkout=canceled`,
-    });
+    }));
     await auditUser(ctx.org.id, ctx.user.id, trial ? 'billing.checkout_started_trial' : 'billing.checkout_started', { products: [sel.retail && 'retail', sel.wholesale && 'wholesale'].filter(Boolean), extra_locations: sel.extraLocations });
     url = session.url;
   } catch (e) {
+    if (e instanceof CheckoutBlockedError) return fail(e.message);
     return failFrom(e);
   }
   if (!url) return fail('Stripe did not return a checkout page. Try again.');
