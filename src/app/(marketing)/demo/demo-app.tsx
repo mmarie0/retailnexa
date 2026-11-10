@@ -48,7 +48,7 @@ export function DemoApp({ anchor }: { anchor: string }) {
       </div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="font-bold">{DEMO_BUSINESS.name} <span className="font-normal text-muted">— fictional sample {account === 'retail' ? 'retail' : 'wholesale'} data</span></p>
-        <div role="tablist" aria-label="Demo sections" className="flex gap-1 overflow-x-auto rounded-full bg-soft p-1">
+        <div role="tablist" aria-label="Demo sections" className="flex flex-wrap gap-1 rounded-[18px] bg-soft p-1">
           {tabs.map((t) => (
             <button
               key={t}
@@ -140,7 +140,7 @@ function Dashboard({ anchor, account }: { anchor: string; account: Account }) {
 
       <div className="grid gap-3 sm:grid-cols-3">
         {/* RetailNexa isn't a POS: transactions and average sale come from the monthly sales report the store uploads at month end. */}
-        <KpiTile label={`${lastMonthName} report: transactions`} value={lastMonth.transactions.toLocaleString('en-US')} footnote="From the monthly sales report you upload at month end" />
+        <KpiTile label={`${lastMonthName} report: transactions`} value={lastMonth.transactions.toLocaleString('en-US')} footnote="From the monthly sales report you upload at month end (coming soon)" />
         <KpiTile label={`${lastMonthName} report: average sale`} value={money(averageTicketCents(lastMonth.salesCents, lastMonth.transactions) ?? 0)} footnote={`${money(lastMonth.salesCents)} in sales that month`} />
         {account === 'wholesale'
           ? <KpiTile label="Inventory value (at cost)" value={money(inventoryValue)} footnote={`Vendor balances owed: ${money(vendorBalance)}`} />

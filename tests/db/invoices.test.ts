@@ -20,7 +20,11 @@ afterAll(closeDb);
 
 const begin = (u: TestUser, o = org, mime = 'image/jpeg', size = 2000, loc: string | null = null) =>
   as<{ id: string; storage_path: string }>(u, `select * from public.begin_invoice_upload($1, 'scan.jpg', $2, $3, $4)`, [o, mime, size, loc]);
-const put = (u: TestUser, path: string) => as(u, `insert into storage.objects (bucket_id, name) values ('invoices', $1)`, [path]);
+// Storage records the uploaded file's type and size in metadata; by default the declared ones.
+const put = async (u: TestUser, path: string, meta?: object) => {
+  const m = meta ?? (await sys<{ m: object }>(`select jsonb_build_object('mimetype', mime_type, 'size', size_bytes) as m from public.invoice_files where storage_path = $1`, [path]))[0]?.m ?? {};
+  return as(u, `insert into storage.objects (bucket_id, name, metadata) values ('invoices', $1, $2)`, [path, JSON.stringify(m)]);
+};
 const canRead = async (u: TestUser, path: string) => (await as(u, `select 1 from storage.objects where bucket_id = 'invoices' and name = $1`, [path])).length === 1;
 
 describe('#105 invoices', () => {
@@ -136,5 +140,31 @@ describe('#105 invoices', () => {
     await as(owner, `select public.review_invoice($1, $2, 'VN-1', '2026-11-02', 500, null, null, false)`, [id, vendor]);
     expect((await as<{ id: string }>(owner, `select id from public.list_invoices($1, null, 'inv vendor')`, [org])).map((r) => r.id)).toContain(id);
     expect((await as<{ id: string }>(mgrA, `select id from public.list_invoices($1, null, 'inv vendor')`, [org])).map((r) => r.id)).not.toContain(id);
+  });
+
+  it('#145 the stored file must match the declared type and size', async () => {
+    const [{ id, storage_path }] = await begin(owner, org, 'application/pdf', 2000);
+    await put(owner, storage_path, { mimetype: 'image/jpeg', size: 9_000_000 });
+    await expectDenied(as(owner, `select public.finish_invoice_upload($1)`, [id]), /doesn.t match/);
+    const [f] = await sys<{ status: string }>(`select status from public.invoice_files where id = $1`, [id]);
+    expect(f.status).toBe('uploading');
+  });
+
+  it('#145 an uploader without invoices.view can upload (reads back only their own pending file); linking a bill needs bills.view', async () => {
+    const up = await createUser('inv-upload-only');
+    const m = await addMember(owner, org, up, 'manager');
+    await sys(`insert into public.member_permission_overrides (organization_id, membership_id, permission, granted) values ($1, $2, 'invoices.view', false), ($1, $2, 'bills.view', false)`, [org, m]);
+    const [{ id, storage_path }] = await begin(up);
+    await put(up, storage_path);
+    expect(await canRead(up, storage_path)).toBe(true); // own pending file
+    await as(up, `select public.finish_invoice_upload($1)`, [id]);
+    expect(await canRead(up, storage_path)).toBe(false); // no invoices.view once it's done
+    const [{ id: bill }] = await sys<{ id: string }>(`select id from public.bills where organization_id = $1 limit 1`, [org]).then((r) => r.length ? r : [{ id: '00000000-0000-4000-8000-000000000000' }]);
+    await expectDenied(as(up, `select public.review_invoice($1, $2, 'X', null, null, $3)`, [id, vendor, bill]), /needs access to bills|not found/);
+  });
+
+  it('#145 another business’s store is “store not found”, not a database error', async () => {
+    const [{ id: otherStore }] = await sys<{ id: string }>(`select id from public.locations where organization_id = $1 limit 1`, [other]);
+    await expectDenied(begin(owner, org, 'image/png', 100, otherStore), /store not found/);
   });
 });
