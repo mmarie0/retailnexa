@@ -114,8 +114,11 @@ describe('icsCalendar (#107 vendor calendar)', () => {
     expect(ics.startsWith('BEGIN:VCALENDAR\r\n')).toBe(true);
     expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(2);
     expect(ics).toContain('DTSTART;VALUE=DATE:20261130\r\nDTEND;VALUE=DATE:20261201');
-    expect(ics).toContain('SUMMARY:Rent\\, main\; store · $2\\,500.00 due');
+    expect(ics).toContain('SUMMARY:Rent\\, main\\; store · $2\\,500.00 due');
     expect(ics).toContain('UID:tpl:t1:2026-11-25@retailnexa');
     expect(ics.split('\r\n').every((l) => Buffer.byteLength(l) <= 75)).toBe(true);
+    // #139: every TEXT special is escaped (RFC 5545 §3.3.11).
+    const { esc } = await import('./ics');
+    expect(esc('A;B,C\\D\nE')).toBe(String.raw`A\;B\,C\\D\nE`);
   });
 });
