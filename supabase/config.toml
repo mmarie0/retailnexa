@@ -1,0 +1,6 @@
+# Supabase project marker for the GitHub integration (production deploys from `main`).
+# Only migrations in supabase/migrations are applied on merge. Per Supabase docs,
+# [auth], [api] and other settings here are ignored for production unless a
+# [remotes] block names the production project — we intentionally define none,
+# so live dashboard settings (email confirmation, MFA, URLs) are never overwritten.
+project_id = "retailnexa"
