@@ -52,7 +52,15 @@ export const toCents = (v: unknown): number | null => {
   return Number.isFinite(n) ? Math.round(n * 100) : null;
 };
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : v == null ? '' : String(v).trim());
-const isoDate = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.trim()) ? v.trim() : null);
+/** A real calendar date from 2000 to 2100 (#130); anything else is treated as missing. */
+export const isoDate = (v: unknown): string | null => {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const y = +s.slice(0, 4), m = +s.slice(5, 7), d = +s.slice(8, 10);
+  if (y < 2000 || y > 2100 || m < 1 || m > 12 || d < 1) return null;
+  return d <= new Date(Date.UTC(y, m, 0)).getUTCDate() ? s : null;
+};
 
 function docs(v: unknown): Row[] {
   if (!Array.isArray(v)) return [];

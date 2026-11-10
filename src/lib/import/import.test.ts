@@ -89,3 +89,37 @@ describe('spreadsheet → import rows', () => {
     expect(planFromSheet('vendor', [['Foo'], ['x']], { today }).errors[0].message).toMatch(/Name/);
   });
 });
+
+describe('Excel cells and dates (#129, #130)', () => {
+  it('turns every exceljs cell shape into text; error cells are empty', async () => {
+    const { cellText } = await import('./cell');
+    expect(cellText(null)).toBe('');
+    expect(cellText(12.5)).toBe('12.5');
+    expect(cellText(new Date('2026-10-05T00:00:00Z'))).toBe('2026-10-05');
+    expect(cellText({ richText: [{ text: 'Hair ' }, { text: 'Zone' }] })).toBe('Hair Zone');
+    expect(cellText({ formula: 'A1*2', result: 42 })).toBe('42');
+    expect(cellText({ formula: 'A1/0', result: { error: '#DIV/0!' } })).toBe('');
+    expect(cellText({ error: '#N/A' })).toBe('');
+    expect(cellText({ text: 'site', hyperlink: 'https://x' })).toBe('site');
+    expect(cellText({ sharedFormula: 'B1' })).toBe('');
+  });
+
+  it('backup dates must be real and between 2000 and 2100', async () => {
+    const { isoDate } = await import('./backup');
+    expect(isoDate('2026-10-31')).toBe('2026-10-31');
+    expect(isoDate('2026-02-30')).toBeNull();
+    expect(isoDate('0201-10-01')).toBeNull();
+    expect(isoDate('9999-12-31')).toBeNull();
+    expect(isoDate('infinity')).toBeNull();
+  });
+
+  it('exceljs still loads workbooks with the patched uuid', async () => {
+    const { Workbook } = await import('exceljs');
+    const wb = new Workbook();
+    wb.addWorksheet('S').addRow(['Vendor', 'Amount']);
+    const buf = await wb.xlsx.writeBuffer();
+    const back = new Workbook();
+    await back.xlsx.load(buf as ArrayBuffer);
+    expect(back.worksheets[0].getRow(1).values).toEqual([undefined, 'Vendor', 'Amount']);
+  });
+});

@@ -16,6 +16,7 @@ export default async function MasterImportPage() {
   return (
     <>
       <PageHeader title="Master import" description="Load a business’s data from the old RetailNexa app or from spreadsheets. Every row goes through the same checks as the business’s own screens, and a check run comes first." />
+      <Notice tone="info">The business must give HQ support access first (its owner: Settings → Support access). Everything you import is recorded under your name, not the owner’s.</Notice>
       <ImportClient orgs={(orgs ?? []).map((o) => ({ id: o.id, name: o.name }))} />
       <Card>
         <h2 className="mb-2 font-bold">Recent imports</h2>

@@ -35,37 +35,3 @@ export async function importChunk(input: z.input<typeof chunkSchema>): Promise<C
     return { ok: false, ...empty, message: friendlyError(e) };
   }
 }
-
-/** Excel files are read on the server (first sheet only) and returned as rows of text. */
-export async function readExcel(form: FormData): Promise<{ ok: boolean; rows?: string[][]; message?: string }> {
-  const ctx = await getAdminContext();
-  if (ctx.role !== 'superadmin') return { ok: false, message: 'Only a superadmin can import.' };
-  const file = form.get('file');
-  if (!(file instanceof File) || file.size === 0) return { ok: false, message: 'Choose a file.' };
-  if (file.size > 4 * 1024 * 1024) return { ok: false, message: 'Excel files up to 4 MB. Save larger ones as CSV.' };
-  try {
-    const { Workbook } = await import('exceljs');
-    const wb = new Workbook();
-    await wb.xlsx.load(await file.arrayBuffer());
-    const ws = wb.worksheets[0];
-    if (!ws) return { ok: false, message: 'The workbook has no sheets.' };
-    const rows: string[][] = [];
-    ws.eachRow({ includeEmpty: false }, (row) => {
-      const vals = (row.values as unknown[]).slice(1).map((v) => {
-        if (v == null) return '';
-        if (v instanceof Date) return v.toISOString().slice(0, 10);
-        if (typeof v === 'object' && v !== null) {
-          const o = v as { text?: string; result?: unknown; richText?: { text: string }[] };
-          if (o.richText) return o.richText.map((t) => t.text).join('');
-          if (o.result !== undefined) return o.result instanceof Date ? o.result.toISOString().slice(0, 10) : String(o.result);
-          if (o.text) return o.text;
-        }
-        return String(v);
-      });
-      if (rows.length < 20001) rows.push(vals);
-    });
-    return { ok: true, rows };
-  } catch {
-    return { ok: false, message: 'That Excel file couldn’t be read. Try saving it as CSV.' };
-  }
-}

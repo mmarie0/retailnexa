@@ -4,7 +4,7 @@ import { Badge, Button, Card, Field, Notice, Select } from '@/components/ui';
 import { parseCsv } from '@/lib/sales/csv';
 import { planFromBackup, type ImportKind, type Row } from '@/lib/import/backup';
 import { planFromSheet, SHEET_KINDS } from '@/lib/import/sheet';
-import { importChunk, readExcel, type ChunkResult } from './actions';
+import { importChunk, type ChunkResult } from './actions';
 
 type Source = 'retailnexa_backup' | 'csv';
 interface Prepared { source: Source; fileName: string; rows: Partial<Record<ImportKind, Row[]>>; warnings: string[]; notYet: { name: string; count: number; why: string }[]; rowErrors: { line: number; message: string }[] }
@@ -25,6 +25,7 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [store, setStore] = useState('');
 
   const reset = () => { setPrep(null); setTally(null); setChecked(false); setErr(null); };
 
@@ -38,7 +39,8 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
       let rows: string[][];
       if (/\.xlsx$/i.test(file.name)) {
         const fd = new FormData(); fd.set('file', file);
-        const r = await readExcel(fd);
+        const res = await fetch('/admin/import/xlsx', { method: 'POST', body: fd });
+        const r = (await res.json().catch(() => ({ ok: false }))) as { ok: boolean; rows?: string[][]; message?: string };
         if (!r.ok || !r.rows) { setErr(r.message ?? 'That file couldn’t be read.'); return null; }
         rows = r.rows;
       } else rows = parseCsv(await file.text());
@@ -61,9 +63,12 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
       const rows = p.rows[k] ?? [];
       if (!rows.length) continue;
       t[k] = { imported: 0, skipped: 0, failed: 0, errors: [] };
-      for (let i = 0; i < rows.length; i += CHUNK) {
+      // Sales days belong to a store (#131): the chosen store goes on every row; the database
+      // checks it exists and makes it part of each row's key.
+      const send = k === 'sales_day' && store.trim() ? rows.map((r) => ({ ...r, location: store.trim() })) : rows;
+      for (let i = 0; i < send.length; i += CHUNK) {
         setBusy(`${dryRun ? 'Checking' : 'Importing'} ${LABEL[k].toLowerCase()} ${Math.min(i + CHUNK, rows.length)} of ${rows.length}…`);
-        const r: ChunkResult = await importChunk({ org, kind: k, source: p.source, fileName: p.fileName, dryRun, rows: rows.slice(i, i + CHUNK) });
+        const r: ChunkResult = await importChunk({ org, kind: k, source: p.source, fileName: p.fileName, dryRun, rows: send.slice(i, i + CHUNK) });
         if (!r.ok) { t[k].message = r.message; break; }
         t[k].imported += r.imported; t[k].skipped += r.skipped; t[k].failed += r.failed;
         t[k].errors.push(...r.errors.map((e) => ({ ...e, row: e.row ? e.row + i : e.row })));
@@ -95,6 +100,12 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
             <Select id="imp-kind" value={kind} onChange={(e) => { setKind(e.target.value as ImportKind); reset(); }}>
               {SHEET_KINDS.map((s) => <option key={s.kind} value={s.kind}>{s.label}</option>)}
             </Select>
+          </Field>
+        )}
+        {(source === 'retailnexa_backup' || kind === 'sales_day') && (
+          <Field label="Store for sales days" htmlFor="imp-store" hint="Type the store’s name exactly as it is in the business. Leave empty if the business has one store.">
+            <input id="imp-store" value={store} maxLength={120} onChange={(e) => { setStore(e.target.value); reset(); }}
+              className="w-full rounded-xl bg-soft px-3 py-2 text-[15px]" placeholder="Main store" />
           </Field>
         )}
         <Field label="File" htmlFor="imp-file" hint={source === 'csv' ? 'One kind of record per sheet; the first row is the header.' : 'The backup downloaded from the old RetailNexa app.'}>
