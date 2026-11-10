@@ -29,12 +29,13 @@ export async function readWorkbook(buf: ArrayBuffer, maxRows = 20_000): Promise<
     const sheets = wb.worksheets.filter((ws) => ws.state !== 'hidden' && ws.state !== 'veryHidden').map((ws) => {
       const rows: string[][] = [];
       ws.eachRow({ includeEmpty: false }, (row) => {
-        if (total < maxRows + 1) { rows.push((row.values as unknown[]).slice(1).map(cellText)); total++; }
+        rows.push((row.values as unknown[]).slice(1).map(cellText)); total++;
       });
       return { name: ws.name, rows };
     });
+    if (total > maxRows + 1) throw new WorkbookError(`That workbook has more than ${maxRows.toLocaleString('en-US')} rows. Split it or save each kind as its own CSV.`);
     if (sheets.some((s) => s.rows.length)) return sheets;
-  } catch { /* fall through to the forgiving reader */ }
+  } catch (e) { if (e instanceof WorkbookError) throw e; /* else fall through to the forgiving reader */ }
   try {
     const sheets = await readXlsxLite(buf, maxRows);
     if (!sheets.length) throw new WorkbookError('The workbook has no visible sheets.');

@@ -33,11 +33,14 @@ export function kindFromWord(v: string): ImportKind | null {
 export function kindFromName(fileName: string): ImportKind | null {
   // "data.xlsx › Bills" (a workbook tab) is named by the tab.
   const n = norm((fileName.split('›').pop() ?? '').replace(/\.[a-z0-9]+$/i, '').split('/').pop() ?? '');
-  if (/\bvendors?\b|\bsuppliers?\b/.test(n)) return 'vendor';
+  const exact = kindFromWord(n);
+  if (exact) return exact;
+  // Most specific first: "Vendor bills" / "Vendor invoices" are bills, "Fixed bills" are fixed costs (#146).
   if (/\bfixed\b|\brecurring\b/.test(n)) return 'recurring';
-  if (/\bbank\b|\bstatement\b|\btransactions\b/.test(n)) return 'bank_line';
-  if (/\bsales\b|\bregister\b|\bdaily\b|\bz report\b/.test(n)) return 'sales_day';
+  if (/\bbank\b|\bstatements?\b|\btransactions\b/.test(n)) return 'bank_line';
+  if (/\bsales\b|\bregisters?\b|\bdaily\b|\bz report\b/.test(n)) return 'sales_day';
   if (/\bbills?\b|\binvoices?\b|\bap\b/.test(n)) return 'bill';
+  if (/\bvendors?\b|\bsuppliers?\b/.test(n)) return 'vendor';
   return null;
 }
 

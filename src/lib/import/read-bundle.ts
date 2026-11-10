@@ -6,7 +6,7 @@
 import { parseCsv } from '@/lib/sales/csv';
 import type { Table } from './bundle';
 
-export const BUNDLE_LIMITS = { zipBytes: 25 * 1024 * 1024, unzippedBytes: 150 * 1024 * 1024, files: 60 };
+export const BUNDLE_LIMITS = { zipBytes: 25 * 1024 * 1024, unzippedBytes: 150 * 1024 * 1024, files: 60, sheetBytes: 50 * 1024 * 1024 };
 
 export interface ReadResult { tables: Table[]; backups: { name: string; data: unknown }[]; skipped: string[] }
 
@@ -16,6 +16,8 @@ type ExcelReader = (name: string, data: Blob) => Promise<Table[]>;
 export async function readBundle(file: File | { name: string; size: number; arrayBuffer(): Promise<ArrayBuffer>; text(): Promise<string> }, readExcel: ExcelReader): Promise<ReadResult> {
   const out: ReadResult = { tables: [], backups: [], skipped: [] };
   const lower = file.name.toLowerCase();
+  // Refuse oversized files before reading them into memory (#155).
+  if (!lower.endsWith('.zip') && file.size > BUNDLE_LIMITS.sheetBytes) throw new Error(`${file.name}: files up to 50 MB. Split it or save each kind as its own CSV.`);
   if (lower.endsWith('.csv') || lower.endsWith('.txt')) { out.tables.push({ name: file.name, rows: parseCsv(await file.text()) }); return out; }
   if (/\.(xlsx|xlsm|xls)$/.test(lower)) { out.tables.push(...await readExcel(file.name, new Blob([await file.arrayBuffer()]))); return out; }
   if (lower.endsWith('.json')) { out.backups.push({ name: file.name, data: JSON.parse(await file.text()) }); return out; }
