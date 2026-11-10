@@ -36,10 +36,12 @@ All return `ActionState { ok, message, fieldErrors?, data? }`, validate input wi
 | bills | `createBill` → RPC `create_bill` (redirects to the bill) | `bills.create` |
 | bills | `approveBill`, `voidBill` | `bills.approve` |
 | bills | `recordBillPayment` (form carries a one-time key so double-submits record once) | `bills.pay` |
+| sales | `importSalesDays` (rows parsed in the browser, re-validated with zod and in SQL; one RPC per day; ≤ 400 days) , `recordSalesDayManually` | `sales.import` |
+| sales | `voidSalesDay` | `sales.edit` |
 | admin | `setOrgStatus` (superadmin/billing; close = superadmin), `setFeatureOverride`, `sendPasswordReset`, `updateLead`, `createAnnouncement`, `endAnnouncement` | platform role + MFA |
 
 ## RPC signatures
-See `supabase/migrations/20261109000300_rpc.sql`, `20261110000100_ledger.sql` and `20261110000200_vendors_bills.sql`. Parameter names are part of the contract (PostgREST calls by name).
+See `supabase/migrations/20261109000300_rpc.sql`, `20261110000100_ledger.sql` `20261110000200_vendors_bills.sql` and `20261110000300_sales_days.sql`. Parameter names are part of the contract (PostgREST calls by name).
 
 ## Versioning
 Breaking changes to a route handler or RPC require a new name/version (`sync_subscription_v2`) and a migration window; the old one is removed in a later release after callers are updated.
