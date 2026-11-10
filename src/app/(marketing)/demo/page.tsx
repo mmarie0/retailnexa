@@ -13,7 +13,7 @@ export default function DemoPage() {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-[36px] font-extrabold leading-tight sm:text-[44px]">Try it with a sample store</h1>
-          <p className="mt-2 max-w-2xl text-muted">Everything here is fictional and resets when you leave. Switch locations, open a vendor, filter inventory or build a wholesale order.</p>
+          <p className="mt-2 max-w-2xl text-muted">Everything here is fictional and resets when you leave. Pick a retail or wholesale account, switch locations and open a vendor. Wholesale also shows inventory and order building.</p>
         </div>
         <Link href="/signup" className={buttonClass('primary')}>Start free trial</Link>
       </div>

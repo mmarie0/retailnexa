@@ -16,7 +16,7 @@ export const RETAIL_FEATURES: Feature[] = [
   { title: 'Daily sales at a glance', body: 'Today, yesterday, the last 7 days and month to date, compared with the same weekdays last year. Import register reports from your POS as CSV or enter a day by hand.', status: 'available' },
   { title: 'Bills and vendors', body: 'Vendors with payment terms; bills entered by managers, approved by your accountant and paid in full or in parts; an aging report of what you owe.', status: 'available' },
   { title: 'Vendor price history', body: 'Every vendor’s invoices and prices over time, with alerts when a price goes up.', status: 'in_development' },
-  { title: 'Inventory and labels', body: 'Products with SKUs, UPCs and variants. Receive stock, count shelves, print barcode labels and see what needs reordering.', status: 'in_development' },
+  { title: 'Inventory and labels (wholesale)', body: 'For wholesale accounts: products with SKUs, UPCs and variants. Receive stock, count shelves, print barcode labels and see what needs reordering.', status: 'in_development' },
   { title: 'Register (POS)', body: 'Scan, search or tap shortcut buttons. Cash and card, returns, discounts and drawer counts.', status: 'in_development' },
   { title: 'Staff, schedules and tasks', body: 'Shifts, time clock, timesheets and payroll prep. Assign tasks with photo proof and manager sign-off.', status: 'in_development' },
   { title: 'Multiple stores', body: 'Run several locations under one account and see them separately or combined.', status: 'available' },
