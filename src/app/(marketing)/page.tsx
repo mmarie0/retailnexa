@@ -47,7 +47,7 @@ export default function Home() {
         <div>
           <h1 className="text-[42px] font-extrabold leading-[1.02] sm:text-[64px]">Know where your business stands before you lock up.</h1>
           <p className="mt-6 max-w-xl text-lg text-muted">
-            Sales, vendor bills, inventory, staff and the books for independent stores and wholesale distributors. One login for every location.
+            Sales, vendor bills, bank reconciliation and the books for independent stores and wholesale distributors. One login for every location.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/signup" className={buttonClass('primary', 'lg')}>Start {TRIAL_DAYS}-day free trial</Link>
@@ -61,7 +61,7 @@ export default function Home() {
       <section className="bg-indigo text-white">
         <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 md:grid-cols-3">
           {[
-            { title: 'For retail stores', body: 'Register reports, bills, vendors, inventory, labels, staff schedules and tasks.', href: '/solutions/retail' },
+            { title: 'For retail stores', body: 'Register reports, bills, vendors, recurring bills and bank matching. Inventory and staff are coming soon.', href: '/solutions/retail' },
             { title: 'For wholesale', body: 'Catalog with case packs, customer pricing and credit, sales rep ordering, picking and invoicing.', href: '/solutions/wholesale' },
             { title: 'For the books', body: 'Double-entry accounting underneath it all, so your profit and loss actually reconciles.', href: '/solutions/accounting' },
           ].map((c) => (

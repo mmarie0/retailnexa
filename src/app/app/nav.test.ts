@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ROLE_DEFAULTS } from '@/lib/auth/permissions';
 import { fabFor, locate, visibleAreas, visibleMore } from './nav';
 
 describe('app navigation (copied from the RetailNexa app)', () => {
@@ -26,6 +27,20 @@ describe('app navigation (copied from the RetailNexa app)', () => {
     expect(areas.find((a) => a.key === 'sales')!.pages.map((p) => p.key)).toEqual(['daily', 'history', 'categories']);
     expect(areas.some((a) => a.key === 'books')).toBe(false);
     expect(visibleMore(cashier).map((p) => p.key)).toEqual(['reps', 'statements', 'deposits']);
+  });
+
+  it('role defaults: every bottom tab either opens a page the role may see or is disabled (#123)', () => {
+    for (const role of Object.keys(ROLE_DEFAULTS) as (keyof typeof ROLE_DEFAULTS)[]) {
+      const perms = new Set<string>(ROLE_DEFAULTS[role]);
+      const areas = visibleAreas((p) => role === 'owner' || perms.has(p));
+      expect(areas.filter((a) => a.bottom).map((a) => a.key), role).toEqual(['home', 'bills', 'sales', 'staff', 'upkeep']);
+      const staff = areas.find((a) => a.key === 'staff')!;
+      expect(staff.pages.some((p) => p.href), `${role} staff`).toBe(['employees.view', 'schedule.view', 'payroll.view'].some((p) => role === 'owner' || perms.has(p)));
+      const upkeep = areas.find((a) => a.key === 'upkeep')!;
+      expect(upkeep.pages.some((p) => p.href), `${role} upkeep`).toBe(['maintenance.view', 'tasks.view'].some((p) => role === 'owner' || perms.has(p)));
+    }
+    const viewer = visibleAreas((p) => (ROLE_DEFAULTS.viewer as readonly string[]).includes(p));
+    expect(viewer.find((a) => a.key === 'bills')!.pages.some((p) => p.href)).toBe(false);
   });
 
   it('shows the add button only to people who can use it', () => {

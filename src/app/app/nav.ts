@@ -67,14 +67,14 @@ export const AREAS: NavArea[] = [
   {
     key: 'staff', label: 'Staff', icon: 'staff', bottom: true,
     pages: [
-      { key: 'team', label: 'Employees', href: '/app/staff', icon: 'staff' },
+      { key: 'team', label: 'Employees', href: '/app/staff', icon: 'staff', perm: ['employees.view', 'schedule.view', 'payroll.view'] },
       { key: 'schedule', label: 'Schedule', icon: 'calendar' },
       { key: 'payroll', label: 'Payroll', icon: 'card' },
       { key: 'stubs', label: 'Paystubs', icon: 'doc' },
       { key: 'labor', label: 'Labor %', icon: 'profit' },
     ],
   },
-  { key: 'upkeep', label: 'Upkeep', icon: 'upkeep', bottom: true, pages: [{ key: 'tasks', label: 'Maintenance', href: '/app/upkeep', icon: 'upkeep' }] },
+  { key: 'upkeep', label: 'Upkeep', icon: 'upkeep', bottom: true, pages: [{ key: 'tasks', label: 'Maintenance', href: '/app/upkeep', icon: 'upkeep', perm: ['maintenance.view', 'tasks.view'] }] },
   {
     key: 'books', label: 'Books', icon: 'book', bottom: false,
     pages: [
@@ -110,7 +110,8 @@ const allowed = (p: NavPage, can: (perm: string) => boolean) =>
 
 /** Areas with only the pages this user may see (unbuilt "Soon" pages always show). */
 export function visibleAreas(can: (perm: string) => boolean): NavArea[] {
-  return AREAS.map((a) => ({ ...a, pages: a.pages.filter((p) => allowed(p, can)) })).filter((a) => a.pages.length > 0);
+  // The five bottom tabs always show (same layout as the app); a tab with no page this person may open is shown disabled.
+  return AREAS.map((a) => ({ ...a, pages: a.pages.filter((p) => allowed(p, can)) })).filter((a) => a.bottom || a.pages.length > 0);
 }
 
 export function visibleMore(can: (perm: string) => boolean): NavPage[] {
