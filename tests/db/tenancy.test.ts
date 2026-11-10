@@ -215,7 +215,7 @@ describe('platform admin & support access', () => {
     await expectDenied(as({ ...bill, aal: 'aal1' }, `select public.admin_set_org_status($1, 'suspended', 'test')`, [orgB]));
     await as({ ...bill, aal: 'aal2' }, `select public.admin_set_org_status($1, 'suspended', 'Chargeback review')`, [orgB]);
     expect(await as(bob, `select id from public.organizations where id = $1`, [orgB])).toHaveLength(1); // still readable (export)
-    await expectDenied(as(bob, `insert into public.locations (organization_id, name) values ($1, 'New')`, [orgB]));
+    await expectDenied(as(bob, `insert into public.locations (organization_id, name, kind) values ($1, 'New', 'warehouse')`, [orgB]));
     await expectDenied(as(bob, `select public.invite_member($1, 'x@example.test', 'employee')`, [orgB]));
     const [log] = await sys<{ actor_type: string }>(`select actor_type from public.audit_logs where organization_id = $1 and action = 'organization.status_changed'`, [orgB]);
     expect(log.actor_type).toBe('platform_admin');
