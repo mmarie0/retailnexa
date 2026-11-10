@@ -19,7 +19,7 @@ afterAll(closeDb);
 const save = (u: TestUser, name: string, freq: string, next: string, opts: { day?: number; end?: string; due?: number; lines?: object[] } = {}) =>
   as<{ id: string }>(u, `select public.save_recurring_bill($1, null, $2, $3, $4::jsonb, $5::public.recurrence, $6::date, $7, $8, $9::date) as id`,
     [org, vendor, name, JSON.stringify(opts.lines ?? [{ account_id: rent, amount_cents: 350_000, description: 'Store rent' }]), freq, next, opts.day ?? null, opts.due ?? 5, opts.end ?? null]);
-const run = (u: TestUser, through: string) => as<{ n: number }>(u, `select public.create_due_recurring_bills($1, $2::date) as n`, [org, through]);
+const run = (u: TestUser, through: string) => as<{ n: number }>(u, `select (public.create_due_recurring_bills($1, $2::date) ->> 'made')::int as n`, [org, through]);
 const billsOf = (id: string) => sys<{ bill_date: string; due_date: string; status: string; total_cents: string }>(
   `select to_char(bill_date,'YYYY-MM-DD') as bill_date, to_char(due_date,'YYYY-MM-DD') as due_date, status, total_cents from public.bills where recurring_bill_id = $1 order by bill_date`, [id]);
 

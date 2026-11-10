@@ -6,6 +6,11 @@
 --        (service_role only; called by /api/cron/recurring-bills).
 -- =============================================================================
 
+-- Last failure per template (#68), shown on the template and cleared on save or success.
+alter table public.recurring_bills
+  add column last_error text,
+  add column last_error_at timestamptz;
+
 -- ---------------------------------------------------------------------------
 -- #65 save_recurring_bill: keep the stored day of month on edit
 -- ---------------------------------------------------------------------------
@@ -53,7 +58,8 @@ begin
                                else coalesce(p_day_of_month,
                                              case when next_date = p_next_date then day_of_month end,
                                              extract(day from p_next_date)::int) end,
-           next_date = p_next_date, end_date = p_end_date, due_days = coalesce(p_due_days, 0), is_active = coalesce(p_is_active, true)
+           next_date = p_next_date, end_date = p_end_date, due_days = coalesce(p_due_days, 0), is_active = coalesce(p_is_active, true),
+           last_error = null, last_error_at = null
      where id = v_id and organization_id = p_org;
     if not found then raise exception 'recurring bill not found' using errcode = 'P0002'; end if;
   end if;
@@ -136,13 +142,18 @@ end $$;
 -- Templates in stores the caller can't access are skipped (the job has no
 -- caller, so it covers every store).
 -- ---------------------------------------------------------------------------
+-- Returns {"made": n, "failed": n}. Each template runs in its own subtransaction (#68):
+-- one template that can't be billed (inactive vendor/account) is skipped and flagged
+-- on the template, and the business's other templates still run.
 create or replace function private.make_due_recurring_bills(p_org uuid, p_through date)
-returns int language plpgsql security definer set search_path = '' as $$
+returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
   r public.recurring_bills;
   v_period date;
   v_bill uuid;
   v_made int := 0;
+  v_one int;
+  v_failed int := 0;
   v_steps int;
 begin
   for r in select * from public.recurring_bills
@@ -150,26 +161,36 @@ begin
               and private.can_access_location(p_org, location_id)
             order by next_date for update
   loop
-    v_period := r.next_date; v_steps := 0;
-    while v_period <= p_through and (r.end_date is null or v_period <= r.end_date) and v_steps < 60 loop
-      if not exists (select 1 from public.bills where recurring_bill_id = r.id and recurring_period = v_period and status <> 'void') then
-        v_bill := private.insert_bill(p_org, r.vendor_id, left(r.name, 40) || ' ' || to_char(v_period, 'YYYY-MM-DD'),
-                                      v_period, v_period + r.due_days, r.lines, 'Recurring: ' || r.name, r.location_id);
-        update public.bills set recurring_bill_id = r.id, recurring_period = v_period where id = v_bill;
-        v_made := v_made + 1;
-      end if;
-      v_period := private.next_occurrence(v_period, r.frequency, r.day_of_month);
-      v_steps := v_steps + 1;
-    end loop;
-    update public.recurring_bills
-       set next_date = v_period, is_active = case when r.end_date is not null and v_period > r.end_date then false else is_active end
-     where id = r.id;
+    begin
+      v_period := r.next_date; v_steps := 0; v_one := 0;
+      while v_period <= p_through and (r.end_date is null or v_period <= r.end_date) and v_steps < 60 loop
+        if not exists (select 1 from public.bills where recurring_bill_id = r.id and recurring_period = v_period and status <> 'void') then
+          v_bill := private.insert_bill(p_org, r.vendor_id, left(r.name, 40) || ' ' || to_char(v_period, 'YYYY-MM-DD'),
+                                        v_period, v_period + r.due_days, r.lines, 'Recurring: ' || r.name, r.location_id);
+          update public.bills set recurring_bill_id = r.id, recurring_period = v_period where id = v_bill;
+          v_one := v_one + 1;
+        end if;
+        v_period := private.next_occurrence(v_period, r.frequency, r.day_of_month);
+        v_steps := v_steps + 1;
+      end loop;
+      update public.recurring_bills
+         set next_date = v_period, last_error = null, last_error_at = null,
+             is_active = case when r.end_date is not null and v_period > r.end_date then false else is_active end
+       where id = r.id;
+      v_made := v_made + v_one;
+    exception when others then
+      v_failed := v_failed + 1;
+      update public.recurring_bills set last_error = left(sqlerrm, 300), last_error_at = now() where id = r.id;
+      perform private.log_audit(p_org, case when auth.uid() is null then 'system' else 'user' end,
+        'recurring_bill.failed', 'recurring_bill', r.id::text, jsonb_build_object('error', left(sqlerrm, 300)));
+    end;
   end loop;
-  return v_made;
+  return jsonb_build_object('made', v_made, 'failed', v_failed);
 end $$;
 
-create or replace function public.create_due_recurring_bills(p_org uuid, p_through date default null)
-returns int language plpgsql security definer set search_path = '' as $$
+drop function public.create_due_recurring_bills(uuid, date);
+create function public.create_due_recurring_bills(p_org uuid, p_through date default null)
+returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_through date := coalesce(p_through, private.org_today(p_org));
 begin
   perform private.require_user();
@@ -181,14 +202,16 @@ begin
   end if;
   return private.make_due_recurring_bills(p_org, v_through);
 end $$;
+revoke all on function public.create_due_recurring_bills(uuid, date) from public, anon, authenticated;
+grant execute on function public.create_due_recurring_bills(uuid, date) to authenticated;
 
 -- Daily job: every writable business with a template due by its local today.
--- One business failing (e.g. a deactivated vendor) doesn't stop the others.
+-- One template or business failing doesn't stop the others; failures are counted.
 create or replace function public.run_recurring_bills_job()
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
   v_org uuid;
-  v_made int;
+  v_res jsonb;
   v_orgs int := 0;
   v_bills int := 0;
   v_failed int := 0;
@@ -201,12 +224,13 @@ begin
   loop
     if not private.org_is_writable(v_org) then continue; end if;
     begin
-      v_made := private.make_due_recurring_bills(v_org, private.org_today(v_org));
+      v_res := private.make_due_recurring_bills(v_org, private.org_today(v_org));
       v_orgs := v_orgs + 1;
-      v_bills := v_bills + v_made;
-      if v_made > 0 then
+      v_bills := v_bills + (v_res ->> 'made')::int;
+      v_failed := v_failed + (v_res ->> 'failed')::int;
+      if (v_res ->> 'made')::int > 0 then
         perform private.log_audit(v_org, 'system', 'recurring_bills.created', 'organization', v_org::text,
-          jsonb_build_object('bills', v_made));
+          jsonb_build_object('bills', (v_res ->> 'made')::int));
       end if;
     exception when others then
       v_failed := v_failed + 1;
@@ -214,6 +238,7 @@ begin
         jsonb_build_object('error', left(sqlerrm, 300)));
     end;
   end loop;
+  -- failed = templates (or whole businesses) that couldn't be billed this run.
   return jsonb_build_object('orgs', v_orgs, 'bills', v_bills, 'failed', v_failed);
 end $$;
 

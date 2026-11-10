@@ -27,5 +27,11 @@ export async function GET(request: Request) {
     console.error('[cron recurring-bills] failed', error.message);
     return NextResponse.json({ error: 'job failed' }, { status: 500 });
   }
-  return NextResponse.json(data);
+  const result = data as { orgs: number; bills: number; failed: number };
+  if (result.failed > 0) {
+    // Non-2xx so Vercel shows the run as failed; the bad templates are flagged in the app (#68).
+    console.error('[cron recurring-bills] some recurring bills could not be created', result);
+    return NextResponse.json(result, { status: 500 });
+  }
+  return NextResponse.json(result);
 }

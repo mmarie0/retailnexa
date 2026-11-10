@@ -73,6 +73,26 @@ describe('daily recurring-bills job', () => {
     await expectDenied(as({ kind: 'anon' }, `select public.run_recurring_bills_job()`));
   });
 
+  it('one broken template is skipped and flagged; the others still bill (#68)', async () => {
+    const [{ id: gone }] = await as<{ id: string }>(owner, `insert into public.vendors (organization_id, name) values ($1, 'Gone Vendor') returning id`, [org]);
+    const mk = (v: string, name: string) => sys<{ id: string }>(
+      `insert into public.recurring_bills (organization_id, vendor_id, location_id, name, lines, frequency, day_of_month, next_date, due_days)
+       values ($1, $2, $3, $4, $5::jsonb, 'weekly', null, private.org_today($1) - 1, 0) returning id`, [org, v, A, name, lines()]);
+    const [{ id: good }] = await mk(vendor, 'Good weekly');
+    const [{ id: bad }] = await mk(gone, 'Bad weekly');
+    await sys(`update public.vendors set is_active = false where id = $1`, [gone]);
+    const [{ r }] = await as<{ r: { made: number; failed: number } }>(owner, `select public.create_due_recurring_bills($1) as r`, [org]);
+    expect(r).toEqual({ made: 1, failed: 1 });
+    const [badRow] = await sys<{ last_error: string | null; next: string; today: string }>(
+      `select last_error, next_date::text as next, private.org_today(organization_id)::text as today from public.recurring_bills where id = $1`, [bad]);
+    expect(badRow.last_error).toMatch(/vendor not found/);
+    expect(badRow.next < badRow.today).toBe(true);
+    expect(await sys(`select 1 from public.bills where recurring_bill_id = $1`, [good])).toHaveLength(1);
+    const [{ j }] = await as<{ j: { failed: number } }>({ kind: 'service' }, `select public.run_recurring_bills_job() as j`);
+    expect(j.failed).toBe(1);
+    await sys(`update public.recurring_bills set is_active = false where id in ($1, $2)`, [good, bad]);
+  });
+
   it('creates due bills for every store and is idempotent', async () => {
     const [{ id }] = await sys<{ id: string }>(
       `insert into public.recurring_bills (organization_id, vendor_id, location_id, name, lines, frequency, day_of_month, next_date, due_days)

@@ -13,7 +13,7 @@ import { createDueRecurringBills, saveRecurringBill } from './actions';
 export const metadata: Metadata = { title: 'Recurring bills' };
 const FREQ: Record<string, string> = { weekly: 'Every week', monthly: 'Every month', quarterly: 'Every 3 months', yearly: 'Every year' };
 type Line = { account_id: string; amount_cents: number; description: string | null };
-type Tpl = { id: string; vendor_id: string; location_id: string | null; name: string; lines: Line[]; frequency: string; next_date: string; end_date: string | null; due_days: number; is_active: boolean };
+type Tpl = { id: string; vendor_id: string; location_id: string | null; name: string; lines: Line[]; frequency: string; next_date: string; end_date: string | null; due_days: number; is_active: boolean; last_error?: string | null };
 type Opt = { id: string; label: string };
 
 function Fields({ t, vendors, accounts, locations, today }: { t?: Tpl; vendors: Opt[]; accounts: Opt[]; locations: Opt[]; today: string }) {
@@ -57,7 +57,7 @@ export default async function RecurringBillsPage() {
   if (!can(ctx, 'bills.view')) return <Notice tone="warning">You don’t have access to bills.</Notice>;
   const supabase = await getSupabase();
   const [{ data: tpls }, { data: vendors }, { data: accounts }, { data: locs }, { data: orgRow }] = await Promise.all([
-    supabase.from('recurring_bills').select('id, vendor_id, location_id, name, lines, frequency, next_date, end_date, due_days, is_active').eq('organization_id', ctx.org.id).order('next_date'),
+    supabase.from('recurring_bills').select('id, vendor_id, location_id, name, lines, frequency, next_date, end_date, due_days, is_active, last_error').eq('organization_id', ctx.org.id).order('next_date'),
     supabase.from('vendors').select('id, name').eq('organization_id', ctx.org.id).eq('is_active', true).order('name'),
     supabase.rpc('bill_account_options', { p_org: ctx.org.id }),
     supabase.rpc('my_locations', { p_org: ctx.org.id }),
@@ -94,10 +94,14 @@ export default async function RecurringBillsPage() {
                     <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3">
                       <span><span className="font-bold">{t.name}</span> <span className="text-muted">· {vendorName.get(t.vendor_id) ?? 'Vendor'} · {FREQ[t.frequency]}</span></span>
                       <span className="flex items-center gap-2">
+                        {t.last_error && t.is_active && <Badge tone="danger">Needs attention</Badge>}
                         {!t.is_active ? <Badge>Stopped</Badge> : t.next_date <= today ? <Badge tone="warning">Due</Badge> : <span className="text-sm text-muted">next {fmtDate(t.next_date)}</span>}
                         <span className="num font-semibold">{formatMoney(total)}</span>
                       </span>
                     </summary>
+                    {t.last_error && t.is_active && (
+                      <p className="mt-3 text-sm text-late">The last bill couldn’t be created: {t.last_error}. Pick an active vendor and account, then save.</p>
+                    )}
                     {editable && (
                       <ActionForm action={saveRecurringBill} className="mt-4 flex flex-col gap-3">
                         <Fields t={t} vendors={vendorOpts} accounts={acctOpts} locations={locOpts} today={today} />
