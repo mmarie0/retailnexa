@@ -248,3 +248,25 @@ describe('reading Excel files that exceljs can’t (owner: "it wont read xlsx")'
     expect(sheets[1].rows[1]).toEqual(['Hair Zone', '2026-10-01', '5']);
   });
 });
+
+describe('#146 Type words and line numbers', () => {
+  it('“Vendor bill” and “Vendor invoice” are bills; nothing is dropped silently; lines point at the real sheet line', async () => {
+    const { kindFromWord, planFromTables } = await import('./bundle');
+    expect(kindFromWord('Vendor bill')).toBe('bill');
+    expect(kindFromWord('Vendor invoices')).toBe('bill');
+    expect(kindFromWord('Suppliers')).toBe('vendor');
+    expect(kindFromWord('big suppliers')).toBeNull();
+    const plan = planFromTables([{ name: 'all.csv', rows: [
+      ['Type', 'Name', 'Vendor', 'Invoice #', 'Bill date', 'Amount'],
+      ['Vendor', 'Hair Zone', '', '', '', ''],
+      ['Vendor bill', '', 'Hair Zone', 'INV-9', '2026-10-01', '100.00'],
+      ['Vendor', '', '', '', '', '5'],
+      ['Vendor invoice', '', 'Hair Zone', 'INV-10', 'not a date', '50.00'],
+    ] }], { today: '2026-11-10' });
+    expect(plan.rows.bill!.map((r) => [r.bill_number, r.line])).toEqual([['INV-9', 3]]);
+    expect(plan.errors.map((e) => [e.line, e.message])).toEqual([
+      [4, 'all.csv line 4 (Vendor): vendor name is missing'],
+      [5, 'all.csv line 5 (Bill): Hair Zone: bill date isn’t a date'],
+    ]);
+  });
+});

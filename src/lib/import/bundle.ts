@@ -15,7 +15,7 @@ export interface BundlePlan { rows: Partial<Record<ImportKind, Row[]>>; errors: 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9#]+/g, ' ').trim();
 const TYPE_HEADERS = ['type', 'record', 'record type', 'kind', 'data type', 'sheet'];
 const TYPE_WORDS: [RegExp, ImportKind][] = [
-  [/^vendors?|suppliers?$/, 'vendor'],
+  [/^(vendors?|suppliers?)$/, 'vendor'],
   [/^(bills?|invoices?|vendor bills?|vendor invoices?|ap)$/, 'bill'],
   [/^(sales?|sales days?|daily sales|register|registers|z report|sales reports?)$/, 'sales_day'],
   [/^(bank|bank lines?|bank transactions?|transactions?|statements?|bank statements?)$/, 'bank_line'],
@@ -54,22 +54,24 @@ export function kindFromHeader(head: string[]): ImportKind | null {
 }
 
 /** Splits a sheet with a Type column into one sheet per kind (same header row). */
-export function splitByType(rows: string[][]): { tables: Map<ImportKind, string[][]>; errors: { line: number; message: string }[] } | null {
+export function splitByType(rows: string[][]): { tables: Map<ImportKind, string[][]>; lines: Map<ImportKind, number[]>; errors: { line: number; message: string }[] } | null {
   const [head, ...body] = rows;
   if (!head) return null;
   const t = head.map(norm).findIndex((x) => TYPE_HEADERS.includes(x));
   if (t < 0) return null;
   const tables = new Map<ImportKind, string[][]>();
+  // The original line of each sub-table row, so messages point at the real line (#146).
+  const lines = new Map<ImportKind, number[]>();
   const errors: { line: number; message: string }[] = [];
   body.forEach((r, i) => {
     if (r.every((c) => !c?.trim())) return;
     const k = kindFromWord(r[t] ?? '');
     if (!k) { errors.push({ line: i + 2, message: `Type “${(r[t] ?? '').trim() || '(empty)'}” isn’t one of: Vendor, Bill, Sales, Bank, Fixed cost` }); return; }
-    if (!tables.has(k)) tables.set(k, [head]);
-    // Keep the original line number for messages by padding with blank rows is wasteful; remember it instead.
+    if (!tables.has(k)) { tables.set(k, [head]); lines.set(k, []); }
     tables.get(k)!.push(r);
+    lines.get(k)!.push(i + 2);
   });
-  return { tables, errors };
+  return { tables, lines, errors };
 }
 
 /** Every table → import rows for every kind, with errors naming the file. */
@@ -91,8 +93,11 @@ export function planFromTables(tables: Table[], opts: { today: string; timeZone?
     }
     for (const [kind, rows] of parts) {
       const plan = planFromSheet(kind, rows, opts);
-      add(kind, plan.rows);
-      for (const e of plan.errors) out.errors.push({ line: e.line, message: `${tb.name} (${KIND_WORD[kind]}): ${e.message}` });
+      // Sub-table line N is the original sheet's line lines[N - 2].
+      const orig = split?.lines.get(kind);
+      const real = (n: number) => (orig && n >= 2 ? orig[n - 2] ?? n : n);
+      add(kind, plan.rows.map((r) => (typeof r.line === 'number' ? { ...r, line: real(r.line) } : r)));
+      for (const e of plan.errors) out.errors.push({ line: real(e.line), message: `${tb.name} line ${real(e.line)} (${KIND_WORD[kind]}): ${e.message}` });
       out.notes.push(`${tb.name}: ${plan.rows.length} ${KIND_WORD[kind].toLowerCase()} row${plan.rows.length === 1 ? '' : 's'}.`);
     }
   }
