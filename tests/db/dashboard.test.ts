@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { balanceSheet, incomeStatement } from '../../src/lib/accounting/statements';
 import { as, sys, createUser, createOrg, addMember, expectDenied, closeDb, type TestUser } from './helpers';
 
 let owner: TestUser, acct: TestUser, mgr: TestUser, other: TestUser;
@@ -43,5 +44,43 @@ describe('account_activity', () => {
   it('rejects inverted or huge ranges', async () => {
     await expectDenied(activity(acct, '2026-11-30', '2026-11-01'), /invalid date range/);
     await expectDenied(activity(acct, '2000-01-01', '2026-11-01'), /too long/);
+  });
+});
+
+describe('account_activity_detail', () => {
+  it('returns every account with its movement in the range', async () => {
+    const rows = await as<{ code: string; role: string | null; net_cents: string }>(acct,
+      `select * from public.account_activity_detail($1, '2026-11-01'::date, '2026-11-30'::date)`, [org]);
+    expect(rows.length).toBeGreaterThanOrEqual(25);
+    expect(Number(rows.find((r) => r.role === 'sales')!.net_cents)).toBe(-30_000);
+    expect(Number(rows.find((r) => r.role === 'rent')!.net_cents)).toBe(0);
+  });
+  it('is denied to managers and outsiders', async () => {
+    await expectDenied(as(mgr, `select * from public.account_activity_detail($1, '2026-11-01'::date, '2026-11-30'::date)`, [org]));
+    await expectDenied(as(other, `select * from public.account_activity_detail($1, '2026-11-01'::date, '2026-11-30'::date)`, [org]));
+  });
+});
+
+describe('statements from real ledger data', () => {
+  it('balance sheet balances and P&L net income equals equity growth', async () => {
+    // Add a bill (expense) and a payment so liabilities and cash both move.
+    const [{ id: v }] = await as<{ id: string }>(owner, `insert into public.vendors (organization_id, name) values ($1, 'Landlord') returning id`, [org]);
+    const [{ id: rent }] = await sys<{ id: string }>(`select id from public.accounts where organization_id = $1 and role = 'rent'`, [org]);
+    const [{ id: bill }] = await as<{ id: string }>(acct, `select public.create_bill($1, $2, 'NOV-RENT', '2026-11-01'::date, null, $3::jsonb) as id`,
+      [org, v, JSON.stringify([{ account_id: rent, amount_cents: 15_000 }])]);
+    await as(acct, `select public.approve_bill($1)`, [bill]);
+    await as(owner, `select public.record_bill_payment($1, '2026-11-05'::date, 5_000, 'cash_on_hand', 'dash-pay-0001')`, [bill]);
+
+    const tb = await as<{ account_id: string; code: string; name: string; type: 'asset'; balance_cents: string }>(acct,
+      `select * from public.trial_balance($1, '2026-11-30'::date)`, [org]);
+    const b = balanceSheet(tb.map((r) => ({ id: r.account_id, code: r.code, name: r.name, type: r.type, role: null, net: Number(r.balance_cents) })));
+    expect(b.balanced).toBe(true);
+
+    const act = await as<{ account_id: string; code: string; name: string; type: 'asset'; role: string | null; net_cents: string }>(acct,
+      `select * from public.account_activity_detail($1, '2026-10-01'::date, '2026-11-30'::date)`, [org]);
+    const p = incomeStatement(act.map((r) => ({ id: r.account_id, code: r.code, name: r.name, type: r.type, role: r.role, net: Number(r.net_cents) })));
+    expect(p.revenue.total).toBe(80_000);
+    expect(p.operatingExpenses.total).toBe(15_000);
+    expect(p.netIncome).toBe(b.currentEarnings);
   });
 });
