@@ -81,3 +81,9 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* #137: the add button steps aside while the user is working in something it
+   would cover (an open day panel, an open form, a field with focus, #add). */
+body:has(main [data-fab-hide], main details[open] form, main form :focus, main #add:target) [data-fab] {
+  display: none;
+}

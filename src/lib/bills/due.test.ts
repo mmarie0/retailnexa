@@ -33,6 +33,9 @@ describe('kindOf', () => {
     expect(kindOf('Beauty Wholesale', false)).toBe('order');
     expect(kindOf('City Power & Light', false)).toBe('bill');
     expect(kindOf('Anything', true)).toBe('bill');
+    // The vendor's own setting wins (#136): "Acme Supply" sends a monthly service bill.
+    expect(kindOf('Acme Supply', false, 'bill')).toBe('bill');
+    expect(kindOf('City Power & Light', false, 'order')).toBe('order');
   });
 });
 
@@ -100,5 +103,19 @@ describe('suggestRecurring', () => {
     ];
     const s = suggestRecurring(lines, ['Rent payment']);
     expect(s).toEqual([{ label: 'ACH COMCAST 8812', months: 3, avgCents: 12500, day: 3 }]);
+  });
+});
+
+describe('icsCalendar (#107 vendor calendar)', () => {
+  it('writes one all-day event per item, escaped and folded', async () => {
+    const { icsCalendar } = await import('./ics');
+    const items = monthItems('2026-11', [bill({ id: 'b1', due_date: '2026-11-30' })], [tpl({ next_date: '2026-11-25', name: 'Rent, main; store' })], names, '2026-11-10');
+    const ics = icsCalendar('JLO bills', items, new Date('2026-11-10T12:00:00Z'));
+    expect(ics.startsWith('BEGIN:VCALENDAR\r\n')).toBe(true);
+    expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(2);
+    expect(ics).toContain('DTSTART;VALUE=DATE:20261130\r\nDTEND;VALUE=DATE:20261201');
+    expect(ics).toContain('SUMMARY:Rent\\, main\; store · $2\\,500.00 due');
+    expect(ics).toContain('UID:tpl:t1:2026-11-25@retailnexa');
+    expect(ics.split('\r\n').every((l) => Buffer.byteLength(l) <= 75)).toBe(true);
   });
 });

@@ -159,3 +159,18 @@ describe('#130 dates and #131 stores', () => {
     expect(r).toMatchObject({ imported: 3, failed: 0 });
   });
 });
+
+describe('#133 long keys never collide in derived ids', () => {
+  it('a long key keeps two identical payments, and numberless bills with a shared key prefix both import', async () => {
+    const k = 'k'.repeat(120);
+    const r = await one('bill', [{ key: k, vendor: 'Long Key Vendor', bill_date: '2026-10-01', due_date: '2026-10-30', amount_cents: 1000, account_role: 'inventory',
+      payments: [{ date: '2026-10-02', amount_cents: 300, source: 'bank' }, { date: '2026-10-02', amount_cents: 300, source: 'bank' }] }]);
+    expect(r).toMatchObject({ imported: 1, failed: 0 });
+    const [b] = await sys<{ id: string; paid_cents: string }>(`select id, paid_cents from public.bills where organization_id = $1 and vendor_id = (select id from public.vendors where organization_id = $1 and name = 'Long Key Vendor')`, [org]);
+    expect(b.paid_cents).toBe('600');
+    expect(await sys(`select 1 from public.bill_payments where bill_id = $1`, [b.id])).toHaveLength(2);
+    const prefix = 'collision vendor with a long name|2026-10-0';
+    const two = await one('bill', [1, 2].map((d) => ({ key: `${prefix}${d}|1000`, vendor: 'Coll V', bill_date: `2026-10-0${d}`, due_date: '2026-10-30', amount_cents: 1000, account_role: 'inventory' })));
+    expect(two).toMatchObject({ imported: 2, failed: 0 });
+  });
+});

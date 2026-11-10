@@ -24,10 +24,14 @@ export interface DueViewProps {
   ym: string; curYm: string; today: string; K: Kind | 'all'; F: 'all' | 'unpaid' | 'paid';
   bills: BillRow[]; templates: TemplateRow[]; vendorName: Map<string, string>; budgets: Budget[];
   canCreate: boolean; canPay: boolean; canBudget: boolean;
+  /** False for store-limited members: the budget is business-wide (#135). */
+  showBudget: boolean;
+  vendorKind?: Map<string, Kind>;
 }
 
 /** The Due view, copied from the RetailNexa app's month view (#101). Rendering only; the page loads the data. */
-export function DueView({ ym, curYm, today, K, F, bills, templates, vendorName, budgets, canCreate, canPay, canBudget }: DueViewProps) {
+export function DueView({ ym, curYm, today, K, F, bills, templates, vendorName, budgets, canCreate, canPay, canBudget: canBudgetIn, showBudget, vendorKind }: DueViewProps) {
+  const canBudget = canBudgetIn && showBudget;
   const href = (o: { m?: string; k?: string; f?: string }) => {
     const q = new URLSearchParams();
     const m = o.m ?? ym, k = o.k ?? K, f = o.f ?? F;
@@ -37,19 +41,19 @@ export function DueView({ ym, curYm, today, K, F, bills, templates, vendorName, 
     const s = q.toString();
     return s ? `/app/bills?${s}` : '/app/bills';
   };
-  const allItems = monthItems(ym, bills, templates, vendorName, today);
+  const allItems = monthItems(ym, bills, templates, vendorName, today, vendorKind);
   const items = K === 'all' ? allItems : allItems.filter((i) => i.kind === K);
   const t = totals(items);
-  const budget = K === 'all' ? budgetFor(ym, budgets) : null;
+  const budget = K === 'all' && showBudget ? budgetFor(ym, budgets) : null;
   const scale = Math.max(budget?.cents ?? 0, t.total) || 1;
   const after = budget ? budget.cents - t.total : null;
   const pastAndDone = ym < curYm && t.left === 0;
   const kindCount = (k: Kind | 'all') => { const l = k === 'all' ? allItems : allItems.filter((i) => i.kind === k); return { n: l.length, left: totals(l).left }; };
 
   const nx = ymAdd(ym, 1);
-  const f15 = monthItems(nx, bills, templates, vendorName, today).filter((i) => +i.dueDate.slice(8) <= 15);
+  const f15 = monthItems(nx, bills, templates, vendorName, today, vendorKind).filter((i) => +i.dueDate.slice(8) <= 15);
   const f15t = totals(f15), f15orders = f15.filter((i) => i.kind === 'order').length;
-  const fc = forecast(ym, 6, bills, templates, vendorName, budgets, today);
+  const fc = forecast(ym, 6, bills, templates, vendorName, showBudget ? budgets : [], today, vendorKind);
   const fmax = Math.max(1, ...fc.map((x) => Math.max(x.total, x.budget ?? 0)));
 
   const shown = items.filter((i) => (F === 'unpaid' ? i.leftCents > 0 : F === 'paid' ? i.leftCents === 0 : true));
@@ -136,6 +140,8 @@ export function DueView({ ym, curYm, today, K, F, bills, templates, vendorName, 
         </div>
         {K !== 'all' ? (
           <p className="text-sm opacity-90">{K === 'order' ? 'Vendor orders and invoices only' : 'Rent, utilities, insurance and other bills only'} · <Link href={href({ k: 'all' })} className="font-semibold underline">show all</Link></p>
+        ) : !showBudget ? (
+          <p className="text-sm opacity-90">Bills for the stores you work in. The monthly budget covers the whole business, so only owners and admins see it.</p>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-dashed border-white/40 pt-3 text-sm">
             <span>{after === null ? 'No budget set for this month' : after >= 0 ? <><b>{formatMoney(after)}</b> under budget after all bills</> : <><b>{formatMoney(-after)}</b> over budget</>}{budget && !budget.own && <span className="block text-xs opacity-90">Your every-month budget</span>}</span>
@@ -218,7 +224,7 @@ export function DueView({ ym, curYm, today, K, F, bills, templates, vendorName, 
 
       {/* Six-month forecast */}
       <Card className="flex flex-col gap-3">
-        <div className="flex items-baseline justify-between gap-2"><h2 className="text-lg font-bold">Six-month forecast</h2><span className="text-sm text-muted">Bills due vs. budget</span></div>
+        <div className="flex items-baseline justify-between gap-2"><h2 className="text-lg font-bold">Six-month forecast</h2><span className="text-sm text-muted">{showBudget ? 'Bills due vs. budget' : 'Bills due'}</span></div>
         <ul className="grid grid-cols-[4.5rem_1fr_auto] items-center gap-x-3 gap-y-2.5">
           {fc.map((x) => (
             <li key={x.ym} className="contents">
