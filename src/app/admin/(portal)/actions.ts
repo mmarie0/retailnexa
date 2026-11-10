@@ -1,4 +1,5 @@
 'use server';
+import { isFeatureKey, overrideUntilError } from '@/lib/billing/feature-keys';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { adminCan, getAdminContext } from '@/lib/auth/context';
@@ -30,13 +31,16 @@ export async function setFeatureOverride(_p: ActionState, form: FormData): Promi
     if (!adminCan(ctx.role, 'entitlements')) return fail('Your admin role can’t do that.');
     const parsed = z.object({
       org: z.string().uuid(),
-      feature: z.string().regex(/^[a-z_]+(\.[a-z_]+)*$/, 'Feature keys look like retail or wholesale.portal'),
+      feature: z.string().trim().toLowerCase().refine(isFeatureKey, 'Pick a feature from the list.'),
       value: z.enum(['on', 'off', 'clear']),
       reason: z.string().trim().min(3, 'Give a reason').max(500),
       expires: z.string().optional(),
     }).safeParse(Object.fromEntries(form));
     if (!parsed.success) return fail(parsed.error.issues[0].message);
-    const { org, feature, value, reason, expires } = parsed.data;
+    const { org, feature, value, reason } = parsed.data;
+    const expires = parsed.data.expires?.trim() || null;
+    const untilError = overrideUntilError(feature, value === 'on', expires, new Date().toISOString().slice(0, 10));
+    if (untilError) return fail(untilError);
     const { error } = await ctx.supabase.rpc('admin_set_feature_override', {
       p_org: org, p_feature: feature, p_enabled: value === 'clear' ? null : value === 'on', p_reason: reason,
       p_expires_at: expires ? new Date(`${expires}T23:59:59Z`).toISOString() : null,
