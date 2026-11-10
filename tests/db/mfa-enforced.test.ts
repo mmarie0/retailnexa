@@ -23,6 +23,20 @@ describe('#96 two-factor is enforced in the database', () => {
     expect(await as(owner, `select id from public.profiles where id = $1`, [mate.id])).toHaveLength(0);
   });
 
+  it('org, stores, subscription and overrides are closed too at aal1 (#118); own membership stays', async () => {
+    for (const q of [
+      `select id from public.organizations where id = $1`,
+      `select id from public.locations where organization_id = $1`,
+      `select organization_id from public.subscriptions where organization_id = $1`,
+      `select organization_id from public.feature_overrides where organization_id = $1`,
+      `select id from public.my_locations($1)`,
+    ]) expect(await as(owner, q, [org]), q).toHaveLength(0);
+    expect(await as(owner, `select id from public.memberships where user_id = $1`, [owner.id])).toHaveLength(1);
+    expect(await as(aal2(owner), `select id from public.organizations where id = $1`, [org])).toHaveLength(1);
+    expect((await as(aal2(owner), `select id from public.locations where organization_id = $1`, [org])).length).toBeGreaterThan(0);
+    expect((await as(aal2(owner), `select id from public.my_locations($1)`, [org])).length).toBeGreaterThan(0);
+  });
+
   it('the same user with password + code (aal2) has full access', async () => {
     expect((await as<{ p: string[] }>(aal2(owner), `select public.my_permissions($1) as p`, [org]))[0].p.length).toBeGreaterThan(10);
     expect(await as(aal2(owner), `select id from public.vendors where organization_id = $1`, [org])).toHaveLength(1);
