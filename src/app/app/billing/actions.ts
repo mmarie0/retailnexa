@@ -77,7 +77,13 @@ export async function startCheckout(_p: ActionState, form: FormData): Promise<Ac
     const supabase = await getSupabase();
     const { data: used, error: orgErr } = await supabase.from('organizations').select('id').in('id', [...new Set([ctx.org.id, ...ownedIds])]).not('trial_consumed_at', 'is', null).limit(1);
     if (orgErr) throw orgErr;
-    const trial = (used ?? []).length === 0 && !ctx.subscription;
+    let trial = (used ?? []).length === 0 && !ctx.subscription;
+    if (trial) {
+      // Claim the owner's one trial now, so a second business's Checkout started at the same time gets none (#17).
+      const { data: claimed, error: claimErr } = await createAdminClient().rpc('claim_trial', { p_user: ctx.user.id, p_org: ctx.org.id });
+      if (claimErr) throw claimErr;
+      trial = claimed === true;
+    }
 
     const customer = await ensureCustomer(ctx.org.id, ctx.org.name, ctx.user.email);
     const firstCharge = new Date(Date.now() + TRIAL_DAYS * 86_400_000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
