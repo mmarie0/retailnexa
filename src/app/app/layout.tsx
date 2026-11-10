@@ -13,6 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (can(ctx, 'locations.view')) items.push({ href: '/app/settings/locations', label: 'Locations' });
   if (can(ctx, 'members.view')) items.push({ href: '/app/settings/team', label: 'Team' });
   if (can(ctx, 'org.manage')) items.push({ href: '/app/settings/support-access', label: 'Support access' });
+  if (can(ctx, 'sales.view')) items.push({ href: '/app/sales', label: 'Sales' });
   if (can(ctx, 'bills.view')) items.push({ href: '/app/bills', label: 'Bills' });
   if (can(ctx, 'vendors.view')) items.push({ href: '/app/vendors', label: 'Vendors' });
   if (can(ctx, 'accounting.view')) items.push({ href: '/app/accounting', label: 'Accounting' });

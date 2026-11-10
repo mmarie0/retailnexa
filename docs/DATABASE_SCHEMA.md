@@ -54,6 +54,16 @@ Posting rules from business events to lines live in `src/lib/accounting/postings
 
 RPCs: `create_bill` (bills.create; active vendor, 1–100 positive lines on expense/inventory accounts; due date defaults from vendor terms), `approve_bill` (bills.approve; posts Dr lines / Cr AP), `record_bill_payment` (bills.pay; ≤ open balance, not before bill date, idempotent), `void_bill` (bills.approve; reason required; reverses the posting; refused once paid), `bill_account_options` (bills.view/create; lets managers pick accounts without reading the books). A trigger blocks `reverse_journal_entry` on bill/bill-payment entries so bill status and ledger can’t drift.
 
+## Phase 2 sales tables (migration `20261110000300_sales_days.sql`)
+
+| Table | Purpose | Client access |
+|---|---|---|
+| `sales_import_batches` | One per CSV import: source (csv/vela), filename, rows recorded | `sales.view` reads; `create_sales_import_batch()` writes |
+| `sales_days` | Register Z-report per location/register/date: gross, discounts, tax, cash, card, store credit, journal entry; voidable once | `sales.view` reads; writes via RPCs; amounts immutable (trigger) |
+| `sales_day_categories` | Optional category breakdown (net sales, quantity) | `sales.view` reads; insert-only |
+
+RPCs: `record_sales_day` (sales.import; tenders must equal gross − discounts + tax; one live record per location/register/date; posts like `dailySales()`), `void_sales_day` (sales.edit; reason required; reversal dated on the business date), `create_sales_import_batch` (sales.import). Sales entries can’t be reversed directly through the journal.
+
 ## Key functions
 
 Authorization helpers (`private`, SECURITY DEFINER, `search_path=''`): `is_org_member`, `member_role`, `has_permission`, `is_platform_admin(roles[])` (requires `aal2` when `mfa_required`), `has_support_access`, `org_is_writable` (org active **and** subscription trialing/active or past_due ≤ 7 days), `shares_org_with`, `role_rank`.
