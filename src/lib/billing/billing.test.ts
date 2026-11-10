@@ -84,3 +84,12 @@ describe('billing waiver (#32)', () => {
     expect(a.notice).toBeNull();
   });
 });
+
+describe('pricing checklist only promises shipped features (#100)', () => {
+  it('every plan entry is shipped or says coming soon', async () => {
+    const { PLANS, SHIPPED_PLAN_FEATURES } = await import('./plans');
+    for (const p of Object.values(PLANS)) {
+      for (const i of p.includes) expect(SHIPPED_PLAN_FEATURES.has(i) || i.endsWith('(coming soon)'), i).toBe(true);
+    }
+  });
+});

@@ -22,14 +22,16 @@ export default async function BillsPage({ searchParams }: PageProps<'/app/bills'
   const sp = await searchParams;
   const filter = FILTERS.find((f) => f.key === sp.status) ?? FILTERS[0];
   const supabase = await getSupabase();
-  const [{ data }, { data: vendors }, { data: orgRow }] = await Promise.all([
-    supabase.from('bills').select('id, vendor_id, bill_number, bill_date, due_date, status, total_cents, paid_cents')
+  const [{ data }, { data: vendors }, { data: orgRow }, { data: locs }] = await Promise.all([
+    supabase.from('bills').select('id, vendor_id, location_id, bill_number, bill_date, due_date, status, total_cents, paid_cents')
       .eq('organization_id', ctx.org.id).in('status', [...filter.statuses])
       .order('due_date', { ascending: true }).limit(200),
     supabase.from('vendors').select('id, name').eq('organization_id', ctx.org.id),
     supabase.from('organizations').select('timezone').eq('id', ctx.org.id).maybeSingle(),
+    supabase.from('locations').select('id, name').eq('organization_id', ctx.org.id),
   ]);
   const bills = data ?? [];
+  const storeName = new Map((locs ?? []).map((l) => [l.id, l.name]));
   const vendorName = new Map((vendors ?? []).map((v) => [v.id, v.name]));
   const today = todayIn(orgRow?.timezone);
   const open = bills.filter((b) => b.status === 'approved');
@@ -65,7 +67,7 @@ export default async function BillsPage({ searchParams }: PageProps<'/app/bills'
         <Card className="overflow-x-auto p-0">
           <table className="w-full min-w-[640px] text-[15px]">
             <thead className="text-left text-sm text-muted">
-              <tr><th className="px-5 py-3 font-semibold">Vendor</th><th className="px-3 font-semibold">Bill #</th><th className="px-3 font-semibold">Due</th><th className="px-3 font-semibold">Status</th><th className="px-5 text-right font-semibold">Open</th></tr>
+              <tr><th className="px-5 py-3 font-semibold">Vendor</th><th className="px-3 font-semibold">Bill #</th><th className="px-3 font-semibold">Store</th><th className="px-3 font-semibold">Due</th><th className="px-3 font-semibold">Status</th><th className="px-5 text-right font-semibold">Open</th></tr>
             </thead>
             <tbody>
               {bills.map((b) => {
@@ -75,6 +77,7 @@ export default async function BillsPage({ searchParams }: PageProps<'/app/bills'
                   <tr key={b.id} className="border-t border-line hover:bg-soft/60">
                     <td className="px-5 py-2.5"><Link href={`/app/bills/${b.id}`} className="font-semibold text-accent-strong">{vendorName.get(b.vendor_id) ?? 'Vendor'}</Link></td>
                     <td className="px-3">{b.bill_number}</td>
+                    <td className="px-3 text-sm">{b.location_id ? storeName.get(b.location_id) ?? 'Store' : 'Whole business'}</td>
                     <td className="px-3">{fmtDate(b.due_date)}{late > 0 && <span className="ml-2 text-sm font-semibold text-late">{late}d late</span>}</td>
                     <td className="px-3"><Badge tone={STATUS_TONE[b.status as BillStatus]}>{STATUS_LABEL[b.status as BillStatus]}</Badge></td>
                     <td className="num px-5 text-right">{formatMoney(openCents)}<span className="block text-sm text-muted">of {formatMoney(Number(b.total_cents))}</span></td>
