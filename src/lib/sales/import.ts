@@ -50,7 +50,7 @@ export function guessMapping(headers: string[]): Mapping {
   return out;
 }
 
-/** "$1,234.56", "1234.5", "(12.00)", "-3" → cents. Negative allowed here; the caller decides. */
+/** "$1,234.56", "1234.5", "(12.00)", "-3" → cents. Negative allowed here; the caller decides. More than 2 significant decimals → null. */
 export function parseAmount(raw: string | undefined): number | null {
   if (raw == null) return null;
   let s = raw.trim();
@@ -59,7 +59,9 @@ export function parseAmount(raw: string | undefined): number | null {
   if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); }
   s = s.replace(/[$\s,]/g, '');
   if (s.startsWith('-')) { neg = !neg; s = s.slice(1); }
-  const m = /^(\d{0,12})(?:\.(\d{1,2})\d*)?$/.exec(s);
+  // At most 2 decimals; extra digits are accepted only when they're zeros ("12.500"),
+  // never silently dropped ("12.345" is an error, #27 L2).
+  const m = /^(\d{0,12})(?:\.(\d{1,2})0*)?$/.exec(s);
   if (!m || (m[1] === '' && m[2] === undefined)) return null;
   const c = Number(m[1] || '0') * 100 + Number((m[2] ?? '').padEnd(2, '0') || '0');
   return neg ? -c : c;
