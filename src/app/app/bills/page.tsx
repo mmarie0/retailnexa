@@ -41,7 +41,7 @@ export default async function BillsPage({ searchParams }: PageProps<'/app/bills'
   return (
     <>
       <PageHeader title="Bills" description="Supplier bills: enter them as drafts, approve to post them to the books, then record payments."
-        actions={<><LinkButton href="/app/bills/aging" variant="secondary">Aging</LinkButton>{canCreate && <LinkButton href="/app/bills/new">Enter a bill</LinkButton>}</>} />
+        actions={<><LinkButton href="/app/bills/aging" variant="secondary">Aging</LinkButton><LinkButton href="/app/bills/recurring" variant="secondary">Recurring</LinkButton>{canCreate && <LinkButton href="/app/bills/new">Enter a bill</LinkButton>}</>} />
       <ReadOnlyNotice show={can(ctx, 'bills.create') && !ctx.access.canWrite} />
       {filter.key === 'open' && open.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2">
