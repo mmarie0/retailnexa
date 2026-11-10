@@ -85,3 +85,15 @@ describe('bills (#27)', () => {
     expect((await as(mgrA, `select id from public.bills where organization_id = $1`, [org])).length).toBe(3);
   });
 });
+
+describe('my_locations (store pickers)', () => {
+  it('restricted members get only their stores; owners get all; outsiders nothing', async () => {
+    const [{ id: m }] = await sys<{ id: string }>(`select id from public.memberships where organization_id = $1 and user_id = $2`, [org, acctB.id]);
+    expect(m).toBeTruthy();
+    const b = await as<{ id: string }>(acctB, `select id from public.my_locations($1)`, [org]);
+    expect(b.map((r) => r.id)).toEqual([B]);
+    expect((await as(owner, `select id from public.my_locations($1)`, [org])).length).toBe(2);
+    const outsider = await createUser('ls-outsider');
+    expect(await as(outsider, `select id from public.my_locations($1)`, [org])).toHaveLength(0);
+  });
+});
