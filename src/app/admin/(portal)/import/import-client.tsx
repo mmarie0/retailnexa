@@ -72,6 +72,8 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
 
   async function prepare(): Promise<Prepared | null> {
     if (!file) { setErr('Choose a file.'); return null; }
+    // Same 50 MB cap on every path, checked before reading (#159).
+    if (!/\.zip$/i.test(file.name) && file.size > 50 * 1024 * 1024) { setErr('Files up to 50 MB. Split it or save each kind as its own CSV.'); return null; }
     try {
       if (all) {
         // Everything in one file: a .zip of sheets and/or the old app's backup, or one sheet with a Type column.

@@ -35,12 +35,19 @@ export function kindFromName(fileName: string): ImportKind | null {
   const n = norm((fileName.split('›').pop() ?? '').replace(/\.[a-z0-9]+$/i, '').split('/').pop() ?? '');
   const exact = kindFromWord(n);
   if (exact) return exact;
-  // Most specific first: "Vendor bills" / "Vendor invoices" are bills, "Fixed bills" are fixed costs (#146).
+  // Names about vendors (#146, #159): "Vendor bills/invoices", "AP vendors" are bills; a vendor list
+  // ("Vendors", "Vendor list", "Preferred suppliers") is vendors; "Vendor statements" or "Bank vendors"
+  // mix two kinds, so the sheet needs a Type column instead of a guess.
+  if (/\bvendors?\b|\bsuppliers?\b/.test(n)) {
+    if (/\bbills?\b|\binvoices?\b|\bap\b|\bpayables?\b/.test(n)) return 'bill';
+    if (/\bfixed\b|\brecurring\b|\bbank\b|\bstatements?\b|\btransactions?\b|\bsales\b|\bregisters?\b|\bdaily\b/.test(n)) return null;
+    return 'vendor';
+  }
+  // Otherwise most specific first: "Fixed bills" are fixed costs.
   if (/\bfixed\b|\brecurring\b/.test(n)) return 'recurring';
   if (/\bbank\b|\bstatements?\b|\btransactions\b/.test(n)) return 'bank_line';
   if (/\bsales\b|\bregisters?\b|\bdaily\b|\bz report\b/.test(n)) return 'sales_day';
   if (/\bbills?\b|\binvoices?\b|\bap\b/.test(n)) return 'bill';
-  if (/\bvendors?\b|\bsuppliers?\b/.test(n)) return 'vendor';
   return null;
 }
 
