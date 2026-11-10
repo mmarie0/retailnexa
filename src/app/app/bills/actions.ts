@@ -6,6 +6,7 @@ import { can, getOrgContext, getSupabase, type OrgContext } from '@/lib/auth/con
 import type { Permission } from '@/lib/auth/permissions';
 import { fail, failFrom, ok, type ActionState } from '@/lib/actions';
 import { parseDollarsToCents } from '@/lib/money';
+import { todayIn } from '@/lib/time';
 
 const READ_ONLY = 'Your account is read-only right now, so changes can’t be saved. Check the billing page.';
 const isState = (v: unknown): v is ActionState => typeof v === 'object' && v !== null && 'ok' in v;
@@ -30,6 +31,7 @@ const vendorSchema = z.object({
   email: z.string().trim().max(254).email('Enter a valid email').or(z.literal('')).transform((v) => v || null),
   phone: opt(40),
   payment_terms_days: z.coerce.number().int().min(0, '0–365 days').max(365, '0–365 days'),
+  pay_method: z.enum(['', 'check', 'ach', 'card', 'cash', 'other']).optional().transform((v) => v || null),
   notes: opt(2000),
 });
 
@@ -211,6 +213,66 @@ export async function voidBillPayment(_p: ActionState, form: FormData): Promise<
     revalidatePath(`/app/bills/${bill}`);
     revalidatePath('/app/bills');
     return ok('Payment voided. The bill is open again for that amount.');
+  } catch (e) {
+    return failFrom(e);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Due view (#101): monthly budget and the "paid" check box
+// ---------------------------------------------------------------------------
+export async function setBillBudget(_p: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const ctx = await guard('bills.approve');
+    if (isState(ctx)) return ctx;
+    const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).parse(form.get('month'));
+    const raw = String(form.get('amount') ?? '').trim();
+    const cents = raw === '' ? null : parseDollarsToCents(raw);
+    if (raw !== '' && !cents) return fail('Enter an amount like 4500.00, or leave it empty to remove the budget.', { amount: 'Enter an amount' });
+    const everyMonth = form.get('every_month') === 'on';
+    const supabase = await getSupabase();
+    // "Every month" sets the default and drops this month's own budget so the default applies.
+    if (everyMonth) {
+      const { error: e1 } = await supabase.rpc('set_bill_budget', { p_org: ctx.org.id, p_month: null, p_amount_cents: cents });
+      if (e1) throw e1;
+      const { error: e2 } = await supabase.rpc('set_bill_budget', { p_org: ctx.org.id, p_month: `${month}-01`, p_amount_cents: null });
+      if (e2) throw e2;
+    } else {
+      const { error } = await supabase.rpc('set_bill_budget', { p_org: ctx.org.id, p_month: `${month}-01`, p_amount_cents: cents });
+      if (error) throw error;
+    }
+    revalidatePath('/app/bills');
+    revalidatePath('/app');
+    return ok(cents ? 'Budget saved.' : 'Budget removed.');
+  } catch (e) {
+    return failFrom(e);
+  }
+}
+
+/** Pays what's left on an approved bill today, from the bank (the live app's check box). */
+export async function markBillPaid(_p: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const ctx = await guard('bills.pay');
+    if (isState(ctx)) return ctx;
+    const parsed = z.object({ id: uuid, idempotency_key: z.string().regex(/^[A-Za-z0-9-]{8,100}$/) }).safeParse(Object.fromEntries(form));
+    if (!parsed.success) return fail('Something went wrong. Reload and try again.');
+    const supabase = await getSupabase();
+    const [{ data: bill }, { data: orgRow }] = await Promise.all([
+      supabase.from('bills').select('status, total_cents, paid_cents').eq('id', parsed.data.id).eq('organization_id', ctx.org.id).maybeSingle(),
+      supabase.from('organizations').select('timezone').eq('id', ctx.org.id).maybeSingle(),
+    ]);
+    if (!bill) return fail('Bill not found.');
+    if (bill.status === 'paid') return ok('Already paid.');
+    if (bill.status !== 'approved') return fail('Approve this bill before paying it.');
+    const left = Number(bill.total_cents) - Number(bill.paid_cents);
+    const { error } = await supabase.rpc('record_bill_payment', {
+      p_bill: parsed.data.id, p_paid_on: todayIn(orgRow?.timezone), p_amount_cents: left, p_source: 'bank',
+      p_idempotency_key: `${ctx.org.id.slice(0, 8)}-${parsed.data.idempotency_key}`, p_reference: null,
+    });
+    if (error) throw error;
+    revalidatePath('/app/bills');
+    revalidatePath(`/app/bills/${parsed.data.id}`);
+    return ok('Marked paid from the bank today.');
   } catch (e) {
     return failFrom(e);
   }

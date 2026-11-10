@@ -7,6 +7,7 @@ import { formatMoney } from '@/lib/billing/plans';
 import { todayIn } from '@/lib/time';
 import { salesWindows, summarizeBills, summarizeSales } from '@/lib/dashboard/summary';
 import { incomeStatement, type LedgerRow } from '@/lib/accounting/statements';
+import { budgetFor, daysInMonth, monthItems, totals, type BillRow, type Budget, type TemplateRow } from '@/lib/bills/due';
 import { DailySalesChart } from './_dashboard/daily-sales-chart';
 import { Change, Stat } from './_dashboard/tiles';
 
@@ -30,7 +31,8 @@ export default async function OverviewPage() {
   const showProfit = can(ctx, 'accounting.view') || can(ctx, 'profit.view');
   const w = salesWindows(today);
   const salesSel = 'business_date, gross_sales_cents, discounts_cents, transaction_count';
-  const [recent, lastYear, bills, activity] = await Promise.all([
+  const ym = today.slice(0, 7);
+  const [recent, lastYear, bills, activity, monthBills, tpls, budgetRows, vendorRows] = await Promise.all([
     showSales ? supabase.from('sales_days').select(salesSel).eq('organization_id', ctx.org.id).is('voided_at', null)
       .gte('business_date', w.recent.from).lte('business_date', w.recent.to).limit(2000) : Promise.resolve({ data: null }),
     showSales ? supabase.from('sales_days').select(salesSel).eq('organization_id', ctx.org.id).is('voided_at', null)
@@ -38,7 +40,20 @@ export default async function OverviewPage() {
     showBills ? supabase.from('bills').select('status, due_date, total_cents, paid_cents').eq('organization_id', ctx.org.id)
       .in('status', ['draft', 'approved']).limit(2000) : Promise.resolve({ data: null }),
     showProfit ? supabase.rpc('account_activity_detail', { p_org: ctx.org.id, p_from: monthStart, p_to: today }) : Promise.resolve({ data: null }),
+    // "Bills this month" (#101): same numbers as the Due view.
+    showBills ? supabase.from('bills').select('id, vendor_id, bill_number, bill_date, due_date, status, total_cents, paid_cents, recurring_bill_id')
+      .eq('organization_id', ctx.org.id).neq('status', 'void').gte('due_date', monthStart).lte('due_date', `${ym}-${daysInMonth(ym)}`).limit(2000) : Promise.resolve({ data: null }),
+    showBills ? supabase.from('recurring_bills').select('id, vendor_id, name, frequency, day_of_month, next_date, end_date, due_days, is_active, lines')
+      .eq('organization_id', ctx.org.id).eq('is_active', true) : Promise.resolve({ data: null }),
+    showBills ? supabase.from('bill_budgets').select('month, amount_cents').eq('organization_id', ctx.org.id) : Promise.resolve({ data: null }),
+    showBills ? supabase.from('vendors').select('id, name').eq('organization_id', ctx.org.id) : Promise.resolve({ data: null }),
   ]);
+  const billMonth = showBills ? (() => {
+    const templates = ((tpls.data ?? []) as (Omit<TemplateRow, 'amount_cents'> & { lines: { amount_cents: number }[] })[])
+      .map(({ lines, ...t }) => ({ ...t, amount_cents: lines.reduce((a, l) => a + Number(l.amount_cents), 0) }));
+    const items = monthItems(ym, (monthBills.data ?? []) as BillRow[], templates, new Map((vendorRows.data ?? []).map((v) => [v.id as string, v.name as string])), today);
+    return { ...totals(items), budget: budgetFor(ym, (budgetRows.data ?? []) as Budget[])?.cents ?? null };
+  })() : null;
   const salesRows = [...(recent.data ?? []), ...(lastYear.data ?? [])].map((r) => ({
     date: r.business_date as string, netCents: Number(r.gross_sales_cents) - Number(r.discounts_cents), transactions: r.transaction_count as number | null,
   }));
@@ -98,6 +113,26 @@ export default async function OverviewPage() {
           {pl && <Stat label={`${monthName} operating profit`} value={formatMoney(pl.operatingProfit)} sub={`After ${formatMoney(pl.operatingExpenses.total)} expenses`} />}
         </div>
       )}
+      {billMonth && billMonth.count > 0 && (() => {
+        const b = billMonth, scale = Math.max(b.budget ?? 0, b.total) || 1;
+        return (
+          <Link href="/app/bills" className="flex flex-col gap-2 rounded-[18px] bg-card p-4 shadow-[var(--shadow-card)] hover:opacity-90">
+            <span className="flex items-baseline justify-between gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-[.08em] text-muted">Bills this month</span>
+              {b.late > 0 && <span className="text-xs font-bold text-late">{b.late} overdue</span>}
+            </span>
+            <span className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="num text-[22px] font-medium">{formatMoney(b.left)} <span className="text-sm text-muted">left to pay</span></span>
+              <span className="text-sm text-muted">{formatMoney(b.paid)} of {formatMoney(b.total)} paid{b.budget !== null ? ` · budget ${formatMoney(b.budget)}` : ''}</span>
+            </span>
+            <span role="img" aria-label={`Paid ${formatMoney(b.paid)}, unpaid ${formatMoney(b.left)}`} className="relative flex h-2.5 rounded-md bg-soft">
+              <span className="h-full rounded-l-md bg-paid" style={{ width: `${(b.paid / scale) * 100}%` }} />
+              <span className="h-full bg-accent" style={{ width: `${(b.left / scale) * 100}%` }} />
+              {b.budget !== null && <i className="absolute -top-1 -bottom-1 w-0.5 bg-ink" style={{ left: `calc(${Math.min(100, (b.budget / scale) * 100)}% - 1px)` }} />}
+            </span>
+          </Link>
+        );
+      })()}
       {steps.length > 0 && (
         <Card>
           <h2 className="text-lg font-bold">Get set up</h2>

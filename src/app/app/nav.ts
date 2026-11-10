@@ -35,7 +35,7 @@ export interface NavArea {
 
 /** Tabs for Bills → More (same order as the live app). */
 export const BILLS_MORE: NavPage[] = [
-  { key: 'reps', label: 'Rep schedule', icon: 'calendar' },
+  { key: 'reps', label: 'Rep schedule', href: '/app/bills/reps', icon: 'calendar', perm: 'bills.view' },
   { key: 'fixed', label: 'Fixed costs', href: '/app/bills/recurring', icon: 'repeat', perm: 'bills.view' },
   { key: 'statements', label: 'Vendor statements', icon: 'doc' },
   { key: 'bank', label: 'Bank', href: '/app/bank', icon: 'bank', perm: 'bank.view' },
@@ -48,11 +48,11 @@ export const AREAS: NavArea[] = [
   {
     key: 'bills', label: 'Bills', icon: 'bills', bottom: true,
     pages: [
-      { key: 'due', label: 'Due', href: '/app/bills', icon: 'bills', perm: 'bills.view', match: ['/app/bills/new'] },
+      { key: 'due', label: 'Due', href: '/app/bills', icon: 'bills', perm: 'bills.view', match: ['/app/bills/new', '/app/bills/list'] },
       { key: 'vendors', label: 'Vendors', href: '/app/vendors', icon: 'invoice', perm: 'vendors.view' },
       { key: 'invoices', label: 'Invoices', icon: 'invoice' },
       { key: 'more', label: 'More', href: '/app/bills/more', icon: 'doc', perm: 'bills.view',
-        match: ['/app/bills/recurring', '/app/bills/aging', '/app/bank', '/app/deposits'] },
+        match: ['/app/bills/recurring', '/app/bills/reps', '/app/bills/aging', '/app/bank', '/app/deposits'] },
     ],
   },
   {

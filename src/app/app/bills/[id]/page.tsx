@@ -50,7 +50,7 @@ export default async function BillPage({ params }: PageProps<'/app/bills/[id]'>)
     <>
       <PageHeader title={`${vendor?.name ?? 'Vendor'} · ${bill.bill_number}`}
         description={`Billed ${fmtDate(bill.bill_date)} · due ${fmtDate(bill.due_date)}`}
-        actions={<Link href="/app/bills" className="font-semibold text-accent-strong">All bills</Link>} />
+        actions={<Link href="/app/bills/list" className="font-semibold text-accent-strong">All bills</Link>} />
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={STATUS_TONE[status]}>{STATUS_LABEL[status]}</Badge>
         <Badge>{store?.name ?? 'Whole business'}</Badge>

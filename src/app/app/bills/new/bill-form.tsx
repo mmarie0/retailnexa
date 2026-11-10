@@ -17,11 +17,11 @@ function addDays(iso: string, days: number) {
   return d.toISOString().slice(0, 10);
 }
 
-export function BillForm({ vendors, accounts, locations, today }: { vendors: Vendor[]; accounts: Option[]; locations: Option[]; today: string }) {
+export function BillForm({ vendors, accounts, locations, today, initialDue }: { vendors: Vendor[]; accounts: Option[]; locations: Option[]; today: string; initialDue?: string }) {
   const [state, action] = useActionState(createBill, initialActionState);
   const [vendorId, setVendorId] = useState('');
-  const [billDate, setBillDate] = useState(today);
-  const [due, setDue] = useState('');
+  const [billDate, setBillDate] = useState(initialDue && initialDue < today ? initialDue : today);
+  const [due, setDue] = useState(initialDue ?? '');
   const [lines, setLines] = useState<Line[]>([{ key: 0, account: '', amount: '', description: '' }]);
   const vendor = vendors.find((v) => v.id === vendorId);
   const suggestedDue = vendor && billDate ? addDays(billDate, vendor.terms) : '';
