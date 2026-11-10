@@ -51,20 +51,22 @@ describe('sales days (#27)', () => {
 });
 
 describe('bills (#27)', () => {
-  let billA: string, billB: string, billOrg: string;
+  let billA: string, billA2: string, billB: string, billOrg: string;
   it('restricted members can create bills only for their store, never org-wide', async () => {
     [{ id: billA }] = await bill(mgrA, 'A-1', A);
     await expectDenied(bill(mgrA, 'B-1', B), scopeErr);
-    await expectDenied(bill(mgrA, 'ORG-1', null), scopeErr);
+    // No store given: a one-store member's bill goes to their store, not org-wide (#78).
+    [{ id: billA2 }] = await bill(mgrA, 'ORG-1', null);
+    expect((await sys<{ l: string }>(`select location_id as l from public.bills where id = $1`, [billA2]))[0].l).toBe(A);
     [{ id: billB }] = await bill(owner, 'B-2', B);
     [{ id: billOrg }] = await bill(owner, 'ORG-2', null);
   });
 
   it('reads: restricted members see only their store’s bills, lines and payments; org-wide bills hidden', async () => {
     const a = await as<{ id: string }>(mgrA, `select id from public.bills where organization_id = $1`, [org]);
-    expect(a.map((r) => r.id)).toEqual([billA]);
+    expect(a.map((r) => r.id).sort()).toEqual([billA, billA2].sort());
     expect(await as(mgrA, `select id from public.bill_lines where bill_id = $1`, [billB])).toHaveLength(0);
-    expect((await as(acctAll, `select id from public.bills where organization_id = $1`, [org])).length).toBe(3);
+    expect((await as(acctAll, `select id from public.bills where organization_id = $1`, [org])).length).toBe(4);
   });
 
   it('approve / pay / void across stores is refused; within the store it works', async () => {
@@ -82,7 +84,7 @@ describe('bills (#27)', () => {
   it('removing restrictions restores full access', async () => {
     const [{ id: m }] = await sys<{ id: string }>(`select id from public.memberships where organization_id = $1 and user_id = $2`, [org, mgrA.id]);
     await as(owner, `select public.set_member_locations($1, '{}'::uuid[])`, [m]);
-    expect((await as(mgrA, `select id from public.bills where organization_id = $1`, [org])).length).toBe(3);
+    expect((await as(mgrA, `select id from public.bills where organization_id = $1`, [org])).length).toBe(4);
   });
 });
 
