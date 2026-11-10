@@ -51,10 +51,12 @@ export async function createDueRecurringBills(): Promise<ActionState> {
     if (!ctx.access.canWrite) return fail('Your account is read-only right now. Check the billing page.');
     const { data, error } = await (await getSupabase()).rpc('create_due_recurring_bills', { p_org: ctx.org.id });
     if (error) throw error;
-    const n = Number(data ?? 0);
+    const { made = 0, failed = 0 } = (data ?? {}) as { made?: number; failed?: number };
     revalidatePath('/app/bills/recurring');
     revalidatePath('/app/bills');
-    return ok(n ? `Created ${n} draft bill${n === 1 ? '' : 's'}. Approve them on the Bills page.` : 'Nothing is due yet.');
+    const created = made ? `Created ${made} draft bill${made === 1 ? '' : 's'}. Approve them on the Bills page.` : 'Nothing new was created.';
+    if (failed) return fail(`${made ? created + ' ' : ''}${failed} recurring bill${failed === 1 ? '' : 's'} couldn’t be created. Open the one marked “Needs attention” to see why.`);
+    return ok(made ? created : 'Nothing is due yet.');
   } catch (e) {
     return failFrom(e);
   }

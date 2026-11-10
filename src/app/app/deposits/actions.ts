@@ -17,14 +17,19 @@ export async function recordMoneyMovement(_p: ActionState, form: FormData): Prom
       account: z.enum(['bank', 'cash_on_hand']).default('bank'),
       memo: z.string().trim().max(500).transform((v) => v || null),
       idempotency_key: z.string().regex(/^[A-Za-z0-9-]{8,100}$/),
+      location_id: z.string().uuid().or(z.literal('')).transform((v) => v || null),
     }).safeParse({
       kind: form.get('kind'), date: form.get('date'), account: form.get('account') ?? undefined,
       memo: form.get('memo') ?? '', idempotency_key: form.get('idempotency_key'),
+      location_id: form.get('location_id') ?? '',
     });
     if (!parsed.success) return fail('Check the highlighted fields.', Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])));
     const { kind } = parsed.data;
     const allowed = can(ctx, 'accounting.post') || (kind === 'cash_deposit' && can(ctx, 'cash.create'));
     if (!allowed) return fail('You don’t have permission to do that.');
+    if (!can(ctx, 'accounting.post') && !parsed.data.location_id) {
+      return fail('Check the highlighted fields.', { location_id: 'Pick the store the cash came from' });
+    }
     if (!ctx.access.canWrite) return fail('Your account is read-only right now. Check the billing page.');
     const amount = parseDollarsToCents(String(form.get('amount') ?? ''));
     if (!amount) return fail('Check the highlighted fields.', { amount: 'Enter an amount like 125.00' });
@@ -36,6 +41,7 @@ export async function recordMoneyMovement(_p: ActionState, form: FormData): Prom
       p_org: ctx.org.id, p_kind: kind, p_date: parsed.data.date, p_amount_cents: amount,
       p_idempotency_key: `${ctx.org.id.slice(0, 8)}-${parsed.data.idempotency_key}`, p_fees_cents: fees,
       p_account: kind === 'owner_draw' || kind === 'owner_contribution' ? parsed.data.account : 'bank', p_memo: parsed.data.memo,
+      p_location_id: parsed.data.location_id,
     });
     if (error) throw error;
     revalidatePath('/app/deposits');

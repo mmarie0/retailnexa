@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
-    { "path": "/api/cron/reconcile-billing", "schedule": "17 7 * * *" }
+    { "path": "/api/cron/reconcile-billing", "schedule": "17 7 * * *" },
+    { "path": "/api/cron/recurring-bills", "schedule": "23 10 * * *" }
   ]
 }

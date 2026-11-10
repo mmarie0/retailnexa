@@ -11,7 +11,7 @@ export default async function ExportPage() {
     <>
       <PageHeader title="Export data" description="Download your business records. Exports stay available even after a subscription ends." />
       <Card className="max-w-2xl">
-        <p>The export is a JSON file containing your business profile, locations, team members and roles, subscription history and audit log. As more modules ship (sales, bills, inventory, accounting), their records are added to this export.</p>
+        <p>The export is a JSON file containing your business profile, locations, team members and roles, subscription history and audit log, plus your sales days, vendors, bills and payments (including recurring bill templates), the ledger (accounts and journal entries) and bank statement imports. As new modules ship, such as inventory, their records are added too.</p>
         <a href="/app/export" className={`${buttonClass('primary')} mt-4`} download>Download export</a>
       </Card>
     </>

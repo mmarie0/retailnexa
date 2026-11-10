@@ -19,6 +19,7 @@ These rules are binding for every change, human or AI. A PR that breaks one is n
 ## Roles and permissions
 7. Nobody changes their own role, status or permissions. Non-owners can only invite/assign roles strictly below their own and can only modify members below them. Every org keeps at least one active owner. Owners cannot be invited (only promoted). Permission overrides cannot grant what the granter lacks. All enforced in SQL and tested.
 8. Sensitive permissions (profit, payroll, bank, vendor costs, billing changes, audit, exports) are never in employee/manager defaults.
+   Store restrictions (`member_locations`) are enforced in SQL on sales days, bills, bill payments, recurring bills and cash deposits. Journal entries and lines are **not** store-scoped: they need `accounting.view`, which should only be given to unrestricted roles.
 
 ## Platform staff
 9. Platform admins need a `platform_admins` row **and** an MFA-verified session (`aal2`), checked in the app and again inside Postgres (`private.is_platform_admin`).

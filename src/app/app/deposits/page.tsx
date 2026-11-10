@@ -15,10 +15,12 @@ export default async function DepositsPage() {
   const full = can(ctx, 'accounting.post');
   if (!full && !can(ctx, 'cash.create') && !can(ctx, 'accounting.view')) return <Notice tone="warning">You don’t have access to deposits.</Notice>;
   const supabase = await getSupabase();
-  const [{ data: rows }, { data: orgRow }] = await Promise.all([
+  const [{ data: rows }, { data: orgRow }, { data: locs }] = await Promise.all([
     supabase.rpc('recent_money_movements', { p_org: ctx.org.id, p_limit: 40 }),
     supabase.from('organizations').select('timezone').eq('id', ctx.org.id).maybeSingle(),
+    supabase.rpc('my_locations', { p_org: ctx.org.id }),
   ]);
+  const stores = ((locs ?? []) as { id: string; name: string }[]).map((l) => ({ id: l.id, label: l.name }));
   const list = (rows ?? []) as { id: string; entry_date: string; kind: Kind; memo: string; amount_cents: number; reversed: boolean }[];
   const kinds: Kind[] = full ? ['card_deposit', 'cash_deposit', 'sales_tax_payment', 'owner_draw', 'owner_contribution'] : ['cash_deposit'];
   const canRecord = (full || can(ctx, 'cash.create')) && ctx.access.canWrite;
@@ -28,7 +30,7 @@ export default async function DepositsPage() {
       <PageHeader title="Deposits & payments" description="Money moving between the store, the bank, the state and the owner. Each entry posts to the books with the right rule." />
       <ReadOnlyNotice show={(full || can(ctx, 'cash.create')) && !ctx.access.canWrite} />
       {canRecord && (
-        <Card><MovementForm kinds={kinds} today={todayIn(orgRow?.timezone)} formKey={randomUUID()} /></Card>
+        <Card><MovementForm kinds={kinds} today={todayIn(orgRow?.timezone)} formKey={randomUUID()} stores={stores} allowWholeBusiness={full} /></Card>
       )}
       {list.length === 0 ? <EmptyState title="Nothing recorded yet" /> : (
         <Card className="p-0">
