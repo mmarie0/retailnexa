@@ -20,8 +20,10 @@ export function friendlyError(err: unknown): string {
     return 'You don’t have permission to do that.';
   }
   if (e?.code === '23505') return 'That already exists.';
-  if (msg && msg.length <= 160 && /^[a-z0-9 ,.;’'()-]+$/i.test(msg) && !/[_"]/.test(msg)) {
-    return msg.charAt(0).toUpperCase() + msg.slice(1).replace(/\.?$/, '.');
+  if (msg && msg.length <= 160 && /^[a-z0-9 ,.;:’'()-]+$/i.test(msg) && !/[_"]/.test(msg)) {
+    // Our store-scope errors read "permission denied: <reason>"; show just the reason (#78).
+    const text = msg.replace(/^permission denied:\s*/i, '');
+    return text.charAt(0).toUpperCase() + text.slice(1).replace(/\.?$/, '.');
   }
   console.error('[action error]', err);
   return 'Something went wrong. Please try again.';

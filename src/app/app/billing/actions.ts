@@ -120,7 +120,10 @@ export async function startCheckout(_p: ActionState, form: FormData): Promise<Ac
         cancel_url: `${siteUrl()}/app/billing?checkout=canceled`,
       }));
     } catch (e) {
-      await releaseClaim(); // the Checkout never opened, so the trial isn't spoken for (#73)
+      // This attempt never opened a Checkout, so its trial isn't spoken for (#73). A blocked
+      // attempt (another checkout in progress, or already subscribed) must not release a
+      // claim that may back a still-open session (#80); the database also refuses then.
+      if (!(e instanceof CheckoutBlockedError)) await releaseClaim();
       throw e;
     }
     await auditUser(ctx.org.id, ctx.user.id, trial ? 'billing.checkout_started_trial' : 'billing.checkout_started', { products: [sel.retail && 'retail', sel.wholesale && 'wholesale'].filter(Boolean), extra_locations: sel.extraLocations });
