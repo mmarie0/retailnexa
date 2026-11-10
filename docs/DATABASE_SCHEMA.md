@@ -97,7 +97,7 @@ System RPCs (`service_role` only): `claim_stripe_event`, `finish_stripe_event`, 
 - `id uuid default gen_random_uuid()`, `organization_id uuid not null references organizations on delete cascade`, `created_at`, `updated_at` + `private.set_updated_at` trigger.
 - Money as `bigint` cents with a `currency char(3)`; quantities as `numeric(14,3)` where fractional units exist.
 - Enable RLS; SELECT policy `is_org_member(organization_id) or has_support_access(organization_id)` narrowed by the relevant `has_permission`; write policies check permission **and** `org_is_writable`.
-- Location-scoped tables check `member_locations` when the member has restrictions.
+- Location-scoped tables check `member_locations` when the member has restrictions, via `private.can_access_location(org, location)` in the read policy **and** a BEFORE INSERT/UPDATE trigger (`private.enforce_location_scope`) so every write RPC is covered. Applied to `sales_days`, `sales_day_categories`, `bills`, `bill_lines`, `bill_payments`, `bill_payment_voids` (migration `20261110001100`). Org-wide rows (`location_id is null`) are hidden from restricted members. New location-scoped tables must reuse the helper and add the trigger.
 - Revoke defaults, grant only needed columns; add the table to the audit trigger if it is configuration.
 - Ledger tables are insert-only (no UPDATE/DELETE grants; corrections via reversing entries).
 - Add RLS tests to `tests/db` before merging.
