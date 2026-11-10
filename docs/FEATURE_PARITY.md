@@ -25,20 +25,20 @@ Checked against `main` @ `ec917ba` (after #117 and #122).
 
 | # | Feature | Status | Evidence / what's missing | Tracking |
 |---|---|---|---|---|
-| 1 | Bills due calendar + budget: month view due calendar, monthly bills budget, Orders vs Bills filter, bills this month on Overview | Missing | `src/app/app/bills/page.tsx` is a list (≤200 rows, store column added in QA batch 7). No budget in schema or code. | #101 |
+| 1 | Bills due calendar + budget: month view due calendar, monthly bills budget, Orders vs Bills filter, bills this month on Overview | Built (batch A) | `/app/bills` is the Due view: month bar, All/Orders/Bills, Left-to-pay block with budget meter, Set budget (`bill_budgets`, `set_bill_budget`, bills.approve), first 15 days of next month, calendar with day panel, list with paid check box, six-month forecast. Recurring bills not created yet are projected. "Bills this month" card on Overview. The old list is `/app/bills/list`. Not copied: budget from last year's bank spending, calendar-screenshot import (AI), CSV export of the month. | #101 |
 | 2 | Staff: employees, schedule, payroll, paystubs, labor % | Missing | No staff tables or routes. Permission keys exist in `src/lib/auth/permissions.ts`. | #102 |
 | 3 | Sales history: monthly roll-up, multi-year, bulk import + add month, date-range lookup, year compare, CSV | Partial | `sales_days` + manual/CSV/Vela import + MTD vs last year + daily chart. `/app/sales` shows ≤120 rows with no date range. No store-card/points columns, no monthly roll-up or export. | #103 |
 | 4 | Profit partners: split %, distributions ledger, pay out, profit calculator, investor PDF, bulk import | Missing | No partner tables or routes. | #104 |
-| 5 | Invoices: upload to a private bucket, list by month with search, Needs review filter | Missing | No storage buckets in migrations. Bills have account + amount lines only. | #105 |
+| 5 | Invoices: upload to a private bucket, list by month with search, Needs review filter | Missing | Next PR: needs a private storage bucket and storage policies, which the test shim can't run yet. | #105 |
 | 6 | Location balances between stores: owed to me / I owe, month-end check, mark collected, filters | Missing | No inter-store tables. | #106 |
-| 7 | Vendors page: search, sorts, next due / payment method / total spend per card, vendor calendar | Partial | `/app/vendors` lists and edits name, contact, email, phone, payment terms, notes and active. (`default_account_id` is stored but not shown.) No search, sorts, per-card totals or calendar. | #107 |
+| 7 | Vendors page: search, sorts, next due / payment method / total spend per card, vendor calendar | Built (batch A) | `/app/vendors`: You owe / Past due / Total spend tiles, search, sorts (Amount owed, Overdue first, Next due, Total spend, A–Z), per-card owed, past due or next due, payment method (`vendors.pay_method`), total spend. "Vendor calendar" is the rep schedule (#114); the live app's .ics export, bulk edit, merge and aliases are not copied. | #107 |
 | 8 | Overview: date filters, quick actions, projected profit, spend vs last year, 12-month trend, custom tiles | Partial | `src/lib/dashboard/summary.ts` covers today, yesterday, last 7 days, MTD vs last year, due in 7 days, overdue, gross profit $ and GP % (`app/page.tsx`). Missing everything else listed. | #108 |
 | 9 | Bank: check register with checks and withdrawals on the calendar; card sales vs card deposits | Partial | `/app/bank` covers statement import, match, categorize, ignore and undo. No check register or card-deposit check. | #109 |
 | 10 | Vendor statements: upload, match invoices, flag missing | Missing | `20261110000500_statements.sql` is account activity, not vendor statements. | #110 |
 | 11 | Year-end Excel report | Partial | P&L, balance sheet, cash flow, trial balance and sales tax exist as pages. JSON account export only. No Excel workbook. | #111 |
 | 12 | Sales categories: upload a category report, compare with prior month and year | Partial | `sales_day_categories` table and `record_sales_day(p_categories)` exist, but nothing in `src` passes categories yet. | #112 |
-| 13 | Fixed-cost helpers: quick add for utilities and insurance, suggested recurring costs | Partial | Recurring bills (`/app/bills/recurring`, daily job) with manual templates only. | #113 |
-| 14 | Rep schedule: visit day and frequency per vendor, weekday summary, last invoice date | Missing | — | #114 |
+| 13 | Fixed-cost helpers: quick add for utilities and insurance, suggested recurring costs | Built (batch A) | `/app/bills/recurring`: quick-add chips (Rent, Credit card fee, Utilities, Phone & internet, Insurance, POS / software) and "Suggested from your bank" (withdrawals in 3+ months; needs bank.view). Both only fill in the form. Screenshot import (AI) not built. | #113 |
+| 14 | Rep schedule: visit day and frequency per vendor, weekday summary, last invoice date | Built (batch A) | `/app/bills/reps` (Bills → More): weekday summary with today highlighted, per vendor usual days, frequency, last invoice, next likely visit. Worked out from bill dates, as in the live app. | #114 |
 | 15 | Upkeep / maintenance schedule: suggested tasks, add task | Missing | — | #115 |
 | 16 | Small items: in-app help, storage overview, themes (4 light, 4 dark) | Partial | `/help` has 9 articles (marketing only) and `/contact`. No in-app help button, storage overview or themes. | #116 |
 
@@ -49,7 +49,7 @@ Checked against `main` @ `ec917ba` (after #117 and #122).
 | Recurring bills with a daily job | `/app/bills/recurring`, `/api/cron/recurring-bills` (#64, #67) |
 | Roles, per-member permissions, per-member store access | `/app/settings/team` (#76), `member_locations` + `can_access_location` |
 | Audit log | `audit_logs`, `/app/audit` |
-| Two-factor authentication | `/account/security`. Enforced at sign-in and in the database for users who turn it on (#96). Org, store, subscription and feature-override reads at aal1 are closed by #118 (PR #119). Until that merges, they stay readable with a password alone. |
+| Two-factor authentication | `/account/security`. Enforced at sign-in and in the database for users who turn it on (#96). Org, store, subscription and feature-override reads at aal1 are closed too (#118, fixed in PR #119). |
 | Subscription billing, one trial per owner | `/app/billing`, `trial_claims` (#17, #73, #80) |
 | HQ admin: customers, MRR, billing waivers, password resets | `/admin`, `/admin/tenants` (`sendPasswordReset` has no automated test yet) |
 
@@ -63,7 +63,7 @@ What's in place:
 - Auth rate limits.
 - Admin MFA.
 - The service key is server-only (#19).
-- Customer 2FA is enforced (#96). The #118 follow-up is in PR #119.
+- Customer 2FA is enforced (#96), including org metadata reads (#118, PR #119).
 
 Still open:
 - #30: leaked-password protection needs a paid plan.
@@ -72,7 +72,6 @@ Still open:
 - Private upload buckets with signed URLs and type/size checks: none yet. They come with invoices (#105).
 - Kiosk PIN rate limits: no kiosk yet. They come with staff and time clock (#102 or later).
 - Not yet audited: that every SECURITY DEFINER function checks `auth.uid()` and the role before doing anything. All 107 set `search_path`.
-- #118: aal1 reads of org metadata (fix in PR #119).
 
 ## Plan facts the pricing page must match (#100)
 `src/lib/billing/plans.ts` lists only shipped features. Everything else is marked "(coming soon)", and a unit test enforces this.

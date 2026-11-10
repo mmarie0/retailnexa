@@ -6,7 +6,7 @@ import { BillForm } from './bill-form';
 
 export const metadata: Metadata = { title: 'Enter a bill' };
 
-export default async function NewBillPage() {
+export default async function NewBillPage({ searchParams }: PageProps<'/app/bills/new'>) {
   const ctx = await getOrgContext();
   if (!can(ctx, 'bills.create')) return <Notice tone="warning">You don’t have permission to enter bills.</Notice>;
   if (!ctx.access.canWrite) return <Notice tone="warning">Your account is read-only right now. Check the billing page.</Notice>;
@@ -17,6 +17,8 @@ export default async function NewBillPage() {
     supabase.rpc('my_locations', { p_org: ctx.org.id }),
     supabase.from('organizations').select('timezone').eq('id', ctx.org.id).maybeSingle(),
   ]);
+  const sp = await searchParams;
+  const initialDue = typeof sp.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(sp.due) ? sp.due : undefined;
   const vendorList = (vendors ?? []).map((v) => ({ id: v.id, label: v.name, terms: v.payment_terms_days }));
 
   return (
@@ -33,6 +35,7 @@ export default async function NewBillPage() {
             accounts={((accounts ?? []) as { id: string; code: string; name: string }[]).map((a) => ({ id: a.id, label: `${a.code} · ${a.name}` }))}
             locations={((locations ?? []) as { id: string; name: string }[]).map((l) => ({ id: l.id, label: l.name }))}
             today={todayIn(orgRow?.timezone)}
+            initialDue={initialDue}
           />
         </Card>
       )}

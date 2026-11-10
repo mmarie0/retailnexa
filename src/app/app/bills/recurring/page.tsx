@@ -5,7 +5,8 @@ import { ActionForm } from '@/components/action-form';
 import { Badge, Card, EmptyState, Field, Input, Notice, PageHeader, Select } from '@/components/ui';
 import { SubmitButton } from '@/components/submit-button';
 import { formatMoney } from '@/lib/billing/plans';
-import { todayIn } from '@/lib/time';
+import { requestNow, todayIn } from '@/lib/time';
+import { QUICK_FIXED, daysInMonth, suggestRecurring, ymAdd } from '@/lib/bills/due';
 import { fmtDate } from '../format';
 import { ReadOnlyNotice } from '../../read-only-notice';
 import { createDueRecurringBills, saveRecurringBill } from './actions';
@@ -16,24 +17,26 @@ type Line = { account_id: string; amount_cents: number; description: string | nu
 type Tpl = { id: string; vendor_id: string; location_id: string | null; name: string; lines: Line[]; frequency: string; next_date: string; end_date: string | null; due_days: number; is_active: boolean; last_error?: string | null };
 type Opt = { id: string; label: string };
 
-function Fields({ t, vendors, accounts, locations, today }: { t?: Tpl; vendors: Opt[]; accounts: Opt[]; locations: Opt[]; today: string }) {
+type Preset = { name?: string; amount?: string; next?: string };
+
+function Fields({ t, vendors, accounts, locations, today, preset }: { t?: Tpl; vendors: Opt[]; accounts: Opt[]; locations: Opt[]; today: string; preset?: Preset }) {
   const p = t?.id ?? 'new';
   const line = t?.lines[0];
   return (
     <div className="grid gap-3 sm:grid-cols-3">
       <input type="hidden" name="id" value={t?.id ?? ''} />
-      <Field label="Name" htmlFor={`${p}-name`}><Input id={`${p}-name`} name="name" defaultValue={t?.name} placeholder="Rent" required maxLength={80} /></Field>
+      <Field label="Name" htmlFor={`${p}-name`}><Input id={`${p}-name`} name="name" defaultValue={t?.name ?? preset?.name} placeholder="Rent" required maxLength={80} /></Field>
       <Field label="Vendor" htmlFor={`${p}-vendor`}>
         <Select id={`${p}-vendor`} name="vendor_id" defaultValue={t?.vendor_id ?? ''} required><option value="">Choose…</option>{vendors.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}</Select>
       </Field>
-      <Field label="Amount" htmlFor={`${p}-amount`}><Input id={`${p}-amount`} name="amount" inputMode="decimal" className="num w-full" defaultValue={line ? (line.amount_cents / 100).toFixed(2) : ''} required /></Field>
+      <Field label="Amount" htmlFor={`${p}-amount`}><Input id={`${p}-amount`} name="amount" inputMode="decimal" className="num w-full" defaultValue={line ? (line.amount_cents / 100).toFixed(2) : preset?.amount ?? ''} required /></Field>
       <Field label="Account" htmlFor={`${p}-acct`}>
         <Select id={`${p}-acct`} name="account_id" defaultValue={line?.account_id ?? ''} required><option value="">Choose…</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}</Select>
       </Field>
       <Field label="How often" htmlFor={`${p}-freq`}>
         <Select id={`${p}-freq`} name="frequency" defaultValue={t?.frequency ?? 'monthly'}>{Object.entries(FREQ).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
       </Field>
-      <Field label={t ? 'Next bill date' : 'First bill date'} htmlFor={`${p}-next`}><Input id={`${p}-next`} name="next_date" type="date" defaultValue={t?.next_date ?? today} required /></Field>
+      <Field label={t ? 'Next bill date' : 'First bill date'} htmlFor={`${p}-next`}><Input id={`${p}-next`} name="next_date" type="date" defaultValue={t?.next_date ?? preset?.next ?? today} required /></Field>
       <Field label="Due after (days)" htmlFor={`${p}-due`}><Input id={`${p}-due`} name="due_days" type="number" min={0} max={365} defaultValue={t?.due_days ?? 0} /></Field>
       <Field label="Stop after (optional)" htmlFor={`${p}-end`}><Input id={`${p}-end`} name="end_date" type="date" defaultValue={t?.end_date ?? ''} /></Field>
       {locations.length > 1 && (
@@ -52,10 +55,23 @@ function Fields({ t, vendors, accounts, locations, today }: { t?: Tpl; vendors: 
   );
 }
 
-export default async function RecurringBillsPage() {
+export default async function RecurringBillsPage({ searchParams }: PageProps<'/app/bills/recurring'>) {
   const ctx = await getOrgContext();
   if (!can(ctx, 'bills.view')) return <Notice tone="warning">You don’t have access to bills.</Notice>;
+  const sp = await searchParams;
+  const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : undefined);
+  const preset: Preset = {
+    name: str(sp.name, 80),
+    amount: /^\d{1,9}(\.\d{1,2})?$/.test(str(sp.amount, 12) ?? '') ? str(sp.amount, 12) : undefined,
+    next: /^\d{4}-\d{2}-\d{2}$/.test(str(sp.next, 10) ?? '') ? str(sp.next, 10) : undefined,
+  };
   const supabase = await getSupabase();
+  const since = new Date(requestNow() - 400 * 86_400_000).toISOString().slice(0, 10);
+  const [{ data: bankLines }] = await Promise.all([
+    can(ctx, 'bank.view')
+      ? supabase.from('bank_lines').select('posted_on, description, amount_cents').eq('organization_id', ctx.org.id).lt('amount_cents', 0).gte('posted_on', since).limit(5000)
+      : Promise.resolve({ data: [] as { posted_on: string; description: string; amount_cents: number }[] }),
+  ]);
   const [{ data: tpls }, { data: vendors }, { data: accounts }, { data: locs }, { data: orgRow }] = await Promise.all([
     supabase.from('recurring_bills').select('id, vendor_id, location_id, name, lines, frequency, next_date, end_date, due_days, is_active, last_error').eq('organization_id', ctx.org.id).order('next_date'),
     supabase.from('vendors').select('id, name').eq('organization_id', ctx.org.id).eq('is_active', true).order('name'),
@@ -71,11 +87,21 @@ export default async function RecurringBillsPage() {
   const today = todayIn(orgRow?.timezone);
   const editable = can(ctx, 'bills.create') && ctx.access.canWrite;
   const due = list.filter((t) => t.is_active && t.next_date <= today).length;
+  const have = (n: string) => list.some((t) => t.name.toLowerCase() === n.toLowerCase());
+  const quick = QUICK_FIXED.filter((n) => !have(n));
+  // Next date on the usual day of the month, from today.
+  const nextOn = (day: number) => {
+    const ym = today.slice(0, 7);
+    const d = (m: string) => `${m}-${String(Math.min(day, daysInMonth(m))).padStart(2, '0')}`;
+    return d(ym) >= today ? d(ym) : d(ymAdd(ym, 1));
+  };
+  const suggestions = suggestRecurring(bankLines ?? [], list.map((t) => t.name));
+  const presetHref = (o: Preset) => `/app/bills/recurring?${new URLSearchParams(Object.entries(o).filter(([, v]) => v) as [string, string][])}#add`;
 
   return (
     <>
       <PageHeader title="Recurring bills" description="Bills that come every week, month, quarter or year — rent, utilities, card-terminal fees. Each period becomes a draft bill to approve, never a duplicate."
-        actions={<Link href="/app/bills" className="font-semibold text-accent-strong">All bills</Link>} />
+        actions={<Link href="/app/bills/list" className="font-semibold text-accent-strong">All bills</Link>} />
       <ReadOnlyNotice show={can(ctx, 'bills.create') && !ctx.access.canWrite} />
       {editable && list.length > 0 && (
         <Card className="flex flex-wrap items-center justify-between gap-3">
@@ -116,11 +142,35 @@ export default async function RecurringBillsPage() {
           })}
         </ul>
       )}
+      {editable && quick.length > 0 && (
+        <Card className="flex flex-col gap-2">
+          <h2 className="font-bold">{list.length ? 'Add another fixed cost' : 'Add the bills that never change'}</h2>
+          <div className="flex flex-wrap gap-1.5">
+            {quick.map((n) => <Link key={n} href={presetHref({ name: n })} className="rounded-full bg-soft px-3 py-1.5 text-sm font-semibold text-accent-strong">+ {n}</Link>)}
+          </div>
+        </Card>
+      )}
+      {editable && suggestions.length > 0 && (
+        <Card className="flex flex-col gap-2">
+          <h2 className="font-bold">Suggested from your bank</h2>
+          <p className="text-sm text-muted">Withdrawals that show up month after month. Tap one to fill in the form below; nothing is added until you save.</p>
+          <ul className="flex flex-col divide-y divide-line">
+            {suggestions.map((g) => (
+              <li key={g.label}>
+                <Link href={presetHref({ name: g.label.slice(0, 80), amount: (g.avgCents / 100).toFixed(2), next: nextOn(g.day) })} className="flex items-baseline justify-between gap-3 py-2 text-[15px]">
+                  <span className="min-w-0 truncate"><b>{g.label}</b> <span className="text-sm text-muted">· {g.months} months · around day {g.day}</span></span>
+                  <span className="num shrink-0">≈ {formatMoney(g.avgCents)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       {editable && (vendorOpts.length === 0 ? <Notice tone="info">Add a vendor first.</Notice> : (
-        <Card>
+        <Card id="add">
           <h2 className="mb-4 text-lg font-bold">Add a recurring bill</h2>
           <ActionForm action={saveRecurringBill} className="flex flex-col gap-4">
-            <Fields vendors={vendorOpts} accounts={acctOpts} locations={locOpts} today={today} />
+            <Fields vendors={vendorOpts} accounts={acctOpts} locations={locOpts} today={today} preset={preset} key={JSON.stringify(preset)} />
             <SubmitButton className="self-start" pendingText="Adding…">Add recurring bill</SubmitButton>
           </ActionForm>
         </Card>

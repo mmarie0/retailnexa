@@ -42,7 +42,7 @@ export default async function AgingPage({ searchParams }: PageProps<'/app/bills/
   return (
     <>
       <PageHeader title="Bills aging" description="What you owed each vendor at the end of the chosen day, grouped by how late it was. Matches Accounts payable on the balance sheet for that date."
-        actions={<Link href="/app/bills" className="font-semibold text-accent-strong">All bills</Link>} />
+        actions={<Link href="/app/bills/list" className="font-semibold text-accent-strong">All bills</Link>} />
       <form className="flex items-end gap-2">
         <label className="flex flex-col gap-1 text-sm font-semibold">As of<Input type="date" name="as_of" defaultValue={asOf} className="w-auto" /></label>
         <button className={buttonClass('secondary')}>Show</button>
