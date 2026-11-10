@@ -6,7 +6,8 @@
 export function parseDollarsToCents(input: string | null | undefined): number | null {
   if (input == null) return null;
   const s = input.trim().replace(/^\$/, '').replace(/,/g, '');
-  const m = /^(\d{1,10})(?:\.(\d{0,2}))?$/.exec(s) ?? /^()\.(\d{1,2})$/.exec(s);
+  // At most 2 significant decimals; trailing zeros are fine ("12.500" = $12.50, #94).
+  const m = /^(\d{1,10})(?:\.(\d{0,2})0*)?$/.exec(s) ?? /^()\.(\d{1,2})0*$/.exec(s);
   if (!m) return null;
   const whole = m[1] ? Number(m[1]) : 0;
   const frac = Number((m[2] ?? '').padEnd(2, '0') || '0');

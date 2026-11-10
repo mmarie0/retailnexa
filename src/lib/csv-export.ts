@@ -4,7 +4,8 @@
  * that came from an import (register names, categories, file names, memos)
  * can't run as a formula when the file is opened in Excel or Sheets.
  */
-const FORMULA_START = /^[=+\-@\t\r]/;
+// Leading spaces don't stop Excel from treating " =x" as a formula, so look past them.
+const FORMULA_START = /^[\s]*[=+\-@]|^[\t\r]/;
 
 export function csvCell(value: unknown): string {
   if (value == null) return '';

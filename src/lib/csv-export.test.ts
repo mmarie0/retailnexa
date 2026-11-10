@@ -7,6 +7,8 @@ describe('csvCell (#27 L1)', () => {
     expect(csvCell('+cmd|calc')).toBe("'+cmd|calc");
     expect(csvCell('-2+3')).toBe("'-2+3");
     expect(csvCell('@SUM(A1)')).toBe("'@SUM(A1)");
+    expect(csvCell(' =x')).toBe("' =x");
+    expect(csvCell('  +1')).toBe("'  +1");
     expect(csvCell('\t=x')).toBe("'\t=x");
     expect(csvCell('=HYPERLINK("http://x","y")')).toBe(`"'=HYPERLINK(""http://x"",""y"")"`);
   });

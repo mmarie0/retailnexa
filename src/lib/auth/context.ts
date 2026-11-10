@@ -24,9 +24,22 @@ export const getCurrentUser = cache(async () => {
   return data.user;
 });
 
-export async function requireUser(next = '/app') {
+/** True when the user has a verified authenticator but this session hasn't entered a code yet (#96). */
+export const needsSecondFactor = cache(async (): Promise<boolean> => {
+  const supabase = await getSupabase();
+  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  return data?.nextLevel === 'aal2' && data.currentLevel !== 'aal2';
+});
+
+/**
+ * Signed-in user, or a redirect to sign in. A user with two-factor on who has
+ * only entered their password is sent to the code step first (#96); the
+ * database refuses their business data until then as well.
+ */
+export async function requireUser(next = '/app', opts: { allowPasswordOnly?: boolean } = {}) {
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(next)}`);
+  if (!opts.allowPasswordOnly && (await needsSecondFactor())) redirect(`/login/verify?next=${encodeURIComponent(next)}`);
   return user;
 }
 
@@ -146,7 +159,7 @@ export async function requireAppAccess() {
 export type PlatformRole = 'superadmin' | 'support' | 'billing' | 'readonly';
 
 export const getAdminContext = cache(async (opts: { allowWithoutMfa?: boolean } = {}) => {
-  const user = await requireUser('/admin');
+  const user = await requireUser('/admin', { allowPasswordOnly: opts.allowWithoutMfa });
   const supabase = await getSupabase();
   const { data: row } = await supabase
     .from('platform_admins')

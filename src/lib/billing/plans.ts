@@ -20,19 +20,34 @@ export interface PlanDef {
   includes: string[];
 }
 
+/**
+ * Plan checklist entries that are built today. Anything else in `includes` must
+ * end with "(coming soon)" (#100); a unit test enforces it. Update both, and
+ * docs/FEATURE_PARITY.md, when a feature ships.
+ */
+export const SHIPPED_PLAN_FEATURES = new Set([
+  'First store location included',
+  'One warehouse location included',
+  'Daily sales and register reports',
+  'Bills, vendors and recurring bills',
+  'Bank reconciliation and cash flow',
+  'Double-entry bookkeeping and reports',
+]);
+
 export const PLANS: Record<ProductKey, PlanDef> = {
   retail: {
     key: 'retail',
     name: 'Retail',
     monthlyCents: 12999,
     extraLocationCents: 9999,
-    summary: 'For stores: sales, bills, vendors, inventory, staff and bookkeeping.',
+    summary: 'For stores: sales, bills, vendors, bank and bookkeeping. Inventory and staff are coming soon.',
     includes: [
       'First store location included',
       'Daily sales and register reports',
-      'Bills, vendors and invoice imports',
-      'Inventory, labels and stock counts',
-      'Staff schedules, time clock and tasks',
+      'Bills, vendors and recurring bills',
+      'Bank reconciliation and cash flow',
+      'Inventory, labels and stock counts (coming soon)',
+      'Staff schedules, time clock and tasks (coming soon)',
       'Double-entry bookkeeping and reports',
     ],
   },
@@ -41,13 +56,13 @@ export const PLANS: Record<ProductKey, PlanDef> = {
     name: 'Wholesale',
     monthlyCents: 14999,
     extraLocationCents: null,
-    summary: 'For distributors: catalog, customers, sales reps, ordering and fulfillment.',
+    summary: 'For distributors: bookkeeping today; catalog, customer pricing, sales reps and ordering are coming soon.',
     includes: [
       'One warehouse location included',
-      'Customer pricing tiers and credit terms',
-      'Sales rep logins and commissions',
-      'Branded ordering portal with case packs',
-      'Picking, packing, invoicing and returns',
+      'Customer pricing tiers and credit terms (coming soon)',
+      'Sales rep logins and commissions (coming soon)',
+      'Branded ordering portal with case packs (coming soon)',
+      'Picking, packing, invoicing and returns (coming soon)',
       'Double-entry bookkeeping and reports',
     ],
   },
