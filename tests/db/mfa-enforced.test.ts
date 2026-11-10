@@ -35,6 +35,7 @@ describe('#96 two-factor is enforced in the database', () => {
     expect(await as(aal2(owner), `select id from public.organizations where id = $1`, [org])).toHaveLength(1);
     expect((await as(aal2(owner), `select id from public.locations where organization_id = $1`, [org])).length).toBeGreaterThan(0);
     expect((await as(aal2(owner), `select id from public.my_locations($1)`, [org])).length).toBeGreaterThan(0);
+    expect(await as(aal2(owner), `select organization_id from public.subscriptions where organization_id = $1`, [org])).toHaveLength(1);
   });
 
   it('the same user with password + code (aal2) has full access', async () => {
