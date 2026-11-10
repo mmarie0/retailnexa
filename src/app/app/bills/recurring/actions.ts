@@ -1,31 +1,17 @@
 'use server';
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
 import { can, getOrgContext, getSupabase } from '@/lib/auth/context';
 import { fail, failFrom, ok, type ActionState } from '@/lib/actions';
 import { parseDollarsToCents } from '@/lib/money';
+import { recurringBillForm } from './schema';
 
-const uuid = z.string().uuid();
-const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick a date');
 
 export async function saveRecurringBill(_p: ActionState, form: FormData): Promise<ActionState> {
   try {
     const ctx = await getOrgContext();
     if (!can(ctx, 'bills.create')) return fail('You don’t have permission to do that.');
     if (!ctx.access.canWrite) return fail('Your account is read-only right now. Check the billing page.');
-    const parsed = z.object({
-      id: uuid.or(z.literal('')).transform((v) => v || null),
-      vendor_id: uuid.or(z.literal('')).refine((v) => v !== '', 'Pick a vendor'),
-      name: z.string().trim().min(1, 'Name it, e.g. Rent').max(80),
-      frequency: z.enum(['weekly', 'monthly', 'quarterly', 'yearly']),
-      next_date: date,
-      due_days: z.coerce.number().int().min(0).max(365),
-      end_date: date.or(z.literal('')).transform((v) => v || null),
-      account_id: uuid.or(z.literal('')).refine((v) => v !== '', 'Pick an account'),
-      description: z.string().trim().max(300).transform((v) => v || null),
-      location_id: uuid.or(z.literal('')).transform((v) => v || null),
-      is_active: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
-    }).safeParse(Object.fromEntries(form));
+    const parsed = recurringBillForm.safeParse(Object.fromEntries(form));
     if (!parsed.success) return fail('Check the highlighted fields.', Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])));
     const cents = parseDollarsToCents(String(form.get('amount') ?? ''));
     if (!cents) return fail('Check the highlighted fields.', { amount: 'Enter an amount like 3500.00' });

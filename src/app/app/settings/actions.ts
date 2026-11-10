@@ -150,6 +150,18 @@ export async function setMemberPermission(_p: ActionState, form: FormData): Prom
   }, 'Permission updated.');
 }
 
+/** Limit a member to some stores (#76). No stores ticked = all stores. Owners and admins always see every store. */
+export async function setMemberStores(_p: ActionState, form: FormData): Promise<ActionState> {
+  const ids = z.array(z.string().uuid()).max(200).safeParse(form.getAll('location_id').map(String));
+  if (!ids.success) return fail('Choose stores from the list.');
+  const all = form.get('scope') !== 'some';
+  if (!all && ids.data.length === 0) return fail('Tick at least one store, or choose “All stores”.');
+  return memberRpc('set_member_locations', {
+    p_membership_id: String(form.get('membership_id')),
+    p_location_ids: all ? [] : ids.data,
+  }, all ? 'This person can now see every store.' : `Limited to ${ids.data.length} store${ids.data.length === 1 ? '' : 's'}.`);
+}
+
 export async function revokeInvitation(_p: ActionState, form: FormData): Promise<ActionState> {
   return memberRpc('revoke_invitation', { p_invitation_id: String(form.get('invitation_id')) }, 'Invitation revoked.');
 }
