@@ -31,8 +31,8 @@ export default async function ImportSalesPage() {
         actions={<Link href="/app/sales" className="font-semibold text-accent-strong">All sales days</Link>} />
       <Card>
         <h2 className="mb-1 text-lg font-bold">Import a CSV</h2>
-        <p className="mb-4 text-muted">From Vela POS, export the daily sales report as CSV. You’ll see every row before anything is saved.</p>
-        <SalesImporter locations={locations} />
+        <p className="mb-4 text-muted">From Vela POS, export the Sales Summary for each day (the .xls file works as-is; pick several days at once). Other systems: a CSV with one row per day. You’ll see everything before it’s saved.</p>
+        <SalesImporter locations={locations} timeZone={orgRow?.timezone ?? undefined} />
       </Card>
       <Card>
         <h2 className="mb-4 text-lg font-bold">Enter one day by hand</h2>
