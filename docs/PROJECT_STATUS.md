@@ -10,6 +10,8 @@ _Last updated: 2026-11-10 — Phase 1 merged and migrations live on Supabase. Ph
 
 - **2.4 Overview dashboard** (branch `feat/phase-2-dashboard`, stacked on 2.3): sales tiles (today, yesterday, last 7 days vs prior week, month to date vs the same weekdays last year), 14-day net-sales bar chart with hover values, missing-day markers and a table view; bills to pay / overdue; month gross and operating profit from the ledger (`account_activity` RPC, accounting/profit roles only), flagged “cost of goods not tracked yet” until inventory lands. Each block appears only for roles with the matching permission. 3 DB + 6 unit tests; chart rendered and checked in headless Chrome with sample data. **Not verified:** with real data against live Supabase.
 
+- **2.5 Financial statements** (branch `feat/phase-2-statements`, stacked on 2.4): Profit & loss for this month / last month / quarter / year to date / last year / custom dates (revenue net of discounts, COGS, gross profit, operating expenses, operating profit, other income and expenses, net income) and Balance sheet as of any date (net income to date shown in equity; the page flags any imbalance). Accrual basis. Warns when COGS is $0 because inventory isn’t tracked yet. New `account_activity_detail` RPC. DB test proves the balance sheet balances and P&L net income equals equity growth on real postings (sales, bill, payment). **Not yet:** cash-basis view, cash-flow statement, sales tax report.
+
 ## Phase 1 — what exists and how it was verified
 
 | Area | Built | Verified how | Not yet verified |

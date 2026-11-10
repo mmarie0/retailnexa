@@ -66,6 +66,8 @@ RPCs: `record_sales_day` (sales.import; tenders must equal gross − discounts +
 
 `account_activity(org, from, to)` (migration `20261110000400`): net debits − credits per account role for a date range (≤ 10 years); accounting.view or profit.view. Feeds the dashboard P&L via `profitInputsFromBalances()` + `computeProfit()`.
 
+`account_activity_detail(org, from, to)` (migration `20261110000500`): every account with its net movement in the range; accounting.view or profit.view. Feeds the Profit & loss page via `incomeStatement()`; the Balance sheet uses `trial_balance` + `balanceSheet()` (`src/lib/accounting/statements.ts`).
+
 ## Key functions
 
 Authorization helpers (`private`, SECURITY DEFINER, `search_path=''`): `is_org_member`, `member_role`, `has_permission`, `is_platform_admin(roles[])` (requires `aal2` when `mfa_required`), `has_support_access`, `org_is_writable` (org active **and** subscription trialing/active or past_due ≤ 7 days), `shares_org_with`, `role_rank`.

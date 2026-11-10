@@ -4,6 +4,8 @@ import { cx } from '@/components/ui';
 const TABS = [
   { href: '/app/accounting', label: 'Chart of accounts' },
   { href: '/app/accounting/journal', label: 'Journal' },
+  { href: '/app/accounting/profit-loss', label: 'Profit & loss' },
+  { href: '/app/accounting/balance-sheet', label: 'Balance sheet' },
   { href: '/app/accounting/trial-balance', label: 'Trial balance' },
 ];
 
