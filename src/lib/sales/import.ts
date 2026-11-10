@@ -65,10 +65,26 @@ export function parseAmount(raw: string | undefined): number | null {
   return neg ? -c : c;
 }
 
-/** YYYY-MM-DD, MM/DD/YYYY, M/D/YY (20xx), optionally followed by a time. */
-export function parseDate(raw: string | undefined): string | null {
+/**
+ * YYYY-MM-DD, MM/DD/YYYY, M/D/YY (20xx), optionally with a leading weekday
+ * ("Mon 11/09/2026") and a trailing time. A timestamp with "Z" or a UTC offset is
+ * converted to the store's calendar day when `timeZone` is given (#40).
+ */
+export function parseDate(raw: string | undefined, timeZone?: string): string | null {
   if (!raw) return null;
-  const s = raw.trim().split(/[ T]/)[0];
+  let t = raw.trim().replace(/^(mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)[a-z]*\.?,?\s+/i, '');
+  const zoned = /^\d{4}-\d{2}-\d{2}[T ]\d{1,2}:\d{2}(:\d{2}(\.\d+)?)?\s*(Z|[+-]\d{2}:?\d{2})$/i.exec(t);
+  if (zoned) {
+    const ms = Date.parse(t.replace(' ', 'T').replace(/([+-]\d{2})(\d{2})$/, '$1:$2'));
+    if (Number.isNaN(ms)) return null;
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: timeZone || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).format(ms);
+    } catch {
+      return new Date(ms).toISOString().slice(0, 10);
+    }
+  }
+  t = t.split(/[ T]/)[0];
+  const s = t;
   let y: number, mo: number, d: number;
   let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
   if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }
@@ -97,7 +113,7 @@ export interface RowError { line: number; message: string }
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
 /** Validates and converts data rows (header excluded). `line` is the 1-based file line for messages. */
-export function rowsToSalesDays(rows: string[][], mapping: Mapping, firstLine = 2): { days: SalesDayRow[]; errors: RowError[] } {
+export function rowsToSalesDays(rows: string[][], mapping: Mapping, firstLine = 2, opts: { timeZone?: string } = {}): { days: SalesDayRow[]; errors: RowError[] } {
   const days: SalesDayRow[] = [];
   const errors: RowError[] = [];
   const seen = new Set<string>();
@@ -106,7 +122,7 @@ export function rowsToSalesDays(rows: string[][], mapping: Mapping, firstLine = 
   rows.forEach((r, i) => {
     const line = firstLine + i;
     const fail = (message: string) => errors.push({ line, message });
-    const date = parseDate(cell(r, 'date'));
+    const date = parseDate(cell(r, 'date'), opts.timeZone);
     if (!date) return fail(`“${cell(r, 'date') ?? ''}” is not a date`);
     const amounts = {} as Record<'gross' | 'discounts' | 'tax' | 'cash' | 'card' | 'credit', number>;
     for (const f of ['gross', 'discounts', 'tax', 'cash', 'card', 'credit'] as const) {
