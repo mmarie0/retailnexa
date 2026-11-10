@@ -2,6 +2,9 @@
 
 _Last updated: 2026-11-09 — Phase 1 code complete on branch `feat/phase-1-foundation`; awaiting accounts/credentials for live verification._
 
+## Phase 2 — in progress
+- **2.1 Ledger core** (branch `feat/phase-2-ledger`, PR open): chart of accounts seeded per business, immutable double-entry journal, idempotent posting, single reversal, period close, trial balance, posting rules that fix the prototype’s accounting errors. 65 DB tests + 49 unit tests pass locally. Not yet: UI screens, applied to the live database (needs merge approval).
+
 ## Phase 1 — what exists and how it was verified
 
 | Area | Built | Verified how | Not yet verified |
