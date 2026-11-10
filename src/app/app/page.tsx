@@ -3,19 +3,62 @@ import Link from 'next/link';
 import { can, getOrgContext, getSupabase } from '@/lib/auth/context';
 import { Badge, Card, PageHeader } from '@/components/ui';
 import { ROLE_LABELS } from '@/lib/auth/permissions';
+import { formatMoney } from '@/lib/billing/plans';
+import { todayIn } from '@/lib/time';
+import { salesWindows, summarizeBills, summarizeSales } from '@/lib/dashboard/summary';
+import { computeProfit } from '@/lib/finance/metrics';
+import { profitInputsFromBalances, type AccountRole } from '@/lib/accounting/postings';
+import { DailySalesChart } from './_dashboard/daily-sales-chart';
+import { Change, Stat } from './_dashboard/tiles';
 
 export const metadata: Metadata = { title: 'Overview' };
 
 export default async function OverviewPage() {
   const ctx = await getOrgContext();
   const supabase = await getSupabase();
-  const [{ count: locations }, { count: members }, { data: announcements }] = await Promise.all([
+  const [{ count: locations }, { count: members }, { data: announcements }, { data: orgRow }] = await Promise.all([
     supabase.from('locations').select('id', { count: 'exact', head: true }).eq('organization_id', ctx.org.id).eq('is_active', true),
     can(ctx, 'members.view')
       ? supabase.from('memberships').select('id', { count: 'exact', head: true }).eq('organization_id', ctx.org.id).eq('status', 'active')
       : Promise.resolve({ count: null }),
     supabase.from('announcements').select('id, title, body, severity, audience').order('starts_at', { ascending: false }).limit(3),
+    supabase.from('organizations').select('timezone').eq('id', ctx.org.id).maybeSingle(),
   ]);
+  const today = todayIn(orgRow?.timezone);
+  const monthStart = `${today.slice(0, 8)}01`;
+  const showSales = can(ctx, 'sales.view');
+  const showBills = can(ctx, 'bills.view');
+  const showProfit = can(ctx, 'accounting.view') || can(ctx, 'profit.view');
+  const w = salesWindows(today);
+  const salesSel = 'business_date, gross_sales_cents, discounts_cents, transaction_count';
+  const [recent, lastYear, bills, activity] = await Promise.all([
+    showSales ? supabase.from('sales_days').select(salesSel).eq('organization_id', ctx.org.id).is('voided_at', null)
+      .gte('business_date', w.recent.from).lte('business_date', w.recent.to).limit(2000) : Promise.resolve({ data: null }),
+    showSales ? supabase.from('sales_days').select(salesSel).eq('organization_id', ctx.org.id).is('voided_at', null)
+      .gte('business_date', w.lastYear.from).lte('business_date', w.lastYear.to).limit(2000) : Promise.resolve({ data: null }),
+    showBills ? supabase.from('bills').select('status, due_date, total_cents, paid_cents').eq('organization_id', ctx.org.id)
+      .in('status', ['draft', 'approved']).limit(2000) : Promise.resolve({ data: null }),
+    showProfit ? supabase.rpc('account_activity', { p_org: ctx.org.id, p_from: monthStart, p_to: today }) : Promise.resolve({ data: null }),
+  ]);
+  const salesRows = [...(recent.data ?? []), ...(lastYear.data ?? [])].map((r) => ({
+    date: r.business_date as string, netCents: Number(r.gross_sales_cents) - Number(r.discounts_cents), transactions: r.transaction_count as number | null,
+  }));
+  const sales = showSales && (recent.data ?? []).length ? summarizeSales(salesRows, today) : null;
+  const ap = showBills ? summarizeBills((bills.data ?? []).map((b) => ({
+    status: b.status as string, dueDate: b.due_date as string, openCents: Number(b.total_cents) - Number(b.paid_cents),
+  })), today) : null;
+  const balances = Object.fromEntries(((activity.data ?? []) as { role: string; net_cents: number }[]).map((r) => [r.role, Number(r.net_cents)])) as Partial<Record<AccountRole, number>>;
+  const pi = profitInputsFromBalances(balances);
+  const profit = showProfit && activity.data ? computeProfit({
+    netSalesCents: pi.netSalesCents, cogsCents: pi.cogsCents,
+    operatingExpensesCents: {
+      payroll: pi.operatingExpensesCents.payroll, rent: pi.operatingExpensesCents.rent, utilities: pi.operatingExpensesCents.utilities,
+      cardFees: pi.operatingExpensesCents.card_fees,
+      other: (pi.operatingExpensesCents.other_operating ?? 0) + (pi.operatingExpensesCents.inventory_adjustments ?? 0),
+    },
+    otherIncomeCents: pi.otherIncomeCents, otherExpensesCents: pi.otherExpensesCents, interestCents: pi.interestCents, taxesCents: pi.taxesCents,
+  }) : null;
+  const monthName = new Date(`${today}T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long' });
 
   const steps = [
     { done: !!ctx.subscription, label: 'Choose a plan and start your trial', href: '/app/billing', show: can(ctx, 'billing.manage') },
@@ -33,6 +76,33 @@ export default async function OverviewPage() {
           <p className="font-bold">{a.title}</p><p className="mt-1 text-muted">{a.body}</p>
         </Card>
       ))}
+      {sales && (
+        <section aria-label="Sales" className="flex flex-col gap-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Stat label="Today" value={sales.today.netCents === null ? '—' : formatMoney(sales.today.netCents)} sub={sales.today.netCents === null ? 'Not recorded yet' : 'Net sales'} href="/app/sales" />
+            <Stat label="Yesterday" value={sales.yesterday.netCents === null ? '—' : formatMoney(sales.yesterday.netCents)} sub={sales.yesterday.netCents === null ? 'Not recorded' : 'Net sales'} href="/app/sales" />
+            <Stat label="Last 7 days" value={formatMoney(sales.last7.netCents)} sub={<Change pct={sales.last7.changePct} vs="prior week" />} />
+            <Stat label={`${monthName} so far`} value={formatMoney(sales.monthToDate.netCents)} sub={<Change pct={sales.monthToDate.changePct} vs="last year" />} />
+          </div>
+          <Card><DailySalesChart points={sales.daily} /></Card>
+        </section>
+      )}
+      {showSales && !sales && can(ctx, 'sales.import') && (
+        <Card>
+          <h2 className="text-lg font-bold">Bring in your sales</h2>
+          <p className="mt-1 text-muted">Import your POS daily report or enter a day by hand to see sales here.</p>
+          <Link href="/app/sales/import" className="mt-3 inline-block font-semibold text-accent-strong">Add sales</Link>
+        </Card>
+      )}
+      {(ap || profit) && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {ap && <Stat label="Bills to pay" value={formatMoney(ap.unpaidCents)} sub={ap.drafts ? `${ap.drafts} draft${ap.drafts === 1 ? '' : 's'} awaiting approval` : `${formatMoney(ap.dueNext7Cents)} due this week`} href="/app/bills" />}
+          {ap && <Stat label="Overdue bills" value={formatMoney(ap.overdueCents)} tone={ap.overdueCents > 0 ? 'late' : undefined} sub={ap.overdueCount ? `${ap.overdueCount} bill${ap.overdueCount === 1 ? '' : 's'} past due` : 'Nothing overdue'} href="/app/bills" />}
+          {profit && <Stat label={`${monthName} gross profit`} value={formatMoney(profit.grossProfitCents)}
+            sub={pi.cogsCents === 0 && profit.netSalesCents > 0 ? 'Cost of goods not tracked yet' : profit.grossMarginPct === null ? 'No sales yet' : `${profit.grossMarginPct}% margin`} />}
+          {profit && <Stat label={`${monthName} operating profit`} value={formatMoney(profit.operatingProfitCents)} sub={`After ${formatMoney(profit.operatingExpensesCents)} expenses`} />}
+        </div>
+      )}
       {steps.length > 0 && (
         <Card>
           <h2 className="text-lg font-bold">Get set up</h2>
@@ -48,7 +118,7 @@ export default async function OverviewPage() {
       )}
       <Card>
         <h2 className="text-lg font-bold">What’s next for RetailNexa</h2>
-        <p className="mt-1 text-muted">Your account, team, locations and billing are ready. Sales reports, bills and vendors, inventory and bookkeeping arrive in the next releases and will appear in the menu when they’re available to you.</p>
+        <p className="mt-1 text-muted">Sales, bills, vendors and bookkeeping are live. Inventory and cost of goods, bank reconciliation and wholesale arrive in the next releases and will appear in the menu when they’re available to you.</p>
       </Card>
     </>
   );

@@ -64,6 +64,8 @@ RPCs: `create_bill` (bills.create; active vendor, 1–100 positive lines on expe
 
 RPCs: `record_sales_day` (sales.import; tenders must equal gross − discounts + tax; one live record per location/register/date; posts like `dailySales()`), `void_sales_day` (sales.edit; reason required; reversal dated on the business date), `create_sales_import_batch` (sales.import). Sales entries can’t be reversed directly through the journal.
 
+`account_activity(org, from, to)` (migration `20261110000400`): net debits − credits per account role for a date range (≤ 10 years); accounting.view or profit.view. Feeds the dashboard P&L via `profitInputsFromBalances()` + `computeProfit()`.
+
 ## Key functions
 
 Authorization helpers (`private`, SECURITY DEFINER, `search_path=''`): `is_org_member`, `member_role`, `has_permission`, `is_platform_admin(roles[])` (requires `aal2` when `mfa_required`), `has_support_access`, `org_is_writable` (org active **and** subscription trialing/active or past_due ≤ 7 days), `shares_org_with`, `role_rank`.
