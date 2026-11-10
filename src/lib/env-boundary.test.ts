@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { allowWithoutLimiterKey } from './rate-limit-policy';
+import { missingLimiterKey } from './rate-limit-policy';
 
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((n) => {
@@ -26,9 +26,9 @@ describe('#19 env module boundary', () => {
 });
 
 describe('#19 rate limiter without its key', () => {
-  it('fails closed in production, open elsewhere', () => {
-    expect(allowWithoutLimiterKey('production')).toBe(false);
-    expect(allowWithoutLimiterKey('preview')).toBe(true);
-    expect(allowWithoutLimiterKey(undefined)).toBe(true);
+  it('is never silent in production', () => {
+    expect(missingLimiterKey('production')).toEqual({ allow: true, reportError: true });
+    expect(missingLimiterKey('preview').reportError).toBe(false);
+    expect(missingLimiterKey(undefined).reportError).toBe(false);
   });
 });

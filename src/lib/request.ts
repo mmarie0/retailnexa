@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { headers } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { supabaseSecretKeyOrNull } from '@/lib/env';
-import { allowWithoutLimiterKey } from '@/lib/rate-limit-policy';
+import { missingLimiterKey } from '@/lib/rate-limit-policy';
 
 /**
  * Hashed client IP for rate limiting. Only platform-set headers are trusted:
@@ -26,15 +26,15 @@ export function emailKey(email: string) {
 
 /**
  * Fixed-window limiter backed by Postgres (public.check_rate_limit). Returns
- * true when allowed. Without the secret key it fails closed in production
- * (see rate-limit-policy.ts). Fails open (with a log) if the limiter itself is
+ * true when allowed. Without the secret key it allows but reports an error in
+ * production (see rate-limit-policy.ts). Fails open (with a log) if the limiter itself is
  * unavailable, because Supabase Auth applies its own limits as a backstop.
  */
 export async function rateLimit(bucket: string, max: number, windowSeconds: number): Promise<boolean> {
   if (!supabaseSecretKeyOrNull()) {
-    const allow = allowWithoutLimiterKey(process.env.VERCEL_ENV);
-    if (!allow) console.error('[rate limit] SUPABASE_SECRET_KEY is missing in production; refusing', bucket.split(':')[0]);
-    return allow;
+    const policy = missingLimiterKey(process.env.VERCEL_ENV);
+    if (policy.reportError) console.error('[rate limit] SUPABASE_SECRET_KEY is missing in production; rate limiting is OFF', bucket.split(':')[0]);
+    return policy.allow;
   }
   try {
     const { data, error } = await createAdminClient().rpc('check_rate_limit', { p_bucket: bucket, p_max: max, p_window_seconds: windowSeconds });
