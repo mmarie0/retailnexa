@@ -54,7 +54,8 @@ export function planFromSheet(kind: ImportKind, rows: string[][], opts: { today:
     if (c.name === undefined) return { rows: [], errors: [{ line: 1, message: 'Add a "Name" column.' }] };
     body.forEach((r, i) => {
       const line = i + 2, name = cell(r, c.name);
-      if (!name) return;
+      // A row with data but no name is an error, never silently dropped (#146).
+      if (!name) { if (r.some((x) => x?.trim())) errors.push({ line, message: 'vendor name is missing' }); return; }
       const t = cell(r, c.terms).replace(/[^0-9]/g, '');
       out.push({ key: name.toLowerCase(), name, contact_name: cell(r, c.contact) || null, email: cell(r, c.email) || null, phone: cell(r, c.phone) || null,
         payment_terms_days: t && Number(t) <= 365 ? Number(t) : null, notes: cell(r, c.notes) || null, line });

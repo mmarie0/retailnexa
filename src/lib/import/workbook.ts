@@ -4,7 +4,7 @@
  * file can't be read instead of a generic error.
  */
 import { cellText } from './cell';
-import { readXlsxLite, type LiteSheet } from './xlsx-lite';
+import { LiteLimitError, readXlsxLite, type LiteSheet } from './xlsx-lite';
 import { parseCsv } from '@/lib/sales/csv';
 
 export class WorkbookError extends Error {}
@@ -41,6 +41,7 @@ export async function readWorkbook(buf: ArrayBuffer, maxRows = 20_000): Promise<
     return sheets;
   } catch (e) {
     if (e instanceof WorkbookError) throw e;
+    if (e instanceof LiteLimitError) throw new WorkbookError(`That Excel file can’t be read safely (${e.message}). Open it in Excel and use Save As → CSV, then upload the CSV.`);
     throw new WorkbookError('That Excel file couldn’t be read. Open it in Excel and use Save As → CSV, then upload the CSV.');
   }
 }

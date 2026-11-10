@@ -2,79 +2,195 @@
  * A small, forgiving .xlsx reader used when exceljs can't read a workbook (files
  * from Google Sheets, Numbers or older tools sometimes trip it up). Reads every
  * visible tab's cell values as text, with dates as YYYY-MM-DD. No formulas are
- * evaluated: the cached value Excel saved is used, which is what we want.
+ * evaluated: the cached value Excel saved is used.
+ *
+ * Hardened for untrusted files (#148, #150): one forward pass over each XML
+ * part (no backtracking regexes), Excel's own limits on columns and rows, caps
+ * on unpacked bytes and total cells, and a time budget.
  */
 import JSZip from 'jszip';
 
 export interface LiteSheet { name: string; rows: string[][] }
+export class LiteLimitError extends Error {}
 
-const unescape = (s: string) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
-  .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d))).replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&amp;/g, '&');
-const attr = (tag: string, name: string) => tag.match(new RegExp(`(?:^|\\s)${name}="([^"]*)"`))?.[1];
-/** Text of every <t> inside a fragment (shared strings and inline strings, rich text included). */
-const texts = (frag: string) => [...frag.matchAll(/<(?:\w+:)?t(?:\s[^>]*)?>([\s\S]*?)<\/(?:\w+:)?t>/g)].map((m) => unescape(m[1])).join('');
-const colIndex = (ref: string) => { let n = 0; for (const ch of ref.replace(/\d+/g, '')) n = n * 26 + (ch.charCodeAt(0) - 64); return n - 1; };
-const BUILTIN_DATE = new Set([14, 15, 16, 17, 22, 27, 30, 36, 45, 46, 47, 50, 57]);
-function serialToDate(v: number): string {
-  // Excel's 1900 date system (with its fake Feb 29, 1900); time of day dropped.
-  const ms = Math.round((v - 25569) * 86_400_000);
-  return new Date(ms).toISOString().slice(0, 10);
+export const LITE_LIMITS = {
+  maxColumns: 16_384,          // Excel's last column, XFD
+  maxRowNumber: 1_048_576,     // Excel's last row
+  maxCells: 2_000_000,
+  maxPartBytes: 60 * 1024 * 1024, // one XML part, unpacked
+  timeBudgetMs: 15_000,
+};
+
+const ENTITIES: Record<string, string> = { lt: '<', gt: '>', quot: '"', apos: "'", amp: '&' };
+function unescape(s: string): string {
+  if (s.indexOf('&') < 0) return s;
+  return s.replace(/&(#x[0-9a-fA-F]{1,8}|#[0-9]{1,10}|lt|gt|quot|apos|amp);/g, (_, e: string) => {
+    if (e[0] !== '#') return ENTITIES[e];
+    const n = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1));
+    return Number.isInteger(n) && n >= 0 && n <= 0x10ffff && !(n >= 0xd800 && n <= 0xdfff) ? String.fromCodePoint(n) : '';
+  });
 }
 
-export async function readXlsxLite(data: ArrayBuffer | Uint8Array, maxRows = 20_000): Promise<LiteSheet[]> {
+interface Tag { name: string; attrs: string; close: boolean; selfClose: boolean; start: number; end: number }
+/** Yields tags in order with one forward scan; `text(a, b)` reads what's between. */
+function* tags(xml: string, deadline: number): Generator<Tag> {
+  let i = 0, n = 0;
+  for (;;) {
+    const lt = xml.indexOf('<', i);
+    if (lt < 0) return;
+    if ((++n & 0x3fff) === 0 && Date.now() > deadline) throw new LiteLimitError('took too long');
+    if (xml.startsWith('<!--', lt)) { const e = xml.indexOf('-->', lt + 4); if (e < 0) return; i = e + 3; continue; }
+    if (xml.startsWith('<![CDATA[', lt)) { const e = xml.indexOf(']]>', lt + 9); if (e < 0) return; i = e + 3; continue; }
+    if (xml[lt + 1] === '?' || xml[lt + 1] === '!') { const e = xml.indexOf('>', lt + 1); if (e < 0) return; i = e + 1; continue; }
+    const gt = xml.indexOf('>', lt + 1);
+    if (gt < 0) return;
+    let body = xml.slice(lt + 1, gt);
+    const close = body.startsWith('/');
+    if (close) body = body.slice(1);
+    const selfClose = body.endsWith('/');
+    if (selfClose) body = body.slice(0, -1);
+    const sp = body.search(/[\s]/);
+    const full = sp < 0 ? body : body.slice(0, sp);
+    const name = full.includes(':') ? full.slice(full.indexOf(':') + 1) : full; // drop namespace prefixes
+    yield { name, attrs: sp < 0 ? '' : body.slice(sp), close, selfClose, start: lt, end: gt + 1 };
+    i = gt + 1;
+  }
+}
+function attr(attrs: string, name: string): string | undefined {
+  // Attributes are short; a bounded search is fine. Matches name="..." or prefix:name="...".
+  const re = new RegExp(`(?:^|\\s)(?:[\\w-]+:)?${name}\\s*=\\s*"([^"]*)"`);
+  return attrs.match(re)?.[1];
+}
+
+/** "AB12" → column index 27, or null when it's outside Excel's grid. */
+export function colIndex(ref: string): number | null {
+  let n = 0, k = 0;
+  for (const ch of ref) {
+    const c = ch.charCodeAt(0);
+    if (c >= 65 && c <= 90) { if (++k > 3) return null; n = n * 26 + (c - 64); }
+    else if (c >= 97 && c <= 122) { if (++k > 3) return null; n = n * 26 + (c - 96); }
+    else break;
+  }
+  return k === 0 || n > LITE_LIMITS.maxColumns ? null : n - 1;
+}
+
+const BUILTIN_DATE = new Set([14, 15, 16, 17, 22, 27, 30, 36, 45, 46, 47, 50, 57]);
+function serialToDate(v: number): string | null {
+  // Excel's 1900 date system; 1 = 1900-01-01 … 2958465 = 9999-12-31. Time of day dropped.
+  if (!Number.isFinite(v) || v < 1 || v > 2_958_465) return null;
+  return new Date(Math.round((v - 25569) * 86_400_000)).toISOString().slice(0, 10);
+}
+
+export async function readXlsxLite(data: ArrayBuffer | Uint8Array, maxRows = 20_000, maxCells = LITE_LIMITS.maxCells): Promise<LiteSheet[]> {
+  const deadline = Date.now() + LITE_LIMITS.timeBudgetMs;
   const zip = await JSZip.loadAsync(data);
-  const read = async (p: string) => (await zip.file(p)?.async('string')) ?? null;
+  const read = async (p: string) => {
+    const f = zip.file(p);
+    if (!f) return null;
+    const size = (f as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
+    if (size !== undefined && size > LITE_LIMITS.maxPartBytes) throw new LiteLimitError('a part of the workbook is too large');
+    const s = await f.async('string');
+    if (s.length > LITE_LIMITS.maxPartBytes) throw new LiteLimitError('a part of the workbook is too large');
+    return s;
+  };
   const wb = await read('xl/workbook.xml');
   if (!wb) throw new Error('not an Excel workbook');
-  const rels = (await read('xl/_rels/workbook.xml.rels')) ?? '';
-  const target = new Map([...rels.matchAll(/<Relationship\b[^>]*>/g)].map((m) => [attr(m[0], 'Id') ?? '', attr(m[0], 'Target') ?? '']));
 
+  const target = new Map<string, string>();
+  for (const t of tags((await read('xl/_rels/workbook.xml.rels')) ?? '', deadline)) {
+    if (t.name === 'Relationship' && !t.close) target.set(attr(t.attrs, 'Id') ?? '', attr(t.attrs, 'Target') ?? '');
+  }
+
+  // Shared strings: the text of every <t> inside each <si>.
+  const shared: string[] = [];
   const sst = await read('xl/sharedStrings.xml');
-  const shared = sst ? [...sst.matchAll(/<(?:\w+:)?si>([\s\S]*?)<\/(?:\w+:)?si>/g)].map((m) => texts(m[1])) : [];
+  if (sst) {
+    let cur: string[] | null = null, tStart = -1;
+    for (const t of tags(sst, deadline)) {
+      if (t.name === 'si') { if (!t.close) cur = []; else if (cur) { shared.push(cur.join('')); cur = null; } if (t.selfClose) shared.push(''); }
+      else if (t.name === 't' && cur) { if (!t.close && !t.selfClose) tStart = t.end; else if (t.close && tStart >= 0) { cur.push(unescape(sst.slice(tStart, t.start))); tStart = -1; } }
+    }
+  }
 
   // Which cell styles are dates.
   const styles = (await read('xl/styles.xml')) ?? '';
-  const customDate = new Set([...styles.matchAll(/<numFmt\b[^>]*>/g)]
-    .filter((m) => /[dmy]/i.test((attr(m[0], 'formatCode') ?? '').replace(/"[^"]*"|\[[^\]]*\]/g, '')))
-    .map((m) => Number(attr(m[0], 'numFmtId'))));
-  const xfs = styles.match(/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/)?.[1] ?? '';
-  const dateStyle = [...xfs.matchAll(/<xf\b[^>]*\/?>/g)].map((m) => { const id = Number(attr(m[0], 'numFmtId') ?? 0); return BUILTIN_DATE.has(id) || customDate.has(id); });
+  const customDate = new Set<number>();
+  const dateStyle: boolean[] = [];
+  let inXfs = false;
+  for (const t of tags(styles, deadline)) {
+    if (t.name === 'numFmt' && !t.close) {
+      const code = (attr(t.attrs, 'formatCode') ?? '').replace(/"[^"]*"|\[[^\]]*\]/g, '');
+      if (/[dmy]/i.test(unescape(code))) customDate.add(Number(attr(t.attrs, 'numFmtId')));
+    } else if (t.name === 'cellXfs') inXfs = !t.close && !t.selfClose;
+    else if (t.name === 'xf' && inXfs && !t.close) {
+      const id = Number(attr(t.attrs, 'numFmtId') ?? 0);
+      dateStyle.push(BUILTIN_DATE.has(id) || customDate.has(id));
+    }
+  }
 
   const out: LiteSheet[] = [];
-  let total = 0;
-  for (const m of wb.matchAll(/<(?:\w+:)?sheet\b[^>]*\/?>/g)) {
-    const tag = m[0];
-    const state = attr(tag, 'state');
+  let totalRows = 0, totalCells = 0;
+  for (const st of tags(wb, deadline)) {
+    if (st.name !== 'sheet' || st.close) continue;
+    const state = attr(st.attrs, 'state');
     if (state === 'hidden' || state === 'veryHidden') continue;
-    const rid = attr(tag, 'r:id') ?? attr(tag, 'id') ?? '';
-    let path = target.get(rid) ?? '';
-    if (!path) continue;
+    let path = target.get(attr(st.attrs, 'id') ?? '') ?? '';
+    if (!path || path.includes('..')) continue;
     path = path.startsWith('/') ? path.slice(1) : `xl/${path.replace(/^\.\//, '')}`;
     const xml = await read(path);
-    if (!xml) continue;
+    if (xml === null) continue;
+
     const rows: string[][] = [];
-    for (const rm of xml.matchAll(/<(?:\w+:)?row\b[^>]*>([\s\S]*?)<\/(?:\w+:)?row>/g)) {
-      if (total >= maxRows + 1) break;
-      const row: string[] = [];
-      for (const cm of rm[1].matchAll(/<(?:\w+:)?c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?c>)/g)) {
-        const a = cm[1], inner = cm[2] ?? '';
-        const ref = attr(a, 'r');
-        const i = ref ? colIndex(ref) : row.length;
-        const t = attr(a, 't'), s = Number(attr(a, 's') ?? 0);
-        const v = inner.match(/<(?:\w+:)?v>([\s\S]*?)<\/(?:\w+:)?v>/)?.[1];
-        let val = '';
-        if (t === 's') val = shared[Number(v)] ?? '';
-        else if (t === 'inlineStr') val = texts(inner);
-        else if (t === 'str') val = unescape(v ?? '');
-        else if (t === 'b') val = v === '1' ? 'TRUE' : v === '0' ? 'FALSE' : '';
-        else if (t === 'e') val = '';
-        else if (v !== undefined) val = dateStyle[s] && !Number.isNaN(Number(v)) ? serialToDate(Number(v)) : unescape(v);
-        while (row.length < i) row.push('');
-        row[i] = val;
+    let row: string[] | null = null;
+    let cell: { i: number; t?: string; s: number } | null = null;
+    let vStart = -1, v: string | undefined, isText: string[] = [], tStart = -1;
+    for (const t of tags(xml, deadline)) {
+      if (t.name === 'row') {
+        if (!t.close) {
+          const r = Number(attr(t.attrs, 'r') ?? 0);
+          if (r > LITE_LIMITS.maxRowNumber) throw new LiteLimitError('a row is past Excel’s last row');
+          row = [];
+          if (t.selfClose) row = null;
+        } else if (row) {
+          if (row.some((c) => c.trim() !== '')) { rows.push(row); totalRows++; }
+          row = null;
+          if (totalRows >= maxRows + 1) break;
+        }
+      } else if (t.name === 'c' && row) {
+        if (!t.close) {
+          const ref = attr(t.attrs, 'r');
+          let i: number;
+          if (ref) {
+            const ci = colIndex(ref);
+            if (ci === null) throw new LiteLimitError('a cell is past Excel’s last column (XFD)');
+            i = ci;
+          } else i = row.length;
+          cell = { i, t: attr(t.attrs, 't'), s: Number(attr(t.attrs, 's') ?? 0) };
+          v = undefined; isText = [];
+          if (t.selfClose) cell = null;
+        } else if (cell) {
+          let val = '';
+          const ty = cell.t;
+          if (ty === 's') val = shared[Number(v)] ?? '';
+          else if (ty === 'inlineStr') val = isText.join('');
+          else if (ty === 'str') val = unescape(v ?? '');
+          else if (ty === 'b') val = v === '1' ? 'TRUE' : v === '0' ? 'FALSE' : '';
+          else if (ty === 'e') val = '';
+          else if (v !== undefined) val = (dateStyle[cell.s] && serialToDate(Number(v))) || unescape(v);
+          totalCells += Math.max(1, cell.i - row.length + 1);
+          if (totalCells > maxCells) throw new LiteLimitError('the workbook has too many cells');
+          while (row.length < cell.i) row.push('');
+          row[cell.i] = val;
+          cell = null;
+        }
+      } else if (t.name === 'v' && cell) {
+        if (!t.close && !t.selfClose) vStart = t.end; else if (t.close && vStart >= 0) { v = xml.slice(vStart, t.start); vStart = -1; }
+      } else if (t.name === 't' && cell) {
+        if (!t.close && !t.selfClose) tStart = t.end; else if (t.close && tStart >= 0) { isText.push(unescape(xml.slice(tStart, t.start))); tStart = -1; }
       }
-      if (row.some((c) => c.trim() !== '')) { rows.push(row); total++; }
     }
-    out.push({ name: unescape(attr(tag, 'name') ?? `Sheet${out.length + 1}`), rows });
+    out.push({ name: unescape(attr(st.attrs, 'name') ?? `Sheet${out.length + 1}`), rows });
+    if (totalRows >= maxRows + 1) break;
   }
   return out;
 }
