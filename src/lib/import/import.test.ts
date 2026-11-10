@@ -202,3 +202,49 @@ describe('one .xlsx with a tab per kind (owner: "this is for if i upload csv or 
     expect(plan.rows.bill![0]).toMatchObject({ amount_cents: 1934 });
   });
 });
+
+describe('reading Excel files that exceljs can’t (owner: "it wont read xlsx")', () => {
+  const minimalXlsx = async (opts: { inline?: boolean } = {}) => {
+    const JSZip = (await import('jszip')).default;
+    const z = new JSZip();
+    // A bare-bones workbook like some exporters write: no [Content_Types], prefixed tags, a date style, shared + inline strings.
+    z.file('xl/workbook.xml', '<x:workbook xmlns:x="m" xmlns:r="r"><x:sheets><x:sheet name="Bills &amp; more" sheetId="1" r:id="rId1"/><x:sheet name="Hidden" sheetId="2" r:id="rId2" state="hidden"/></x:sheets></x:workbook>');
+    z.file('xl/_rels/workbook.xml.rels', '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Target="/xl/worksheets/sheet2.xml"/></Relationships>');
+    z.file('xl/sharedStrings.xml', '<sst><si><t>Vendor</t></si><si><r><t>Bill </t></r><r><t>date</t></r></si><si><t>Amount</t></si><si><t>Hair &amp; Co</t></si></sst>');
+    z.file('xl/styles.xml', '<styleSheet><numFmts><numFmt numFmtId="164" formatCode="mm/dd/yyyy"/></numFmts><cellXfs><xf numFmtId="0"/><xf numFmtId="164"/><xf numFmtId="14"/></cellXfs></styleSheet>');
+    const nameCell = opts.inline ? '<x:c r="A2" t="inlineStr"><x:is><x:t>Hair &amp; Co</x:t></x:is></x:c>' : '<x:c r="A2" t="s"><x:v>3</x:v></x:c>';
+    z.file('xl/worksheets/sheet1.xml', `<x:worksheet><x:sheetData><x:row r="1"><x:c r="A1" t="s"><x:v>0</x:v></x:c><x:c r="B1" t="s"><x:v>1</x:v></x:c><x:c r="D1" t="s"><x:v>2</x:v></x:c></x:row><x:row r="2">${nameCell}<x:c r="B2" s="1"><x:v>46296</x:v></x:c><x:c r="D2"><x:v>1934.5</x:v></x:c></x:row><x:row r="3"></x:row></x:sheetData></x:worksheet>`);
+    z.file('xl/worksheets/sheet2.xml', '<worksheet><sheetData><row><c><v>1</v></c></row></sheetData></worksheet>');
+    return z.generateAsync({ type: 'arraybuffer' });
+  };
+
+  it('the forgiving reader handles shared/inline/rich strings, dates by style, gaps, hidden tabs', async () => {
+    const { readXlsxLite } = await import('./xlsx-lite');
+    for (const inline of [false, true]) {
+      const sheets = await readXlsxLite(await minimalXlsx({ inline }));
+      expect(sheets).toEqual([{ name: 'Bills & more', rows: [['Vendor', 'Bill date', '', 'Amount'], ['Hair & Co', '2026-10-01', '', '1934.5']] }]);
+    }
+  });
+
+  it('readWorkbook falls back when exceljs fails, and explains .xls and renamed CSV files', async () => {
+    const { readWorkbook } = await import('./workbook');
+    const sheets = await readWorkbook(await minimalXlsx());
+    expect(sheets[0].rows[1]).toEqual(['Hair & Co', '2026-10-01', '', '1934.5']);
+    const xls = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0]).buffer;
+    await expect(readWorkbook(xls)).rejects.toThrow(/old \.xls file/);
+    const csv = new TextEncoder().encode('Vendor,Amount\nHair Zone,5\n').buffer as ArrayBuffer;
+    expect(await readWorkbook(csv)).toEqual([{ name: 'Sheet1', rows: [['Vendor', 'Amount'], ['Hair Zone', '5']] }]);
+    await expect(readWorkbook(new TextEncoder().encode('just words').buffer as ArrayBuffer)).rejects.toThrow(/isn’t an Excel workbook/);
+  });
+
+  it('a normal Excel file still reads through exceljs, every tab', async () => {
+    const { Workbook } = await import('exceljs');
+    const { readWorkbook } = await import('./workbook');
+    const wb = new Workbook();
+    wb.addWorksheet('Vendors').addRows([['Name'], ['Hair Zone']]);
+    wb.addWorksheet('Bills').addRows([['Vendor', 'Bill date', 'Amount'], ['Hair Zone', new Date('2026-10-01T00:00:00Z'), 5]]);
+    const sheets = await readWorkbook((await wb.xlsx.writeBuffer()) as ArrayBuffer);
+    expect(sheets.map((s) => s.name)).toEqual(['Vendors', 'Bills']);
+    expect(sheets[1].rows[1]).toEqual(['Hair Zone', '2026-10-01', '5']);
+  });
+});

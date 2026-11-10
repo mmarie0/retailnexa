@@ -17,9 +17,9 @@ export async function readBundle(file: File | { name: string; size: number; arra
   const out: ReadResult = { tables: [], backups: [], skipped: [] };
   const lower = file.name.toLowerCase();
   if (lower.endsWith('.csv') || lower.endsWith('.txt')) { out.tables.push({ name: file.name, rows: parseCsv(await file.text()) }); return out; }
-  if (lower.endsWith('.xlsx')) { out.tables.push(...await readExcel(file.name, new Blob([await file.arrayBuffer()]))); return out; }
+  if (/\.(xlsx|xlsm|xls)$/.test(lower)) { out.tables.push(...await readExcel(file.name, new Blob([await file.arrayBuffer()]))); return out; }
   if (lower.endsWith('.json')) { out.backups.push({ name: file.name, data: JSON.parse(await file.text()) }); return out; }
-  if (!lower.endsWith('.zip')) throw new Error('Upload a .zip, .csv, .xlsx or .json file.');
+  if (!lower.endsWith('.zip')) throw new Error('Upload a .csv, an Excel file (.xlsx) or a .zip.');
   if (file.size > BUNDLE_LIMITS.zipBytes) throw new Error('Zip files up to 25 MB.');
 
   const { default: JSZip } = await import('jszip');
@@ -31,7 +31,7 @@ export async function readBundle(file: File | { name: string; size: number; arra
   for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     const n = e.name.toLowerCase();
     if (n.endsWith('.csv') || n.endsWith('.txt')) out.tables.push({ name: e.name, rows: parseCsv(await e.async('string')) });
-    else if (n.endsWith('.xlsx')) out.tables.push(...await readExcel(e.name, await e.async('blob')));
+    else if (/\.(xlsx|xlsm|xls)$/.test(n)) out.tables.push(...await readExcel(e.name, await e.async('blob')));
     else if (n.endsWith('.json')) {
       try { out.backups.push({ name: e.name, data: JSON.parse(await e.async('string')) }); } catch { throw new Error(`${e.name} isn’t valid JSON.`); }
     } else out.skipped.push(e.name);

@@ -22,6 +22,10 @@ const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/
 async function excelSheets(name: string, data: Blob): Promise<{ name: string; rows: string[][] }[]> {
   const fd = new FormData(); fd.set('file', new File([data], name.split('/').pop() || 'sheet.xlsx'));
   const res = await fetch('/admin/import/xlsx', { method: 'POST', body: fd });
+  const isJson = (res.headers.get('content-type') ?? '').includes('application/json');
+  if (!isJson) throw new Error(res.redirected || res.status === 404
+    ? 'Your admin session has ended. Sign in again (with your two-factor code), then try again.'
+    : `${name}: the server couldn’t read it (error ${res.status}). Try again, or save it as CSV.`);
   const r = (await res.json().catch(() => ({ ok: false }))) as { ok: boolean; sheets?: { name: string; rows: string[][] }[]; message?: string };
   if (!r.ok || !r.sheets) throw new Error(`${name}: ${r.message ?? 'couldn’t be read'}`);
   // A tab's own name ("Bills", "Bank") decides what it holds; one-tab workbooks keep the file name.
@@ -69,7 +73,7 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
         return { source, fileName: file.name, rows: plan.rows, warnings: plan.warnings, notYet: plan.notYet, rowErrors: [] };
       }
       let rows: string[][];
-      if (/\.xlsx$/i.test(file.name)) {
+      if (/\.(xlsx|xlsm|xls)$/i.test(file.name)) {
         rows = await excelRows(file.name, file);
       } else rows = parseCsv(await file.text());
       const plan = planFromSheet(kind as ImportKind, rows, { today: today() });
@@ -140,7 +144,7 @@ export function ImportClient({ orgs }: { orgs: { id: string; name: string }[] })
         <Field label="File" htmlFor="imp-file" hint={all
           ? 'One .csv or .xlsx with a “Type” column, an .xlsx with one tab per kind (Vendors, Bills, Sales, Bank, Fixed costs), or a .zip of sheets and the old app backup.'
           : source === 'csv' ? 'One kind of record per sheet; the first row is the header.' : 'The backup downloaded from the old RetailNexa app.'}>
-          <input id="imp-file" type="file" accept={all ? '.zip,.csv,.txt,.xlsx,.json' : source === 'csv' ? '.csv,.txt,.xlsx' : '.json,application/json'} onChange={(e) => { setFile(e.target.files?.[0] ?? null); reset(); }}
+          <input id="imp-file" type="file" accept={all ? '.zip,.csv,.txt,.xlsx,.xlsm,.xls,.json' : source === 'csv' ? '.csv,.txt,.xlsx,.xlsm,.xls' : '.json,application/json'} onChange={(e) => { setFile(e.target.files?.[0] ?? null); reset(); }}
             className="w-full rounded-xl bg-soft px-3 py-2 text-sm" />
         </Field>
       </div>

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminContext } from '@/lib/auth/context';
-import { cellText } from '@/lib/import/cell';
+import { readWorkbook, WorkbookError } from '@/lib/import/workbook';
 
 /**
  * Reads the first sheet of an Excel file for the admin master import and returns
@@ -24,27 +24,16 @@ export async function POST(req: Request) {
   try {
     const buf = await file.arrayBuffer();
     // Refuse archives that would unpack to something huge before exceljs touches them.
+    const isZip = new Uint8Array(buf.slice(0, 2))[0] === 0x50;
     const { default: JSZip } = await import('jszip');
-    const zip = await JSZip.loadAsync(buf);
+    const zip = isZip ? await JSZip.loadAsync(buf) : new JSZip();
     let unzipped = 0;
     zip.forEach((_p, entry) => { unzipped += (entry as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? 0; });
     if (unzipped > MAX_UNZIPPED) return json({ ok: false, message: 'That workbook is too large to read. Save it as CSV.' }, 413);
 
-    const { Workbook } = await import('exceljs');
-    const wb = new Workbook();
-    await wb.xlsx.load(buf);
-    if (!wb.worksheets.length) return json({ ok: false, message: 'The workbook has no sheets.' }, 400);
-    // Every tab (a workbook can hold vendors, bills, sales… on separate tabs); `rows` is the first tab.
-    let total = 0;
-    const sheets = wb.worksheets.filter((ws) => ws.state !== 'hidden' && ws.state !== 'veryHidden').map((ws) => {
-      const rows: string[][] = [];
-      ws.eachRow({ includeEmpty: false }, (row) => {
-        if (total < MAX_ROWS + 1) { rows.push((row.values as unknown[]).slice(1).map(cellText)); total++; }
-      });
-      return { name: ws.name, rows };
-    });
+    const sheets = await readWorkbook(buf, MAX_ROWS);
     return json({ ok: true, rows: sheets[0]?.rows ?? [], sheets });
-  } catch {
-    return json({ ok: false, message: 'That Excel file couldn’t be read. Try saving it as CSV.' }, 400);
+  } catch (e) {
+    return json({ ok: false, message: e instanceof WorkbookError ? e.message : 'That Excel file couldn’t be read. Open it in Excel and use Save As → CSV, then upload the CSV.' }, 400);
   }
 }
