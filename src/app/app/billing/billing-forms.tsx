@@ -45,6 +45,12 @@ export function PlanPicker({ defaults, trialEligible, paymentsReady = true }: { 
         </p>
       </div>
       <FormMessage state={state} />
+      {state.data?.trialReserved === '1' && (
+        <label className="flex items-center gap-2 text-[15px]">
+          <input type="checkbox" name="skip_trial" className="size-4 accent-[#3f63de]" />
+          Pay now without the free trial
+        </label>
+      )}
       <SubmitButton disabled={!paymentsReady || (!retail && !wholesale)} pendingText="Opening secure checkout…" className="self-start">
         {trialEligible ? 'Add card and start free trial' : 'Continue to payment'}
       </SubmitButton>
