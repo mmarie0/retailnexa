@@ -43,6 +43,17 @@ RPCs: `post_journal_entry` (accounting.post; balanced, ≥2 lines, same-org acti
 
 Posting rules from business events to lines live in `src/lib/accounting/postings.ts` (inventory purchase → asset, COGS at sale, bill payment settles AP, sales tax → liability, owner draws → equity, card deposits split fees).
 
+## Phase 2 accounts-payable tables (migration `20261110000200_vendors_bills.sql`)
+
+| Table | Purpose | Client access |
+|---|---|---|
+| `vendors` | Suppliers: contact details, `payment_terms_days`, optional default account; name unique per org (case-insensitive) | `vendors.view` reads; `vendors.manage` inserts/updates listed columns; no deletes |
+| `bills` | Vendor bills: number, dates, `status` (draft/approved/paid/void), `total_cents`, `paid_cents`, link to the posting entry | `bills.view` reads; writes only via RPCs |
+| `bill_lines` | Expense or inventory account + amount per line | `bills.view` reads; **insert-only** |
+| `bill_payments` | Payments from bank or cash, idempotency key, link to the posting entry | `bills.view` reads; **insert-only** |
+
+RPCs: `create_bill` (bills.create; active vendor, 1–100 positive lines on expense/inventory accounts; due date defaults from vendor terms), `approve_bill` (bills.approve; posts Dr lines / Cr AP), `record_bill_payment` (bills.pay; ≤ open balance, not before bill date, idempotent), `void_bill` (bills.approve; reason required; reverses the posting; refused once paid), `bill_account_options` (bills.view/create; lets managers pick accounts without reading the books). A trigger blocks `reverse_journal_entry` on bill/bill-payment entries so bill status and ledger can’t drift.
+
 ## Key functions
 
 Authorization helpers (`private`, SECURITY DEFINER, `search_path=''`): `is_org_member`, `member_role`, `has_permission`, `is_platform_admin(roles[])` (requires `aal2` when `mfa_required`), `has_support_access`, `org_is_writable` (org active **and** subscription trialing/active or past_due ≤ 7 days), `shares_org_with`, `role_rank`.
