@@ -72,6 +72,15 @@ RPCs: `record_sales_day` (sales.import; tenders must equal gross − discounts +
 
 `sales_tax_summary(org, from, to)` (migration `20261110000700`): opening, collected, paid and closing balance of Sales tax payable for a period; accounting.view or profit.view.
 
+## Phase 2 bank tables (migration `20261110000800_bank_reconciliation.sql`)
+
+| Table | Purpose | Client access |
+|---|---|---|
+| `bank_import_batches` | One per statement import: filename, inserted / duplicate counts | `bank.view` reads; RPC writes |
+| `bank_lines` | Statement lines (signed cents), de-duplicated by date + amount + description + occurrence; `status` unmatched / matched / categorized / ignored; linked journal entry | `bank.view` reads; amounts immutable; status only via RPCs |
+
+RPCs (writes need `accounting.post`): `import_bank_lines`, `bank_match_candidates` (bank.view), `match_bank_line`, `categorize_bank_line`, `ignore_bank_line`, `unmatch_bank_line`.
+
 ## Key functions
 
 Authorization helpers (`private`, SECURITY DEFINER, `search_path=''`): `is_org_member`, `member_role`, `has_permission`, `is_platform_admin(roles[])` (requires `aal2` when `mfa_required`), `has_support_access`, `org_is_writable` (org active **and** subscription trialing/active or past_due ≤ 7 days), `shares_org_with`, `role_rank`.

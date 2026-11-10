@@ -16,6 +16,8 @@ _Last updated: 2026-11-10 — Phase 1 merged and migrations live on Supabase. Ph
 
 - **2.7 Reports: bills aging and sales tax** (branch `feat/phase-2-reports`, stacked on 2.6): Bills aging (approved unpaid bills by vendor in not-yet-due / 1–30 / 31–60 / 61–90 / 90+ day buckets, any as-of date) and Sales tax (owed at start + collected − paid = owed at end, period presets or custom dates; warns when payments exceed collections; states that it doesn't file returns). New `sales_tax_summary` RPC. 1 DB + 10 unit tests. **Not verified:** screens in a browser.
 
+- **2.8 Bank statement import and reconciliation** (branch `feat/phase-2-bank-rec`): import a bank CSV (signed amount or debit/credit columns, sign flip, preview); re-imports skip lines already imported; each line is matched to an existing entry (suggestions = same signed bank movement within ±7 days), posted to a chosen account, or ignored with a reason; any resolution can be undone (categorized entries are reversed). Guards: an entry explains at most one line; matched entries and bank-line entries can't be reversed behind the reconciliation's back. Reading needs `bank.view`, acting needs `accounting.post`. 10 DB + 4 unit tests. **Not verified:** with a real bank export; screen in a browser.
+
 ## Phase 1 — what exists and how it was verified
 
 | Area | Built | Verified how | Not yet verified |
