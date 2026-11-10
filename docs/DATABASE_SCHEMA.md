@@ -119,3 +119,15 @@ Migration `20261110001700` (Stripe guards):
 - Create migrations with a timestamp prefix; never edit a migration that has run in production — add a new one.
 - Destructive migrations (drop/rename column, delete data) need owner approval and a written rollback.
 - Supabase Pro plan: daily backups + point-in-time recovery (enable PITR before launch). Restore drill each quarter, documented in PROJECT_STATUS.md.
+
+## Admin master import (migration `20261110002400`)
+
+`import_runs` keeps one row per import call (who, business, kind, file, dry run, counts and errors). It's readable by platform admins only. `import_keys` maps (business, row key) to the created record, so re-running a file never duplicates. Neither table has client grants beyond that.
+
+`admin_import_rows(org, kind, rows, dry_run, source, file_name)`:
+- Callable only by a superadmin in an aal2 session. The business must be writable.
+- Kinds: `vendor`, `bill` (with payments), `recurring`, `sales_day`, `bank_line`.
+- Rows are written through the business's own RPCs (`create_bill`, `approve_bill`, `record_bill_payment`, `save_recurring_bill`, `record_sales_day`, `import_bank_lines`). While the call runs, it acts as the business's first active owner (the JWT claims are switched with `set_config(..., true)` and always restored), so every validation, scope, posting and audit rule applies unchanged.
+- Per-row subtransactions: one bad row is reported and the rest go on.
+- `dry_run` runs each row and rolls it back.
+- The admin is recorded in `import_runs` and in an `admin.import` audit entry. Per-record audit entries name the owner.
