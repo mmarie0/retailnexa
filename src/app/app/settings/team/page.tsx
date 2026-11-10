@@ -5,7 +5,7 @@ import { Badge, Card, PageHeader, Select } from '@/components/ui';
 import { ReadOnlyNotice } from '../../read-only-notice';
 import { SubmitButton } from '@/components/submit-button';
 import { ALL_PERMISSIONS, PERMISSIONS, ROLE_DEFAULTS, ROLE_LABELS, assignableRoles, canManageMember, isMemberRole, type MemberRole } from '@/lib/auth/permissions';
-import { changeMemberRole, revokeInvitation, setMemberPermission, setMemberStatus } from '../actions';
+import { changeMemberRole, revokeInvitation, setMemberPermission, setMemberStatus, setMemberStores } from '../actions';
 import { InviteForm } from './invite-form';
 
 export const metadata: Metadata = { title: 'Team' };
@@ -14,13 +14,17 @@ export default async function TeamPage() {
   const ctx = await getOrgContext();
   if (!can(ctx, 'members.view')) return <p>You don’t have access to the team list.</p>;
   const supabase = await getSupabase();
-  const [{ data: members }, { data: overrides }, { data: invites }] = await Promise.all([
+  const [{ data: members }, { data: overrides }, { data: invites }, { data: locs }, { data: memberLocs }] = await Promise.all([
     supabase.from('memberships').select('id, user_id, role, status, created_at').eq('organization_id', ctx.org.id).order('created_at'),
     supabase.from('member_permission_overrides').select('membership_id, permission, granted').eq('organization_id', ctx.org.id),
     can(ctx, 'members.manage')
       ? supabase.from('invitations').select('id, email, role, expires_at, accepted_at, revoked_at').eq('organization_id', ctx.org.id).is('accepted_at', null).is('revoked_at', null).gt('expires_at', new Date().toISOString())
       : Promise.resolve({ data: [] as { id: string; email: string; role: string; expires_at: string }[] }),
+    supabase.from('locations').select('id, name, kind').eq('organization_id', ctx.org.id).eq('is_active', true).order('name'),
+    supabase.from('member_locations').select('membership_id, location_id').eq('organization_id', ctx.org.id),
   ]);
+  const locations = (locs ?? []) as { id: string; name: string; kind: string }[];
+  const locName = new Map(locations.map((l) => [l.id, l.name]));
   const ids = (members ?? []).map((m) => m.user_id);
   const { data: profiles } = ids.length ? await supabase.from('profiles').select('id, email, full_name').in('id', ids) : { data: [] };
   const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
@@ -40,6 +44,8 @@ export default async function TeamPage() {
           const self = m.user_id === ctx.user.id;
           const editable = manage && canManageMember(myRole, role, self);
           const memberOverrides = (overrides ?? []).filter((o) => o.membership_id === m.id);
+          const myStores = (memberLocs ?? []).filter((x) => x.membership_id === m.id).map((x) => x.location_id as string);
+          const alwaysAll = role === 'owner' || role === 'admin';
           return (
             <li key={m.id}>
               <Card className="flex flex-col gap-3">
@@ -52,6 +58,9 @@ export default async function TeamPage() {
                     <Badge tone="info">{ROLE_LABELS[role]}</Badge>
                     {m.status === 'disabled' && <Badge tone="danger">No access</Badge>}
                     {memberOverrides.length > 0 && <Badge>{memberOverrides.length} custom permission{memberOverrides.length > 1 ? 's' : ''}</Badge>}
+                    {locations.length > 1 && !alwaysAll && (
+                      <Badge>{myStores.length ? myStores.map((id) => locName.get(id) ?? 'Store').join(', ') : 'All stores'}</Badge>
+                    )}
                   </div>
                 </div>
                 {editable && (
@@ -71,6 +80,26 @@ export default async function TeamPage() {
                       </SubmitButton>
                     </ActionForm>
                   </div>
+                )}
+                {editable && !alwaysAll && locations.length > 1 && (
+                  <details className="rounded-xl bg-soft p-3">
+                    <summary className="cursor-pointer font-semibold">Stores this person can see</summary>
+                    <p className="mt-2 text-sm text-muted">Limit someone to their own store: they’ll only see and record that store’s sales days, bills and cash deposits. Owners and admins always see every store.</p>
+                    <ActionForm action={setMemberStores} className="mt-2 flex flex-col gap-2">
+                      <input type="hidden" name="membership_id" value={m.id} />
+                      <label className="flex items-center gap-2 text-[15px]"><input type="radio" name="scope" value="all" defaultChecked={myStores.length === 0} className="size-4 accent-[#3f63de]" /> All stores</label>
+                      <label className="flex items-center gap-2 text-[15px]"><input type="radio" name="scope" value="some" defaultChecked={myStores.length > 0} className="size-4 accent-[#3f63de]" /> Only these:</label>
+                      <div className="ml-6 flex flex-col gap-1">
+                        {locations.map((l) => (
+                          <label key={l.id} className="flex items-center gap-2 text-[15px]">
+                            <input type="checkbox" name="location_id" value={l.id} defaultChecked={myStores.includes(l.id)} className="size-4 accent-[#3f63de]" />
+                            {l.name}{l.kind === 'warehouse' && <span className="text-muted"> · warehouse</span>}
+                          </label>
+                        ))}
+                      </div>
+                      <SubmitButton size="sm" variant="secondary" className="self-start" pendingText="Saving…">Save stores</SubmitButton>
+                    </ActionForm>
+                  </details>
                 )}
                 {managePerms && editable && role !== 'owner' && (
                   <details className="rounded-xl bg-soft p-3">
