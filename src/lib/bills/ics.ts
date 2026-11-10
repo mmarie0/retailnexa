@@ -1,7 +1,7 @@
 import type { DueItem } from './due';
 
 /** Text escaping for iCalendar (RFC 5545 §3.3.11). */
-const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+export const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
 /** Lines longer than 75 octets are folded with CRLF + space (§3.1). */
 function fold(line: string): string {
   const out: string[] = [];
