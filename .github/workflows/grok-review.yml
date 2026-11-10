@@ -1,0 +1,41 @@
+name: Grok review
+
+# Grok (xAI) reviews every pull request and posts one comment.
+# Least privilege: it can read code and write PR comments — nothing else.
+# Never switch this to `pull_request_target` (that would expose secrets to untrusted code).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: grok-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Ask Grok to review
+        env:
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          XAI_MODEL: ${{ vars.XAI_MODEL || 'grok-4.7' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/grok-review.mjs
