@@ -8,11 +8,12 @@ import { requestPasswordReset, signIn, signUp, updatePassword } from './actions'
 
 export function LoginForm({ next }: { next: string }) {
   const [state, action] = useActionState(signIn, initialActionState);
+  const fe = state.fieldErrors ?? {};
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <form action={action} className="flex flex-col gap-4" noValidate>
       <input type="hidden" name="next" value={next} />
-      <Field label="Email" htmlFor="email"><Input id="email" name="email" type="email" autoComplete="email" required /></Field>
-      <Field label="Password" htmlFor="password"><Input id="password" name="password" type="password" autoComplete="current-password" required /></Field>
+      <Field label="Email" htmlFor="email" error={fe.email}><Input id="email" name="email" type="email" autoComplete="email" required /></Field>
+      <Field label="Password" htmlFor="password" error={fe.password}><Input id="password" name="password" type="password" autoComplete="current-password" required /></Field>
       <FormMessage state={state} />
       <SubmitButton pendingText="Logging in…">Log in</SubmitButton>
       <Link href="/forgot-password" className="text-center text-sm font-semibold text-accent-strong">Forgot your password?</Link>

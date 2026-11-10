@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { ComponentProps, ReactNode } from 'react';
+import { cloneElement, isValidElement } from 'react';
 
 export function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ');
@@ -34,12 +35,17 @@ export function Card({ className, ...rest }: ComponentProps<'div'>) {
 }
 
 export function Field({ label, htmlFor, hint, error, children }: { label: string; htmlFor: string; hint?: string; error?: string; children: ReactNode }) {
+  // Wire the message to the control for screen readers (#26).
+  const describedBy = error ? `${htmlFor}-error` : hint ? `${htmlFor}-hint` : undefined;
+  const control = isValidElement<Record<string, unknown>>(children) && describedBy
+    ? cloneElement(children, { 'aria-describedby': describedBy, ...(error ? { 'aria-invalid': true } : {}) })
+    : children;
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={htmlFor} className="text-sm font-semibold">{label}</label>
-      {children}
-      {hint && !error && <p className="text-sm text-muted">{hint}</p>}
-      {error && <p className="text-sm text-late" role="alert">{error}</p>}
+      {control}
+      {hint && !error && <p id={`${htmlFor}-hint`} className="text-sm text-muted">{hint}</p>}
+      {error && <p id={`${htmlFor}-error`} className="text-sm text-late" role="alert">{error}</p>}
     </div>
   );
 }
