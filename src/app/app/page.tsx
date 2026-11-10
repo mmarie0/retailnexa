@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { can, getOrgContext, getSupabase } from '@/lib/auth/context';
-import { Badge, Card, PageHeader } from '@/components/ui';
+import { Badge, Card } from '@/components/ui';
 import { ROLE_LABELS } from '@/lib/auth/permissions';
 import { formatMoney } from '@/lib/billing/plans';
 import { todayIn } from '@/lib/time';
@@ -62,7 +62,10 @@ export default async function OverviewPage() {
 
   return (
     <>
-      <PageHeader title={`Welcome to ${ctx.org.name}`} description={`You’re signed in as ${ROLE_LABELS[ctx.org.role]}.`} />
+      <div className="flex items-baseline justify-between gap-2.5">
+        <h1 className="text-[26px] font-extrabold tracking-[-.02em]">{ctx.org.name}</h1>
+        <span className="text-[13px] text-muted">{ROLE_LABELS[ctx.org.role]}</span>
+      </div>
       {visibleAnnouncements.map((a) => (
         <Card key={a.id} className={a.severity === 'critical' ? 'border-late' : a.severity === 'warning' ? 'border-soon' : ''}>
           <p className="font-bold">{a.title}</p><p className="mt-1 text-muted">{a.body}</p>
@@ -70,11 +73,11 @@ export default async function OverviewPage() {
       ))}
       {sales && (
         <section aria-label="Sales" className="flex flex-col gap-3">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat hero block="blue" label={`${monthName} so far`} value={formatMoney(sales.monthToDate.netCents)} sub={<Change pct={sales.monthToDate.changePct} vs="last year" />} href="/app/sales" />
+          <div className="grid grid-cols-3 gap-2.5 max-[520px]:grid-cols-1">
             <Stat label="Today" value={sales.today.netCents === null ? '—' : formatMoney(sales.today.netCents)} sub={sales.today.netCents === null ? 'Not recorded yet' : 'Net sales'} href="/app/sales" />
             <Stat label="Yesterday" value={sales.yesterday.netCents === null ? '—' : formatMoney(sales.yesterday.netCents)} sub={sales.yesterday.netCents === null ? 'Not recorded' : 'Net sales'} href="/app/sales" />
             <Stat label="Last 7 days" value={formatMoney(sales.last7.netCents)} sub={<Change pct={sales.last7.changePct} vs="prior week" />} />
-            <Stat label={`${monthName} so far`} value={formatMoney(sales.monthToDate.netCents)} sub={<Change pct={sales.monthToDate.changePct} vs="last year" />} />
           </div>
           <Card><DailySalesChart points={sales.daily} /></Card>
         </section>
@@ -87,10 +90,10 @@ export default async function OverviewPage() {
         </Card>
       )}
       {(ap || pl) && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {ap && <Stat label="Bills to pay" value={formatMoney(ap.unpaidCents)} sub={ap.drafts ? `${ap.drafts} draft${ap.drafts === 1 ? '' : 's'} awaiting approval` : `${formatMoney(ap.dueNext7Cents)} due this week`} href="/app/bills" />}
+        <div className="grid grid-cols-2 gap-3">
+          {ap && <Stat block="indigo" label="Bills to pay" value={formatMoney(ap.unpaidCents)} sub={ap.drafts ? `${ap.drafts} draft${ap.drafts === 1 ? '' : 's'} awaiting approval` : `${formatMoney(ap.dueNext7Cents)} due this week`} href="/app/bills" />}
           {ap && <Stat label="Overdue bills" value={formatMoney(ap.overdueCents)} tone={ap.overdueCents > 0 ? 'late' : undefined} sub={ap.overdueCount ? `${ap.overdueCount} bill${ap.overdueCount === 1 ? '' : 's'} past due` : 'Nothing overdue'} href="/app/bills" />}
-          {pl && <Stat label={`${monthName} gross profit`} value={formatMoney(pl.grossProfit)} href={can(ctx, 'accounting.view') ? '/app/accounting/profit-loss' : undefined}
+          {pl && <Stat block="lav" label={`${monthName} gross profit`} value={formatMoney(pl.grossProfit)} href={can(ctx, 'accounting.view') ? '/app/accounting/profit-loss' : undefined}
             sub={pl.cogs.total === 0 && pl.revenue.total > 0 ? 'Cost of goods not tracked yet' : marginPct === null ? 'No sales yet' : `${marginPct.toFixed(2)}% margin`} />}
           {pl && <Stat label={`${monthName} operating profit`} value={formatMoney(pl.operatingProfit)} sub={`After ${formatMoney(pl.operatingExpenses.total)} expenses`} />}
         </div>
