@@ -68,10 +68,10 @@ export const AREAS: NavArea[] = [
     key: 'staff', label: 'Staff', icon: 'staff', bottom: true,
     pages: [
       { key: 'team', label: 'Employees', href: '/app/staff', icon: 'staff', perm: ['employees.view', 'schedule.view', 'payroll.view'] },
-      { key: 'schedule', label: 'Schedule', icon: 'calendar' },
-      { key: 'payroll', label: 'Payroll', icon: 'card' },
-      { key: 'stubs', label: 'Paystubs', icon: 'doc' },
-      { key: 'labor', label: 'Labor %', icon: 'profit' },
+      { key: 'schedule', label: 'Schedule', href: '/app/staff/schedule', icon: 'calendar', perm: 'schedule.view' },
+      { key: 'payroll', label: 'Payroll', href: '/app/staff/payroll', icon: 'card', perm: 'payroll.view' },
+      { key: 'stubs', label: 'Paystubs', href: '/app/staff/stubs', icon: 'doc', perm: 'payroll.view' },
+      { key: 'labor', label: 'Labor %', href: '/app/staff/labor', icon: 'profit', perm: 'payroll.view' },
     ],
   },
   { key: 'upkeep', label: 'Upkeep', icon: 'upkeep', bottom: true, pages: [{ key: 'tasks', label: 'Maintenance', href: '/app/upkeep', icon: 'upkeep', perm: ['maintenance.view', 'tasks.view'] }] },
@@ -103,6 +103,8 @@ export const FAB: Record<string, { label: string; href: string; perm: string } |
   daily: { label: 'Add daily report', href: '/app/sales/import', perm: 'sales.import' },
   fixed: { label: 'Add fixed cost', href: '/app/bills/recurring#add', perm: 'bills.create' },
   bank: { label: 'Upload bank statement', href: '/app/bank#import', perm: 'accounting.post' },
+  team: { label: 'Add employee', href: '/app/staff#add', perm: 'employees.manage' },
+  payroll: { label: 'New pay run', href: '/app/staff/payroll#new', perm: 'payroll.manage' },
 };
 
 const allowed = (p: NavPage, can: (perm: string) => boolean) =>

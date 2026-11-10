@@ -87,3 +87,10 @@
 body:has(main [data-fab-hide], main details[open] form, main form :focus, main #add:target) [data-fab] {
   display: none;
 }
+
+/* Printing a schedule or paystubs: only the page content. */
+@media print {
+  header, nav[aria-label="Sections"], [data-fab], .no-print, details > summary::marker { display: none !important; }
+  body { background: #fff !important; }
+  .print-break { break-after: page; }
+}
