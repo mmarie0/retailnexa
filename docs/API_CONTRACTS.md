@@ -38,6 +38,7 @@ All return `ActionState { ok, message, fieldErrors?, data? }`, validate input wi
 | bills | `recordBillPayment` (form carries a one-time key so double-submits record once) | `bills.pay` |
 | sales | `importSalesDays` (rows parsed in the browser, re-validated with zod and in SQL; one RPC per day; ≤ 400 days) , `recordSalesDayManually` | `sales.import` |
 | sales | `voidSalesDay` | `sales.edit` |
+| deposits | `recordMoneyMovement` (one-time key per submission; new key returned on success) | `accounting.post`, or `cash.create` for cash deposits |
 | admin | `setOrgStatus` (superadmin/billing; close = superadmin), `setFeatureOverride`, `sendPasswordReset`, `updateLead`, `createAnnouncement`, `endAnnouncement` | platform role + MFA |
 
 ## RPC signatures
