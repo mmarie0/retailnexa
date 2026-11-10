@@ -8,6 +8,7 @@ RetailNexa uses Server Actions for form mutations, Route Handlers for machine en
 |---|---|---|---|
 | `POST /api/webhooks/stripe` | Stripe signature (`STRIPE_WEBHOOK_SECRET`) | Billing events → subscription mirror | 200 `{received, outcome}`; 400 bad/missing signature; 500 processing failed (Stripe retries); 503 not configured |
 | `GET /api/cron/reconcile-billing` | `Authorization: Bearer $CRON_SECRET` (constant-time compare) | Re-sync stale subscriptions from Stripe | 200 `{checked, synced, failed}`; 401; 503 |
+| `GET /api/cron/recurring-bills` | `Authorization: Bearer $CRON_SECRET` (constant-time compare) | Daily 10:23 UTC: create draft bills owed by recurring templates (`run_recurring_bills_job`) | 200 `{orgs, bills, failed}`; 401; 500; 503 |
 | `GET /app/billing/return?session_id=cs_…` | Signed-in member | Verify Checkout session belongs to caller's org, sync, redirect | 303 → `/app/billing?checkout=success\|pending\|unknown` |
 | `GET /app/export` | `data.export` | JSON export of the org (RLS-scoped) | 200 attachment; 403 |
 | `GET /auth/confirm?token_hash&type&next` or `?code` | — | Email confirmation, recovery, invite links | 307 → `next` (sanitised) or `/login?error=link_expired` |

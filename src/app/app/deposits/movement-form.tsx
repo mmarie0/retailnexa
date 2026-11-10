@@ -23,7 +23,9 @@ const HELP: Record<Kind, string> = {
   owner_contribution: 'Money the owner put into the business, e.g. starting funds.',
 };
 
-export function MovementForm({ kinds, today, formKey }: { kinds: Kind[]; today: string; formKey: string }) {
+export function MovementForm({ kinds, today, formKey, stores, allowWholeBusiness }: {
+  kinds: Kind[]; today: string; formKey: string; stores: { id: string; label: string }[]; allowWholeBusiness: boolean;
+}) {
   const [state, action] = useActionState(recordMoneyMovement, initialActionState);
   const [kind, setKind] = useState<Kind>(kinds[0]);
   const [amount, setAmount] = useState('');
@@ -55,6 +57,15 @@ export function MovementForm({ kinds, today, formKey }: { kinds: Kind[]; today: 
         {(kind === 'owner_draw' || kind === 'owner_contribution') && (
           <Field label={kind === 'owner_draw' ? 'Taken from' : 'Put into'} htmlFor="account">
             <Select id="account" name="account" defaultValue="bank"><option value="bank">Bank account</option><option value="cash_on_hand">Cash on hand</option></Select>
+          </Field>
+        )}
+        {(stores.length > 1 || !allowWholeBusiness) && (
+          <Field label="Store" htmlFor="location_id" error={err.location_id}
+            hint={allowWholeBusiness ? undefined : 'Pick the store the cash came from.'}>
+            <Select id="location_id" name="location_id" defaultValue={allowWholeBusiness ? '' : (stores[0]?.id ?? '')} required={!allowWholeBusiness}>
+              {allowWholeBusiness && <option value="">Whole business</option>}
+              {stores.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </Select>
           </Field>
         )}
         <Field label="Note (optional)" htmlFor="memo"><Input id="memo" name="memo" maxLength={500} /></Field>

@@ -85,6 +85,10 @@ RPCs (writes need `accounting.post`): `import_bank_lines`, `bank_match_candidate
 
 `recurring_bills`: template (vendor, store, lines, `frequency` weekly/monthly/quarterly/yearly, `day_of_month`, `next_date`, optional `end_date`, `due_days`). `bills.recurring_bill_id` + `recurring_period` with a unique index make each period bill at most once. RPCs: `save_recurring_bill` (bills.create, location-scoped), `create_due_recurring_bills(org, through)` (draft bills for every due period up to the business-local today; ≤ 60 periods per template per run; ≤ 31 days ahead). Reads: `bills.view` + store scope.
 
+Migration `20261110001600`: editing a template keeps its stored `day_of_month` unless the next bill date moves (#65). Bill creation is shared through `private.insert_bill` (no caller checks); `create_bill` and the recurring run call it after their own checks. `run_recurring_bills_job()` (service_role only; refuses any signed-in caller) runs every writable business's due templates up to its local today; one business failing is logged to `audit_logs` (`recurring_bills.failed`) and doesn't stop the others. Bills it creates have `created_by` null and a `system` audit entry.
+
+Money movements (#27): `record_money_movement` requires a store the caller can access (store-restricted members can't record org-wide entries); `recent_money_movements` shows cash-only callers just their stores' deposits.
+
 ## Key functions
 
 Authorization helpers (`private`, SECURITY DEFINER, `search_path=''`): `is_org_member`, `member_role`, `has_permission`, `is_platform_admin(roles[])` (requires `aal2` when `mfa_required`), `has_support_access`, `org_is_writable` (org active **and** subscription trialing/active or past_due ≤ 7 days), `shares_org_with`, `role_rank`.
