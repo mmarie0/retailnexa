@@ -29,7 +29,10 @@ export function PricingCalculator() {
             <p className="num mt-5"><span className="text-4xl font-extrabold">{formatMoney(p.monthlyCents)}</span><span className="text-muted"> /month</span></p>
             {p.extraLocationCents && <p className="text-sm text-muted">+ {formatMoney(p.extraLocationCents)}/month for each additional store</p>}
             <ul className="mt-5 space-y-2">
-              {p.includes.map((i) => <li key={i} className="flex gap-2"><span aria-hidden="true" className="text-paid">✓</span>{i}</li>)}
+              {p.includes.map((i) => {
+                const soon = i.endsWith('(coming soon)');
+                return <li key={i} className={soon ? 'flex gap-2 text-muted' : 'flex gap-2'}><span aria-hidden="true" className={soon ? 'text-muted' : 'text-paid'}>{soon ? '○' : '✓'}</span>{i}</li>;
+              })}
             </ul>
           </div>
         );

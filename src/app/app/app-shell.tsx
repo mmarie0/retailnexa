@@ -83,7 +83,7 @@ export function AppShell({ areas, more, orgName, orgSwitcher, email, today, fabP
       <header className="sticky top-0 z-20 -mx-4 bg-paper px-4 pt-3">
         <div className="flex items-center justify-between gap-3">
           <div ref={menuRef} className="relative flex min-w-0 items-center gap-2.5">
-            <button type="button" aria-haspopup="menu" aria-expanded={menuOpen} aria-controls="navmenu" onClick={() => setMenuOpen((o) => !o)}
+            <button type="button" aria-label="Menu" aria-haspopup="menu" aria-expanded={menuOpen} aria-controls="navmenu" onClick={() => setMenuOpen((o) => !o)}
               className={cx('inline-flex flex-none items-center gap-1.5 rounded-xl px-2.5 py-[7px] text-[13.5px] font-bold shadow-[var(--shadow-card)]', menuOpen ? 'bg-accent text-white' : 'bg-card text-ink')}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="size-[18px]"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
               <span className="max-[421px]:hidden">Menu</span>
@@ -95,7 +95,7 @@ export function AppShell({ areas, more, orgName, orgSwitcher, email, today, fabP
                   <p className="truncate font-bold">{orgName}</p>
                   {orgSwitcher}
                 </div>
-                {areas.map((a) => (
+                {areas.filter((a) => a.pages.length > 0).map((a) => (
                   <div key={a.key} className="border-t border-soft py-1">
                     <p className="flex items-center gap-1.5 px-3 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-[.08em] text-muted"><Icon k={a.icon} className="size-4 text-accent" />{a.label}</p>
                     {(a.key === 'bills' ? [...a.pages.filter((p) => p.key !== 'more'), ...more] : a.pages)
@@ -154,7 +154,15 @@ export function AppShell({ areas, more, orgName, orgSwitcher, email, today, fabP
         <div className="grid w-full max-w-[560px] grid-cols-5">
           {areas.filter((a) => a.bottom).map((a) => {
             const on = area.key === a.key;
-            const href = firstHref(a) ?? '/app';
+            const href = firstHref(a);
+            // A section with nothing this person can open stays visible (same five tabs as the app) but isn't a link (#123).
+            if (!href) {
+              return (
+                <span key={a.key} aria-disabled="true" title="Not available for your role yet" className="flex flex-col items-center gap-[3px] rounded-xl px-0.5 py-1.5 text-[11.5px] font-semibold text-muted/50">
+                  <Icon k={a.icon} className="size-[22px]" />{a.label}
+                </span>
+              );
+            }
             return (
               <Link key={a.key} href={href} aria-current={on ? 'page' : undefined}
                 className={cx('flex flex-col items-center gap-[3px] rounded-xl px-0.5 py-1.5 text-[11.5px] font-semibold', on ? 'bg-accent text-white' : 'text-muted hover:text-ink')}>

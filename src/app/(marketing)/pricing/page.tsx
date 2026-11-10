@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: 'Pricing' };
 const FAQ = [
   ['Why do you need my card for a free trial?', `It lets your account keep running without interruption when the trial ends. You are not charged during the ${TRIAL_DAYS} days, and you can cancel any time before the first payment.`],
   ['What happens if I cancel?', 'You keep access until the end of the period you paid for. After that your account becomes read-only: your records are kept and you can export them or reactivate whenever you like.'],
-  ['Can I run retail and wholesale on one account?', 'Yes. Choose both and they share one set of books, one inventory and one team.'],
+  ['Can I run retail and wholesale on one account?', 'Yes. Choose both and they share one set of books and one team. Shared inventory is coming soon.'],
   ['Who handles my card details?', 'Stripe. Card numbers go straight to Stripe and never touch RetailNexa’s servers.'],
 ];
 
