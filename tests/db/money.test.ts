@@ -82,3 +82,18 @@ describe('recent_money_movements', () => {
     await expectDenied(as(other, `select * from public.recent_money_movements($1)`, [org]));
   });
 });
+
+describe('sales_tax_summary', () => {
+  it('splits opening, collected, paid and closing', async () => {
+    const [{ id: store }] = await sys<{ id: string }>(`select id from public.locations where organization_id = $1 limit 1`, [org]);
+    // October: collect 300; November: collect 700 (+ the 7,000 paid on Nov 8 above).
+    await as(mgr, `select public.record_sales_day($1, $2, '2026-10-20'::date, 5000, 0, 300, 5300, 0, 0, 'R1')`, [org, store]);
+    await as(mgr, `select public.record_sales_day($1, $2, '2026-11-02'::date, 10000, 0, 700, 10700, 0, 0, 'R1')`, [org, store]);
+    const [s] = await as<Record<string, string>>(acct, `select * from public.sales_tax_summary($1, '2026-11-01'::date, '2026-11-30'::date)`, [org]);
+    expect(Number(s.opening_cents)).toBe(300);
+    expect(Number(s.collected_cents)).toBe(700);
+    expect(Number(s.paid_cents)).toBe(7_000);
+    expect(Number(s.closing_cents)).toBe(300 + 700 - 7_000);
+    await expectDenied(as(mgr, `select * from public.sales_tax_summary($1, '2026-11-01'::date, '2026-11-30'::date)`, [org]));
+  });
+});

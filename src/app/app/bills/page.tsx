@@ -40,7 +40,7 @@ export default async function BillsPage({ searchParams }: PageProps<'/app/bills'
   return (
     <>
       <PageHeader title="Bills" description="Supplier bills: enter them as drafts, approve to post them to the books, then record payments."
-        actions={canCreate ? <LinkButton href="/app/bills/new">Enter a bill</LinkButton> : undefined} />
+        actions={<><LinkButton href="/app/bills/aging" variant="secondary">Aging</LinkButton>{canCreate && <LinkButton href="/app/bills/new">Enter a bill</LinkButton>}</>} />
       {filter.key === 'open' && open.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2">
           <Card><p className="text-sm text-muted">Unpaid</p><p className="num text-2xl font-bold">{formatMoney(openTotal)}</p></Card>
