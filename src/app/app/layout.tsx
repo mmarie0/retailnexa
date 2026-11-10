@@ -17,6 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (can(ctx, 'accounting.post') || can(ctx, 'cash.create')) items.push({ href: '/app/deposits', label: 'Deposits & payments' });
   if (can(ctx, 'bills.view')) items.push({ href: '/app/bills', label: 'Bills' });
   if (can(ctx, 'vendors.view')) items.push({ href: '/app/vendors', label: 'Vendors' });
+  if (can(ctx, 'bank.view')) items.push({ href: '/app/bank', label: 'Bank' });
   if (can(ctx, 'accounting.view')) items.push({ href: '/app/accounting', label: 'Accounting' });
   if (can(ctx, 'audit.view')) items.push({ href: '/app/audit', label: 'Audit log' });
   if (can(ctx, 'data.export')) items.push({ href: '/app/settings/export', label: 'Export data' });
