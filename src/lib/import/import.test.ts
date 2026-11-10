@@ -270,3 +270,56 @@ describe('#146 Type words and line numbers', () => {
     ]);
   });
 });
+
+describe('#148 #150 the fallback reader is safe on hostile files', () => {
+  const sheetXlsx = async (sheetXml: string, extra: Record<string, string> = {}) => {
+    const JSZip = (await import('jszip')).default;
+    const z = new JSZip();
+    z.file('xl/workbook.xml', '<x:workbook xmlns:x="m" xmlns:r="r"><x:sheets><x:sheet name="S" sheetId="1" r:id="rId1"/></x:sheets></x:workbook>');
+    z.file('xl/_rels/workbook.xml.rels', '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>');
+    z.file('xl/worksheets/sheet1.xml', sheetXml);
+    for (const [k, v] of Object.entries(extra)) z.file(k, v);
+    return z.generateAsync({ type: 'arraybuffer' });
+  };
+
+  it('a cell past column XFD is refused, not allocated', async () => {
+    const { readXlsxLite, colIndex } = await import('./xlsx-lite');
+    const { readWorkbook } = await import('./workbook');
+    expect(colIndex('XFD1')).toBe(16_383);
+    expect(colIndex('XFE1')).toBeNull();
+    expect(colIndex('ZZZZZZ1')).toBeNull();
+    expect(colIndex('A'.repeat(20) + '1')).toBeNull();
+    const bad = await sheetXlsx('<worksheet><sheetData><row r="1"><c r="ZZZZZZ1"><v>1</v></c></row></sheetData></worksheet>');
+    await expect(readXlsxLite(bad)).rejects.toThrow(/last column/);
+    await expect(readWorkbook(bad)).rejects.toThrow(/can’t be read safely/);
+    const edge = await readXlsxLite(await sheetXlsx('<worksheet><sheetData><row r="1"><c r="XFD1" t="str"><v>x</v></c></row></sheetData></worksheet>'));
+    expect(edge[0].rows[0]).toHaveLength(16_384);
+  });
+
+  it('unclosed tags stay linear: 100k unclosed <si> in well under a second', async () => {
+    const { readXlsxLite } = await import('./xlsx-lite');
+    const file = await sheetXlsx('<worksheet><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row></sheetData></worksheet>',
+      { 'xl/sharedStrings.xml': '<sst>' + '<si>'.repeat(100_000) });
+    const t0 = Date.now();
+    await readXlsxLite(file);
+    expect(Date.now() - t0).toBeLessThan(1500);
+  });
+
+  it('bad entities and impossible date serials don’t fail the workbook', async () => {
+    const { readXlsxLite } = await import('./xlsx-lite');
+    const sheets = await readXlsxLite(await sheetXlsx(
+      '<worksheet><sheetData><row r="1"><c r="A1" t="str"><v>a&#999999999;b &#x41;</v></c><c r="B1" s="1"><v>1e308</v></c><c r="C1" s="1"><v>46296</v></c></row></sheetData></worksheet>',
+      { 'xl/styles.xml': '<styleSheet><cellXfs><xf numFmtId="0"/><xf numFmtId="14"/></cellXfs></styleSheet>' }));
+    expect(sheets[0].rows[0]).toEqual(['ab A', '1e308', '2026-10-01']);
+  });
+
+  it('caps total cells', async () => {
+    const { readXlsxLite, LITE_LIMITS } = await import('./xlsx-lite');
+    const keep = LITE_LIMITS.maxCells;
+    LITE_LIMITS.maxCells = 1000;
+    try {
+      const rows = Array.from({ length: 5 }, (_, r) => `<row r="${r + 1}"><c r="Z${r + 1}"><v>1</v></c><c r="ZZ${r + 1}"><v>1</v></c></row>`).join('');
+      await expect(readXlsxLite(await sheetXlsx(`<worksheet><sheetData>${rows}</sheetData></worksheet>`))).rejects.toThrow(/too many cells/);
+    } finally { LITE_LIMITS.maxCells = keep; }
+  });
+});

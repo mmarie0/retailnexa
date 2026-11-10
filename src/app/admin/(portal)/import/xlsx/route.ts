@@ -24,12 +24,15 @@ export async function POST(req: Request) {
   try {
     const buf = await file.arrayBuffer();
     // Refuse archives that would unpack to something huge before exceljs touches them.
-    const isZip = new Uint8Array(buf.slice(0, 2))[0] === 0x50;
-    const { default: JSZip } = await import('jszip');
-    const zip = isZip ? await JSZip.loadAsync(buf) : new JSZip();
-    let unzipped = 0;
-    zip.forEach((_p, entry) => { unzipped += (entry as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? 0; });
-    if (unzipped > MAX_UNZIPPED) return json({ ok: false, message: 'That workbook is too large to read. Save it as CSV.' }, 413);
+    // Only real zips ("PK") get the size check; anything else goes to readWorkbook, which explains .xls or reads a renamed CSV (#150).
+    const head = new Uint8Array(buf.slice(0, 2));
+    if (head[0] === 0x50 && head[1] === 0x4b) {
+      const { default: JSZip } = await import('jszip');
+      const zip = await JSZip.loadAsync(buf).catch(() => null);
+      let unzipped = 0;
+      zip?.forEach((_p, entry) => { unzipped += (entry as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? 0; });
+      if (unzipped > MAX_UNZIPPED) return json({ ok: false, message: 'That workbook is too large to read. Save it as CSV.' }, 413);
+    }
 
     const sheets = await readWorkbook(buf, MAX_ROWS);
     return json({ ok: true, rows: sheets[0]?.rows ?? [], sheets });
