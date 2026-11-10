@@ -29,23 +29,39 @@ export function siteUrl(): string {
   return raw.replace(/\/$/, '');
 }
 
-const supabasePublicKeys = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'];
+/**
+ * Supabase keys. Accepts the current names set by the Supabase ↔ Vercel
+ * integration (publishable / secret keys) and the legacy names (anon /
+ * service_role). NEXT_PUBLIC_* must be referenced literally so Next.js can
+ * inline them into browser code.
+ */
+export function supabaseUrl(): string | undefined {
+  return process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || undefined;
+}
+export function supabasePublishableKey(): string | undefined {
+  return process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || undefined;
+}
+export function supabaseSecretKeyOrNull(): string | null {
+  return process.env.SUPABASE_SECRET_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || null;
+}
 
 export function isSupabaseConfigured() {
-  return read(supabasePublicKeys).missing.length === 0;
+  return !!supabaseUrl() && !!supabasePublishableKey();
 }
 
 export function supabasePublicEnv() {
-  const { values, missing } = read(supabasePublicKeys);
+  const url = supabaseUrl();
+  const anonKey = supabasePublishableKey();
+  const missing = [...(url ? [] : ['NEXT_PUBLIC_SUPABASE_URL']), ...(anonKey ? [] : ['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'])];
   if (missing.length) throw new ConfigError(missing);
-  z.string().url().parse(values.NEXT_PUBLIC_SUPABASE_URL);
-  return { url: values.NEXT_PUBLIC_SUPABASE_URL, anonKey: values.NEXT_PUBLIC_SUPABASE_ANON_KEY };
+  z.string().url().parse(url);
+  return { url: url!, anonKey: anonKey! };
 }
 
 export function supabaseServiceKey(): string {
-  const { values, missing } = read(['SUPABASE_SERVICE_ROLE_KEY']);
-  if (missing.length) throw new ConfigError(missing);
-  return values.SUPABASE_SERVICE_ROLE_KEY;
+  const key = supabaseSecretKeyOrNull();
+  if (!key) throw new ConfigError(['SUPABASE_SECRET_KEY']);
+  return key;
 }
 
 const stripeKeys = [

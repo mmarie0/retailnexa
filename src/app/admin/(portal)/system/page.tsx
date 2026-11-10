@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { getAdminContext } from '@/lib/auth/context';
 import { Badge, Card, PageHeader } from '@/components/ui';
-import { cronSecret, isStripeConfigured, isSupabaseConfigured } from '@/lib/env';
+import { cronSecret, isStripeConfigured, isSupabaseConfigured, supabaseSecretKeyOrNull } from '@/lib/env';
 
 export const metadata: Metadata = { title: 'System health' };
 
@@ -10,7 +10,7 @@ export default async function SystemPage() {
   const { data: failed } = await supabase.from('stripe_events').select('id, type, attempts, last_error, received_at').in('status', ['failed', 'processing']).order('received_at', { ascending: false }).limit(50);
   const checks = [
     ['Supabase (database and sign-in)', isSupabaseConfigured()],
-    ['Supabase service key (webhooks, leads)', !!process.env.SUPABASE_SERVICE_ROLE_KEY],
+    ['Supabase service key (webhooks, leads)', !!supabaseSecretKeyOrNull()],
     ['Stripe billing', isStripeConfigured()],
     ['Scheduled jobs secret (CRON_SECRET)', !!cronSecret()],
   ] as const;

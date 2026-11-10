@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { supabasePublishableKey, supabaseUrl } from '@/lib/env';
 
 /**
  * Refreshes the Supabase session cookie on every matched request and performs
@@ -9,8 +10,8 @@ import { createServerClient } from '@supabase/ssr';
 const PROTECTED = ['/app', '/admin', '/onboarding', '/account'];
 
 export async function proxy(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = supabaseUrl();
+  const key = supabasePublishableKey();
   const isProtected = PROTECTED.some((p) => request.nextUrl.pathname === p || request.nextUrl.pathname.startsWith(`${p}/`));
 
   if (!url || !key) {
