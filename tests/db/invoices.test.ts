@@ -108,4 +108,33 @@ describe('#105 invoices', () => {
     await expectDenied(as(u, `select public.review_invoice($1, null, 'X', null, null)`, [id]));
     expect(await canRead(u, storage_path)).toBe(true);
   });
+
+  it('#142 list_invoices and invoice_months filter in the database, past 1000 invoices, under the caller’s RLS', async () => {
+    const u = await createUser('inv-many');
+    const o = await createOrg(u, 'Many Invoices Co', 'retail');
+    await sys(`insert into public.invoice_files (organization_id, storage_path, file_name, mime_type, size_bytes, status, created_at)
+               select $1::uuid, $1::text || '/' || g || '.jpg', 'scan-' || g || '.jpg', 'image/jpeg', 100, 'reviewed', '2026-10-15'::timestamptz
+                 from generate_series(1, 1001) g`, [o]);
+    await sys(`insert into public.invoice_files (organization_id, storage_path, file_name, mime_type, size_bytes, status, invoice_date, invoice_number)
+               values ($1::uuid, $1::text || '/old.pdf', 'oldest_100%.pdf', 'application/pdf', 100, 'needs_review', '2024-01-05', 'OLD-1')`, [o]);
+    const months = await as<{ month: string; invoices: number }>(u, `select * from public.invoice_months($1)`, [o]);
+    expect(months).toEqual([{ month: '2026-10', invoices: 1001 }, { month: '2024-01', invoices: 1 }]);
+    const list = (m: string | null, q: string | null, review = false) =>
+      as<{ file_name: string }>(u, `select file_name from public.list_invoices($1, $2, $3, $4)`, [o, m, q, review]);
+    expect((await list('2024-01', null)).map((r) => r.file_name)).toEqual(['oldest_100%.pdf']);
+    expect((await list(null, 'old-1')).map((r) => r.file_name)).toEqual(['oldest_100%.pdf']);
+    expect((await list(null, '100%')).map((r) => r.file_name)).toEqual(['oldest_100%.pdf']); // % is literal
+    expect(await list(null, '_')).toHaveLength(1); // _ is literal too: only 'oldest_100%.pdf'
+    expect((await list(null, null, true)).map((r) => r.file_name)).toEqual(['oldest_100%.pdf']);
+    expect(await list(null, null)).toHaveLength(200);
+    expect(await as(outsider, `select * from public.list_invoices($1)`, [o])).toHaveLength(0);
+    expect(await as(outsider, `select * from public.invoice_months($1)`, [o])).toHaveLength(0);
+  });
+
+  it('#142 search finds vendor names; store-limited members only see their store', async () => {
+    const [{ id, storage_path }] = await begin(owner, org, 'image/png', 100, B); await put(owner, storage_path); await as(owner, `select public.finish_invoice_upload($1)`, [id]);
+    await as(owner, `select public.review_invoice($1, $2, 'VN-1', '2026-11-02', 500, null, null, false)`, [id, vendor]);
+    expect((await as<{ id: string }>(owner, `select id from public.list_invoices($1, null, 'inv vendor')`, [org])).map((r) => r.id)).toContain(id);
+    expect((await as<{ id: string }>(mgrA, `select id from public.list_invoices($1, null, 'inv vendor')`, [org])).map((r) => r.id)).not.toContain(id);
+  });
 });

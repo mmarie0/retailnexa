@@ -197,3 +197,35 @@ grant execute on function
   public.begin_invoice_upload(uuid, text, text, int, uuid), public.finish_invoice_upload(uuid),
   public.review_invoice(uuid, uuid, text, date, bigint, uuid, text, boolean), public.discard_invoice(uuid)
   to authenticated;
+
+-- Months that have invoices (for the month picker), under the caller's own RLS (#142).
+create or replace function public.invoice_months(p_org uuid)
+returns table (month text, invoices int) language sql stable security invoker set search_path = '' as $$
+  select to_char(coalesce(f.invoice_date, (f.created_at at time zone coalesce(o.timezone, 'UTC'))::date), 'YYYY-MM') as month, count(*)::int
+    from public.invoice_files f join public.organizations o on o.id = f.organization_id
+   where f.organization_id = p_org and f.status in ('needs_review', 'reviewed')
+   group by 1 order by 1 desc
+$$;
+revoke all on function public.invoice_months(uuid) from public, anon;
+grant execute on function public.invoice_months(uuid) to authenticated;
+create index invoice_files_org_date_idx on public.invoice_files (organization_id, invoice_date);
+
+-- The invoices list: month, search and Needs review filtered in the database, so
+-- every invoice the caller may see is reachable, however many there are (#142).
+-- SECURITY INVOKER: invoice_files and vendors RLS apply as usual.
+create or replace function public.list_invoices(
+  p_org uuid, p_month text default null, p_q text default null, p_needs_review boolean default false, p_limit int default 200
+) returns setof public.invoice_files language sql stable security invoker set search_path = '' as $$
+  select f.* from public.invoice_files f
+    join public.organizations o on o.id = f.organization_id
+    left join public.vendors v on v.id = f.vendor_id
+   where f.organization_id = p_org and f.status in ('needs_review', 'reviewed')
+     and (not coalesce(p_needs_review, false) or f.status = 'needs_review')
+     and (p_month is null or to_char(coalesce(f.invoice_date, (f.created_at at time zone coalesce(o.timezone, 'UTC'))::date), 'YYYY-MM') = p_month)
+     and (nullif(btrim(p_q), '') is null or concat_ws(' ', f.file_name, f.invoice_number, f.note, v.name)
+            ilike '%' || replace(replace(replace(btrim(p_q), '\', '\\'), '%', '\%'), '_', '\_') || '%')
+   order by f.created_at desc
+   limit least(greatest(coalesce(p_limit, 200), 1), 500)
+$$;
+revoke all on function public.list_invoices(uuid, text, text, boolean, int) from public, anon;
+grant execute on function public.list_invoices(uuid, text, text, boolean, int) to authenticated;

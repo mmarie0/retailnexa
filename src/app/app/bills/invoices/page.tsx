@@ -29,9 +29,11 @@ export default async function InvoicesPage({ searchParams }: PageProps<'/app/bil
   const view = sp.view === 'review' ? 'review' : 'all';
   const month = typeof sp.m === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(sp.m) ? sp.m : 'all';
   const supabase = await getSupabase();
-  const [{ data: rows }, { data: vendors }, { data: locs }, { data: bills }] = await Promise.all([
-    supabase.from('invoice_files').select('id, location_id, vendor_id, bill_id, storage_path, file_name, mime_type, status, invoice_number, invoice_date, amount_cents, note, created_at')
-      .eq('organization_id', ctx.org.id).in('status', ['needs_review', 'reviewed']).order('created_at', { ascending: false }).limit(1000),
+  const [{ data: rows }, { data: monthRows }, { count: needs }, { data: vendors }, { data: locs }, { data: bills }] = await Promise.all([
+    // Filtered in the database so every invoice is reachable (#142).
+    supabase.rpc('list_invoices', { p_org: ctx.org.id, p_month: month === 'all' ? null : month, p_q: q || null, p_needs_review: view === 'review', p_limit: 201 }),
+    supabase.rpc('invoice_months', { p_org: ctx.org.id }),
+    supabase.from('invoice_files').select('id', { count: 'exact', head: true }).eq('organization_id', ctx.org.id).eq('status', 'needs_review'),
     supabase.from('vendors').select('id, name').eq('organization_id', ctx.org.id).order('name'),
     supabase.rpc('my_locations', { p_org: ctx.org.id }),
     can(ctx, 'bills.view')
@@ -39,16 +41,13 @@ export default async function InvoicesPage({ searchParams }: PageProps<'/app/bil
         .order('bill_date', { ascending: false }).limit(300)
       : Promise.resolve({ data: [] as { id: string; vendor_id: string; bill_number: string; total_cents: number; bill_date: string }[] }),
   ]);
-  const all = (rows ?? []) as Inv[];
+  const list = (rows ?? []) as Inv[];
+  const monthList = (monthRows ?? []) as { month: string; invoices: number }[];
+  const total = monthList.reduce((a, m) => a + m.invoices, 0);
   const vendorName = new Map((vendors ?? []).map((v) => [v.id, v.name]));
   const stores = ((locs ?? []) as { id: string; name: string }[]);
   const storeName = new Map(stores.map((s) => [s.id, s.name]));
-  const months = [...new Set(all.map(monthOf))].sort().reverse();
-  const needs = all.filter((i) => i.status === 'needs_review').length;
-  const ql = q.toLowerCase();
-  const list = all.filter((i) => (view === 'review' ? i.status === 'needs_review' : true))
-    .filter((i) => (month === 'all' ? true : monthOf(i) === month))
-    .filter((i) => !ql || [i.file_name, i.invoice_number, i.vendor_id ? vendorName.get(i.vendor_id) : '', i.note].some((s) => s?.toLowerCase().includes(ql)));
+  const months = monthList.map((m) => m.month);
   const shown = list.slice(0, 200);
   // Short-lived links: Storage only signs files this user may read (invoices.view + store access).
   const { data: signed } = shown.length
@@ -72,12 +71,12 @@ export default async function InvoicesPage({ searchParams }: PageProps<'/app/bil
         <Link href={qs({ view: 'review' })} className="hover:opacity-90">
           <Block tone={needs ? 'coral' : 'blue'} className="flex flex-col gap-1">
             <span className="text-[11px] font-bold uppercase tracking-[.08em]">Needs review</span>
-            <span className="num text-[28px] font-medium leading-none">{needs}</span>
+            <span className="num text-[28px] font-medium leading-none">{needs ?? 0}</span>
           </Block>
         </Link>
         <Card className="flex flex-col gap-1">
           <Eyebrow>All invoices</Eyebrow>
-          <span className="num text-[28px] font-medium leading-none">{all.length}</span>
+          <span className="num text-[28px] font-medium leading-none">{total}</span>
         </Card>
       </div>
       {editable && <Card><InvoiceUploader stores={stores} /></Card>}
@@ -103,7 +102,7 @@ export default async function InvoicesPage({ searchParams }: PageProps<'/app/bil
         </form>
       </div>
 
-      {all.length === 0 ? (
+      {total === 0 ? (
         <EmptyState title="No invoices yet">{editable ? 'Upload photos or PDFs of your vendor invoices above.' : 'Someone with upload rights can add invoices.'}</EmptyState>
       ) : list.length === 0 ? (
         <EmptyState title="Nothing matches">Try another month or search. <Link href="/app/bills/invoices" className="font-semibold text-accent-strong">Show all</Link></EmptyState>
@@ -181,7 +180,7 @@ export default async function InvoicesPage({ searchParams }: PageProps<'/app/bil
           </section>
         ))
       )}
-      {list.length > shown.length && <p className="text-sm text-muted">Showing the newest 200. Pick a month or search to see others.</p>}
+      {list.length > shown.length && <p className="text-sm text-muted">Showing the newest 200 that match. Pick a month or search to narrow it down.</p>}
     </>
   );
 }
