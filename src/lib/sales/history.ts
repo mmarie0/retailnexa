@@ -131,12 +131,27 @@ export function parseCategorySheet(rows: string[][]): { rows: { category: string
     if (!name || /^(total|grand total|totals)$/i.test(name)) return;
     const cents = parseAmount(r[c.sales!]);
     if (cents === null) return errors.push({ line, message: `${name}: sales must be a number like 1234.56` }) && undefined;
-    const qRaw = c.qty === undefined ? '' : (r[c.qty] ?? '').replace(/[,\s]/g, '');
-    const q = qRaw === '' ? null : Number(qRaw);
-    if (q !== null && (!Number.isFinite(q) || q < 0)) return errors.push({ line, message: `${name}: quantity must be a number like 12` }) && undefined;
+    const q = parseQty(c.qty === undefined ? '' : r[c.qty]);
+    if (q === undefined) return errors.push({ line, message: `${name}: quantity must be a number like 12 or -3` }) && undefined;
     out.push({ category: name.slice(0, 120), sales_cents: cents, quantity: q });
   });
   return { rows: out, errors };
+}
+
+/**
+ * Category quantity: same sign rules as amounts, so a net-returns row ("-3" or
+ * accounting "(3)") is accepted (#165). Blank → null; not a number or past the
+ * table's ±100,000,000 → undefined (a line error).
+ */
+export function parseQty(raw: string | undefined): number | null | undefined {
+  let s = (raw ?? '').replace(/[,\s]/g, '');
+  if (s === '') return null;
+  let neg = false;
+  if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); }
+  if (s.startsWith('-')) { neg = !neg; s = s.slice(1); }
+  if (!/^\d+(\.\d+)?$/.test(s)) return undefined;
+  const q = Number(s) * (neg ? -1 : 1);
+  return Math.abs(q) <= 100_000_000 ? q : undefined;
 }
 
 export interface CategoryRow { category: string; sales_cents: number; quantity: number | null }

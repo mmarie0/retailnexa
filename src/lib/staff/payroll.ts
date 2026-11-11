@@ -183,3 +183,6 @@ export function monthRange(d: string): { from: string; to: string } {
   const last = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).getUTCDate();
   return { from: `${ym}-01`, to: `${ym}-${String(last).padStart(2, '0')}` };
 }
+
+/** Pay-run line check message. Plain ASCII, like the database's own messages (#166). */
+export const payLineError = (name: string) => `Check ${name}: hours 0 to 400, overtime no more than hours, bonus 0 to 10,000 dollars.`;

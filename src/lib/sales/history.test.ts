@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { avgSale, compareCategories, monthTotals, parseCategorySheet, parseMonth, parseMonthSheet, share } from './history';
+import { avgSale, compareCategories, monthTotals, parseCategorySheet, parseQty, parseMonth, parseMonthSheet, share } from './history';
 
 const day = (d: string, loc = 'A', o: Partial<Record<string, number | null>> = {}) => ({
   business_date: d, location_id: loc, gross_sales_cents: 10000, discounts_cents: 500, sales_tax_cents: 700, cash_cents: 4000, card_cents: 6200,
@@ -46,7 +46,10 @@ describe('sheets', () => {
   it('category sheet skips totals; compare with last month and last year', () => {
     const { rows } = parseCategorySheet([['Department', 'Net Sales', 'Qty'], ['Wigs', '1,000.00', '10'], ['Braiding hair', '500', ''], ['Total', '1500', '']]);
     expect(rows).toEqual([{ category: 'Wigs', sales_cents: 100000, quantity: 10 }, { category: 'Braiding hair', sales_cents: 50000, quantity: null }]);
-    expect(parseCategorySheet([['Category', 'Sales', 'Qty'], ['Wigs', '10', 'ten']]).errors).toEqual([{ line: 2, message: 'Wigs: quantity must be a number like 12' }]);
+    expect(parseCategorySheet([['Category', 'Sales', 'Qty'], ['Wigs', '10', 'ten']]).errors).toEqual([{ line: 2, message: 'Wigs: quantity must be a number like 12 or -3' }]);
+    // #165: a net-returns row keeps its sign, like its sales.
+    expect(parseCategorySheet([['Category', 'Sales', 'Qty'], ['Returns', '-50.00', '-3']])).toEqual({ rows: [{ category: 'Returns', sales_cents: -5000, quantity: -3 }], errors: [] });
+    expect([parseQty('-3'), parseQty('(3)'), parseQty('1,200'), parseQty(''), parseQty('abc'), parseQty('1e9'), parseQty('100000001')]).toEqual([-3, -3, 1200, null, undefined, undefined, undefined]);
     const cmp = compareCategories(rows, [{ category: 'wigs', sales_cents: 80000, quantity: null }], [{ category: 'Lace fronts', sales_cents: 9000, quantity: null }]);
     expect(cmp.map((c) => [c.category, c.cents, c.vsPrevPct, c.lastYearCents])).toEqual([
       ['Wigs', 100000, 25, null], ['Braiding hair', 50000, null, null], ['Lace fronts', 0, null, 9000],

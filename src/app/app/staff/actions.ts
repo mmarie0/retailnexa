@@ -5,6 +5,7 @@ import { can, getOrgContext, getSupabase, type OrgContext } from '@/lib/auth/con
 import type { Permission } from '@/lib/auth/permissions';
 import { fail, failFrom, ok, type ActionState } from '@/lib/actions';
 import { parseDollarsToCents } from '@/lib/money';
+import { payLineError } from '@/lib/staff/payroll';
 
 const READ_ONLY = 'Your account is read-only right now, so changes can’t be saved. Check the billing page.';
 async function guard(p: Permission): Promise<{ ctx: OrgContext; error?: undefined } | { error: ActionState }> {
@@ -53,7 +54,7 @@ export async function saveEmployee(_p: ActionState, form: FormData): Promise<Act
       const rate = parseDollarsToCents(String(form.get('rate') ?? '0') || '0') ?? null;
       if (rate === null) return fail('Enter a pay rate like 15.00.', { rate: 'Enter an amount' });
       const burden = Number(form.get('burden_pct') ?? 10), hours = String(form.get('weekly_hours') ?? '').trim();
-      if (!(burden >= 0 && burden <= 100)) return fail('Employer taxes are 0–100%.', { burden_pct: '0–100' });
+      if (!(burden >= 0 && burden <= 100)) return fail('Employer taxes are 0 to 100 percent.', { burden_pct: '0 to 100' });
       pay = { pay_type: form.get('pay_type') === 'salary' ? 'salary' : 'hourly', rate_cents: rate, burden_pct: burden,
         weekly_hours: hours ? Math.min(168, Math.max(0, Number(hours))) : null,
         tax_type: ['w2', '1099'].includes(String(form.get('tax_type'))) ? form.get('tax_type') : null,
@@ -184,7 +185,7 @@ export async function createPayRun(_p: ActionState, form: FormData): Promise<Act
       const bonus = bonusRaw ? parseDollarsToCents(bonusRaw) : 0;
       const hours = Number(form.get(`hours-${id}`) ?? 0), ot = Number(form.get(`ot-${id}`) ?? 0);
       if (bonus === null || bonus > 1_000_000 || !(hours >= 0 && hours <= 400) || !(ot >= 0 && ot <= hours)) {
-        return fail(`Check ${String(form.get(`name-${id}`) ?? 'an employee')}: hours 0–400, overtime no more than hours, bonus up to $10,000.`);
+        return fail(payLineError(String(form.get(`name-${id}`) ?? 'an employee')));
       }
       lines.push({ employee_id: id, hours, overtime_hours: ot, bonus_cents: bonus, pay_method: String(form.get(`method-${id}`) ?? '') || null,
         advance_ids: form.getAll(`adv-${id}`).map(String).filter((a) => z.string().uuid().safeParse(a).success) });
