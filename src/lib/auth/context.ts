@@ -94,7 +94,7 @@ const toDate = (v: string | null) => (v ? new Date(v) : null);
 export const getOrgContext = cache(async (): Promise<OrgContext> => {
   const user = await requireUser();
   const orgs = await getMyOrganizations();
-  if (orgs.length === 0) redirect('/onboarding');
+  if (orgs.length === 0) redirect((await getAgent()) ? '/partner' : '/onboarding');
 
   const selected = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value;
   const org = orgs.find((o) => o.id === selected) ?? orgs[0];
@@ -175,8 +175,9 @@ export const getAdminContext = cache(async (opts: { allowWithoutMfa?: boolean } 
   return { user: { id: user.id, email: user.email ?? '' }, role: row.role as PlatformRole, mfaOk, supabase };
 });
 
-export function adminCan(role: PlatformRole, action: 'suspend' | 'close' | 'entitlements' | 'leads' | 'announcements') {
+export function adminCan(role: PlatformRole, action: 'suspend' | 'close' | 'entitlements' | 'leads' | 'announcements' | 'agents') {
   switch (action) {
+    case 'agents':
     case 'close':
       return role === 'superadmin';
     case 'suspend':
@@ -187,4 +188,25 @@ export function adminCan(role: PlatformRole, action: 'suspend' | 'close' | 'enti
     case 'announcements':
       return role === 'superadmin' || role === 'support';
   }
+}
+
+// ---------------------------------------------------------------------------
+// Sales agents (partners who sell RetailNexa)
+// ---------------------------------------------------------------------------
+export interface Agent { userId: string; name: string; email: string; refCode: string; isActive: boolean; discountOrgId: string | null }
+
+/** The signed-in user's sales-agent record, if any (RLS: own row only). */
+export const getAgent = cache(async (): Promise<Agent | null> => {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  const { data } = await (await getSupabase()).from('sales_agents').select('user_id, name, email, ref_code, is_active, discount_org_id').eq('user_id', user.id).maybeSingle();
+  return data ? { userId: data.user_id, name: data.name, email: data.email, refCode: data.ref_code, isActive: data.is_active, discountOrgId: data.discount_org_id } : null;
+});
+
+/** Partner portal guard: an active agent, or a 404 (the portal isn't advertised). */
+export async function getAgentContext() {
+  await requireUser('/partner');
+  const agent = await getAgent();
+  if (!agent || !agent.isActive) notFound();
+  return { agent, orgs: await getMyOrganizations(), supabase: await getSupabase() };
 }

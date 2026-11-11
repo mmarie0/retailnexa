@@ -7,6 +7,7 @@ import { SubmitButton } from '@/components/submit-button';
 import { ROLE_LABELS, isMemberRole } from '@/lib/auth/permissions';
 import { addDays, FEATURE_KEYS, WAIVER_DEFAULT_DAYS, WAIVER_MAX_DAYS } from '@/lib/billing/feature-keys';
 import { sendPasswordReset, setFeatureOverride, setOrgStatus } from '../../actions';
+import { assignAgent } from '../../agents/actions';
 
 export const metadata: Metadata = { title: 'Customer' };
 
@@ -29,6 +30,8 @@ export default async function TenantPage({ params }: PageProps<'/admin/tenants/[
   ]);
   const ids = (members.data ?? []).map((m) => m.user_id);
   const { data: profiles } = ids.length ? await supabase.from('profiles').select('id, email, full_name').in('id', ids) : { data: [] };
+  const { data: agents } = await supabase.from('sales_agents').select('user_id, name, is_active').order('name');
+  const agentName = (agents ?? []).find((a) => a.user_id === org.sales_agent_id)?.name;
   const stripeMode = process.env.STRIPE_SECRET_KEY?.startsWith('sk_test') ? 'test/' : '';
 
   return (
@@ -39,6 +42,23 @@ export default async function TenantPage({ params }: PageProps<'/admin/tenants/[
         <Badge tone="info">Plan {sub.data?.status ?? 'none'}</Badge>
         {(grants.data ?? []).length > 0 ? <Badge tone="warning">Support access granted until {new Date(grants.data![0].expires_at).toLocaleString()}</Badge> : <Badge>No support access to records</Badge>}
       </div>
+
+      <Card>
+        <h2 className="mb-1 font-bold">Sales agent</h2>
+        <p className="text-sm text-muted">{agentName ? `Credited to ${agentName}${org.sales_agent_source === 'referral' ? ' (referral link)' : ''}${org.sales_agent_since ? ` since ${new Date(org.sales_agent_since).toLocaleDateString()}` : ''}.` : 'Not credited to a sales agent.'}</p>
+        {adminCan(ctx.role, 'entitlements') && (agents ?? []).length > 0 && (
+          <ActionForm action={assignAgent} className="mt-2 flex flex-wrap items-end gap-2">
+            <input type="hidden" name="org" value={org.id} />
+            <Field label="Agent" htmlFor="agent">
+              <Select id="agent" name="agent" defaultValue={org.sales_agent_id ?? ''}>
+                <option value="">None</option>
+                {(agents ?? []).map((a) => <option key={a.user_id} value={a.user_id}>{a.name}{a.is_active ? '' : ' (inactive)'}</option>)}
+              </Select>
+            </Field>
+            <SubmitButton size="sm" variant="secondary">Save</SubmitButton>
+          </ActionForm>
+        )}
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>

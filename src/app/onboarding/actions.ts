@@ -1,5 +1,7 @@
 'use server';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { REF_COOKIE } from '@/lib/referral';
 import { z } from 'zod';
 import { getSupabase, requireUser } from '@/lib/auth/context';
 import { setActiveOrgCookie } from '@/lib/auth/org-cookie';
@@ -31,6 +33,13 @@ export async function createOrganization(_p: ActionState, form: FormData): Promi
   });
   if (error) return fail(friendlyError(error));
   await setActiveOrgCookie(orgId as string);
+  // Credit the business to the sales agent whose link brought them here (best effort; never blocks signup).
+  const ref = (await cookies()).get(REF_COOKIE)?.value;
+  if (ref) {
+    const { error: refErr } = await supabase.rpc('claim_referral', { p_org: orgId as string, p_code: ref });
+    if (refErr) console.error('[onboarding] referral not credited', refErr.message);
+    (await cookies()).delete(REF_COOKIE);
+  }
 
   // Pre-select the plan on the billing page from what they chose on pricing (or their business type).
   const plan = new URLSearchParams(parsed.data.plan ?? '');
