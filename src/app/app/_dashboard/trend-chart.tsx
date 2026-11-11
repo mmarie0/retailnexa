@@ -24,7 +24,7 @@ export function TrendChart({ points, title = '12-month sales trend' }: { points:
       </figcaption>
       <div className="relative mt-3 h-40" onMouseLeave={() => setActive(null)}>
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 border-t border-dashed border-line" />
-        <span aria-hidden className="pointer-events-none absolute -top-2.5 right-0 bg-card pl-1 text-xs text-muted">{formatMoney(max)}</span>
+        <span aria-hidden className="pointer-events-none absolute -top-2.5 end-0 bg-card ps-1 text-xs text-muted">{formatMoney(max)}</span>
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-line" />
         <div aria-hidden className="absolute inset-x-0 bottom-0 border-t border-muted/40" />
         <ol className="relative flex h-full items-end gap-1.5">
@@ -49,13 +49,13 @@ export function TrendChart({ points, title = '12-month sales trend' }: { points:
       <details className="text-sm">
         <summary className="cursor-pointer font-semibold text-accent-strong">{t('Show as table')}</summary>
         <table className="mt-2 w-full">
-          <thead className="text-left text-muted"><tr><th className="py-1 font-semibold">{t('Month')}</th><th className="text-right font-semibold">{t('Net sales')}</th><th className="text-right font-semibold">{t('Last year')}</th></tr></thead>
+          <thead className="text-start text-muted"><tr><th className="py-1 font-semibold">{t('Month')}</th><th className="text-end font-semibold">{t('Net sales')}</th><th className="text-end font-semibold">{t('Last year')}</th></tr></thead>
           <tbody>
             {points.map((p) => (
               <tr key={p.ym} className="border-t border-line">
                 <td className="py-1">{mon(p.ym, { month: 'short', year: 'numeric' })}{p.projected ? t(' (on pace)') : ''}</td>
-                <td className="num text-right">{p.cents === null ? '—' : formatMoney(p.cents)}</td>
-                <td className="num text-right">{p.lastYearCents === null ? '—' : formatMoney(p.lastYearCents)}</td>
+                <td className="num text-end">{p.cents === null ? '—' : formatMoney(p.cents)}</td>
+                <td className="num text-end">{p.lastYearCents === null ? '—' : formatMoney(p.lastYearCents)}</td>
               </tr>
             ))}
           </tbody>

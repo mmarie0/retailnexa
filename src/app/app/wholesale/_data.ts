@@ -19,10 +19,14 @@ export interface Customer {
   auto_email: boolean; on_hold: boolean; notes: string | null; is_active: boolean;
 }
 export interface Item {
-  id: string; name: string; sku: string | null; upc: string | null; brand: string | null; category: string | null; vendor: string | null; bin: string | null;
+  id: string; name: string; sku: string | null; upc: string | null; brand: string | null; category: string | null; subcategory: string | null; vendor: string | null; bin: string | null;
+  image_path: string | null; sort_order: number;
   unit: string | null; cost_cents: number; price_cents: number; case_pack: number | null; reorder_at: number | null; reorder_qty: number | null; qty: number; is_active: boolean;
 }
-export interface Settings { default_terms: number; tax_rate: number; inv_prefix: string; next_inv: number; so_prefix: string; next_so: number; markup: number; pay_instructions: string | null }
+export interface Settings {
+  default_terms: number; tax_rate: number; inv_prefix: string; next_inv: number; so_prefix: string; next_so: number; markup: number; pay_instructions: string | null;
+  catalog_view: 'list' | 'grid'; grid_size: 's' | 'm' | 'l'; grid_images: boolean;
+}
 export interface Order {
   id: string; kind: 'quote' | 'order'; number: string; customer_id: string; order_date: string; need_by: string | null; valid_until: string | null; customer_po: string | null;
   status: string; discount_cents: number; shipping_cents: number; tax_rate: number; subtotal_cents: number; cost_cents: number; tax_cents: number; total_cents: number;
@@ -31,10 +35,10 @@ export interface Order {
 export interface Invoice extends InvoiceRow { order_id: string | null; terms: number; customer_po: string | null; shipping_cents: number; tax_rate: number; tax_cents: number; notes: string | null; void_reason: string | null }
 export interface ExpectedPayment { id: string; customer_id: string; due_date: string; amount_cents: number; method: string; check_no: string | null; bank: string | null; note: string | null; status: string; received_on: string | null }
 
-export const DEFAULT_SETTINGS: Settings = { default_terms: 30, tax_rate: 0, inv_prefix: 'INV-', next_inv: 1001, so_prefix: 'SO-', next_so: 1, markup: 40, pay_instructions: null };
+export const DEFAULT_SETTINGS: Settings = { default_terms: 30, tax_rate: 0, inv_prefix: 'INV-', next_inv: 1001, so_prefix: 'SO-', next_so: 1, markup: 40, pay_instructions: null, catalog_view: 'list', grid_size: 'm', grid_images: true };
 
 const CUSTOMER_COLS = 'id, name, contact, email, phone, address, ship_address, terms, tier_id, credit_limit_cents, tax_exempt, resale_cert, cert_expiry, auto_email, on_hold, notes, is_active';
-const ITEM_COLS = 'id, name, sku, upc, brand, category, vendor, bin, unit, cost_cents, price_cents, case_pack, reorder_at, reorder_qty, qty, is_active';
+const ITEM_COLS = 'id, name, sku, upc, brand, category, subcategory, image_path, sort_order, vendor, bin, unit, cost_cents, price_cents, case_pack, reorder_at, reorder_qty, qty, is_active';
 const ORDER_COLS = 'id, kind, number, customer_id, order_date, need_by, valid_until, customer_po, status, discount_cents, shipping_cents, tax_rate, subtotal_cents, cost_cents, tax_cents, total_cents, notes, invoice_id';
 const INVOICE_COLS = 'id, number, customer_id, order_id, invoice_date, terms, due_date, customer_po, discount_cents, shipping_cents, tax_rate, subtotal_cents, cost_cents, tax_cents, total_cents, notes, voided_at, void_reason';
 const PAYMENT_COLS = 'id, invoice_id, paid_on, amount_cents, method, check_no, bank, deposit_date, expected_payment_id';
@@ -42,7 +46,7 @@ const PAYMENT_COLS = 'id, invoice_id, paid_on, amount_cents, method, check_no, b
 const num = <T extends object>(rows: T[], keys: (keyof T)[]) => rows.map((r) => { const o = { ...r }; for (const k of keys) if (o[k] != null) (o[k] as unknown) = Number(o[k]); return o; });
 
 export async function loadSettings(org: string): Promise<Settings> {
-  const { data } = await (await getSupabase()).from('wholesale_settings').select('default_terms, tax_rate, inv_prefix, next_inv, so_prefix, next_so, markup, pay_instructions').eq('organization_id', org).maybeSingle();
+  const { data } = await (await getSupabase()).from('wholesale_settings').select('default_terms, tax_rate, inv_prefix, next_inv, so_prefix, next_so, markup, pay_instructions, catalog_view, grid_size, grid_images').eq('organization_id', org).maybeSingle();
   return data ? { ...(data as Settings), tax_rate: Number(data.tax_rate), markup: Number(data.markup) } : DEFAULT_SETTINGS;
 }
 
@@ -100,4 +104,20 @@ export async function loadExpected(org: string) {
   const sb = await getSupabase();
   const rows = await pageAll<ExpectedPayment>((a, b) => sb.from('expected_payments').select('id, customer_id, due_date, amount_cents, method, check_no, bank, note, status, received_on').eq('organization_id', org).order('due_date').order('id').range(a, b));
   return Object.assign(num(rows, ['amount_cents']), { truncated: rows.truncated });
+}
+
+/** Quantity invoiced per item over the last 90 days ("most popular"). */
+export async function loadPopularity(org: string): Promise<Map<string, number>> {
+  const { data, error } = await (await getSupabase()).rpc('item_popularity', { p_org: org, p_days: 90 });
+  if (error) throw error;
+  return new Map(((data ?? []) as { item_id: string; qty: number }[]).map((r) => [r.item_id, Number(r.qty)]));
+}
+
+/** Short-lived links to item photos in the private bucket (10 minutes). */
+export async function itemImageUrls(items: { id: string; image_path: string | null }[]): Promise<Map<string, string>> {
+  const withImg = items.filter((i) => i.image_path).slice(0, 1000);
+  if (!withImg.length) return new Map();
+  const { data } = await (await getSupabase()).storage.from('item-images').createSignedUrls(withImg.map((i) => i.image_path!), 600);
+  const byPath = new Map((data ?? []).filter((d) => d.signedUrl).map((d) => [d.path, d.signedUrl]));
+  return new Map(withImg.flatMap((i) => (byPath.has(i.image_path) ? [[i.id, byPath.get(i.image_path)!] as [string, string]] : [])));
 }

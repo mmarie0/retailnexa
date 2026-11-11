@@ -12,7 +12,7 @@ import { Pills, SearchBox, money, money0 } from '../_ui';
 import { adjustStock, deleteItem, saveItem } from '../actions';
 import { getT } from '@/lib/i18n/server';
 
-export const metadata: Metadata = { title: 'Inventory' };
+export const metadata: Metadata = { title: 'Products & inventory' };
 
 async function ItemFields({ it, markup }: { it?: Item; markup: number }) {
   const t = await getT();
@@ -26,7 +26,8 @@ async function ItemFields({ it, markup }: { it?: Item; markup: number }) {
       <div className="sm:col-span-2"><Field label={t('Item name')} htmlFor={`${p}-name`}><Input id={`${p}-name`} name="name" defaultValue={it?.name} required maxLength={160} /></Field></div>
       {f('sku', 'SKU (optional)', 60)}
       {f('brand', 'Brand (optional)', 60)}
-      {f('category', 'Category (optional)', 60)}
+      {f('category', 'Category (optional)', 60, 'Hair')}
+      {f('subcategory', 'Subcategory (optional)', 60, 'Braiding hair')}
       {f('upc', 'UPC / barcode (optional)', 40)}
       {f('vendor', 'Vendor (optional)', 120)}
       {f('bin', 'Bin / shelf (optional)', 30, 'A-12')}
@@ -62,14 +63,14 @@ export default async function InventoryPage({ searchParams }: PageProps<'/app/wh
   const shown = rows
     .filter(({ it }) => (f === 'inactive' ? !it.is_active : it.is_active))
     .filter((r) => (f === 'reorder' ? r.reorder !== null : f === 'out' ? r.free <= 0 : true))
-    .filter(({ it }) => !q || [it.name, it.sku, it.upc, it.brand, it.category, it.vendor, it.bin].some((v) => v?.toLowerCase().includes(q)));
+    .filter(({ it }) => !q || [it.name, it.sku, it.upc, it.brand, it.category, it.subcategory, it.vendor, it.bin].some((v) => v?.toLowerCase().includes(q)));
   const value = stockValue(items);
   const catalog = can(ctx, 'wholesale.catalog.manage') && ctx.access.canWrite, adjust = can(ctx, 'inventory.manage') && ctx.access.canWrite;
   const seeCost = can(ctx, 'wholesale.catalog.manage') || can(ctx, 'inventory.manage');
 
   return (
     <>
-      <PageHeader title={t('Inventory')} description={t('What’s on hand, what open orders are holding, what’s free to sell, and what to reorder.')} />
+      <PageHeader title={t('Products & inventory')} description={t('Your products: what’s on hand, what open orders are holding, what’s free to sell, and what to reorder.')} />
       <ReadOnlyNotice show={(can(ctx, 'wholesale.catalog.manage') || can(ctx, 'inventory.manage')) && !ctx.access.canWrite} />
       {items.length > 0 && (
         <div className="grid grid-cols-3 gap-3 max-[520px]:grid-cols-1">
@@ -93,9 +94,9 @@ export default async function InventoryPage({ searchParams }: PageProps<'/app/wh
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-bold">{it.name}</p>
-                    <p className="text-sm text-muted">{[it.sku && `SKU ${it.sku}`, it.brand, it.bin && `Bin ${it.bin}`, it.case_pack && `${it.case_pack}/case`].filter(Boolean).join(' · ') || t('No SKU')}</p>
+                    <p className="text-sm text-muted">{[it.sku && `SKU ${it.sku}`, it.brand, [it.category, it.subcategory].filter(Boolean).join(' › ') || null, it.bin && `Bin ${it.bin}`, it.case_pack && `${it.case_pack}/case`].filter(Boolean).join(' · ') || t('No SKU')}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-end">
                     <p className="num font-semibold">{money(it.price_cents)}{seeCost && <span className="font-normal text-muted"> {t('· cost')} {money(it.cost_cents)}</span>}</p>
                     {reorder !== null && <Badge tone="warning">{t('Reorder')} {fmtQty(reorder)}</Badge>}
                     {free <= 0 && it.is_active && <Badge tone="danger">{t('Out')}</Badge>}

@@ -47,7 +47,7 @@ export default async function InvoicePage({ params }: PageProps<'/app/wholesale/
             <p className="text-xl font-extrabold">{org?.legal_name || org?.name}</p>
             <p className="text-sm text-muted">{[org?.phone, org?.website].filter(Boolean).join(' · ')}</p>
           </div>
-          <div className="text-right">
+          <div className="text-end">
             <p className="text-[11px] font-bold uppercase tracking-[.08em] text-muted">{t('Invoice')}</p>
             <p className="text-xl font-extrabold">{i.number}</p>
             <p className="text-sm text-muted">{fmtDate(i.invoice_date)} · {termsLabel(raw.terms)} {t('· due')} {fmtDate(i.due_date)}</p>
@@ -59,26 +59,26 @@ export default async function InvoicePage({ params }: PageProps<'/app/wholesale/
           {c?.ship_address && <div><p className="text-[11px] font-bold uppercase tracking-[.08em] text-muted">{t('Ship to')}</p><p className="whitespace-pre-line text-sm">{c.ship_address}</p></div>}
         </div>
         <table className="w-full text-[15px]">
-          <thead><tr className="border-b border-line text-left text-sm text-muted"><th className="py-1.5 font-semibold">{t('Item')}</th><th className="py-1.5 text-right font-semibold">{t('Qty')}</th><th className="py-1.5 text-right font-semibold">{t('Price')}</th><th className="py-1.5 text-right font-semibold">{t('Amount')}</th></tr></thead>
+          <thead><tr className="border-b border-line text-start text-sm text-muted"><th className="py-1.5 font-semibold">{t('Item')}</th><th className="py-1.5 text-end font-semibold">{t('Qty')}</th><th className="py-1.5 text-end font-semibold">{t('Price')}</th><th className="py-1.5 text-end font-semibold">{t('Amount')}</th></tr></thead>
           <tbody>
             {(lines ?? []).map((l) => (
               <tr key={l.id} className="border-b border-soft align-top">
                 <td className="py-1.5">{l.name}{l.sku && <span className="block text-xs text-muted">{l.sku}</span>}</td>
-                <td className="num py-1.5 text-right">{fmtQty(Number(l.qty))}</td>
-                <td className="num py-1.5 text-right">{money(Number(l.price_cents))}</td>
-                <td className="num py-1.5 text-right">{money(Math.round(Number(l.qty) * Number(l.price_cents)))}</td>
+                <td className="num py-1.5 text-end">{fmtQty(Number(l.qty))}</td>
+                <td className="num py-1.5 text-end">{money(Number(l.price_cents))}</td>
+                <td className="num py-1.5 text-end">{money(Math.round(Number(l.qty) * Number(l.price_cents)))}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        <dl className="ml-auto grid w-full max-w-xs grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-[15px]">
-          <dt className="text-muted">{t('Subtotal')}</dt><dd className="num text-right">{money(i.subtotal_cents)}</dd>
-          {i.discount_cents > 0 && <><dt className="text-muted">{t('Discount')}</dt><dd className="num text-right">−{money(i.discount_cents)}</dd></>}
-          {raw.shipping_cents > 0 && <><dt className="text-muted">{t('Shipping')}</dt><dd className="num text-right">{money(raw.shipping_cents)}</dd></>}
-          <dt className="text-muted">{t('Tax (')}{raw.tax_rate}%)</dt><dd className="num text-right">{money(raw.tax_cents)}</dd>
-          <dt className="font-bold">{t('Total')}</dt><dd className="num text-right font-bold">{money(i.total_cents)}</dd>
-          {i.paid > 0 && <><dt className="text-muted">{t('Paid')}</dt><dd className="num text-right">−{money(i.paid)}</dd></>}
-          {i.status !== 'void' && <><dt className="font-bold">{t('Balance due')}</dt><dd className="num text-right font-bold">{money(i.balance)}</dd></>}
+        <dl className="ms-auto grid w-full max-w-xs grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-[15px]">
+          <dt className="text-muted">{t('Subtotal')}</dt><dd className="num text-end">{money(i.subtotal_cents)}</dd>
+          {i.discount_cents > 0 && <><dt className="text-muted">{t('Discount')}</dt><dd className="num text-end">−{money(i.discount_cents)}</dd></>}
+          {raw.shipping_cents > 0 && <><dt className="text-muted">{t('Shipping')}</dt><dd className="num text-end">{money(raw.shipping_cents)}</dd></>}
+          <dt className="text-muted">{t('Tax (')}{raw.tax_rate}%)</dt><dd className="num text-end">{money(raw.tax_cents)}</dd>
+          <dt className="font-bold">{t('Total')}</dt><dd className="num text-end font-bold">{money(i.total_cents)}</dd>
+          {i.paid > 0 && <><dt className="text-muted">{t('Paid')}</dt><dd className="num text-end">−{money(i.paid)}</dd></>}
+          {i.status !== 'void' && <><dt className="font-bold">{t('Balance due')}</dt><dd className="num text-end font-bold">{money(i.balance)}</dd></>}
         </dl>
         {raw.notes && <p className="whitespace-pre-line text-sm">{raw.notes}</p>}
         {settings.pay_instructions && <p className="whitespace-pre-line rounded-xl bg-soft p-3 text-sm"><span className="font-semibold">{t('How to pay:')} </span>{settings.pay_instructions}</p>}

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { cx } from '@/components/ui';
 import { fabFor, locate, type IconKey, type NavArea, type NavPage } from './nav';
 import { useT } from '@/lib/i18n/client';
+import { LanguageSwitch } from '@/components/language-switch';
 
 /* Icon paths copied from the RetailNexa app so the menus look the same. */
 const PATHS: Record<IconKey, ReactNode> = {
@@ -65,7 +66,7 @@ export function AppShell({ theme, areas, more, orgName, orgSwitcher, email, toda
   children: ReactNode;
 }) {
   const t = useT();
-  const soonPill = <span className="ml-auto rounded-full bg-soft px-2 py-0.5 text-[11px] font-bold text-muted">{t('Soon')}</span>;
+  const soonPill = <span className="ms-auto rounded-full bg-soft px-2 py-0.5 text-[11px] font-bold text-muted">{t('Soon')}</span>;
   const path = usePathname();
   const here = locate(path, areas);
   const area = areas.find((a) => a.key === here.area) ?? areas[0];
@@ -97,7 +98,7 @@ export function AppShell({ theme, areas, more, orgName, orgSwitcher, email, toda
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true" className={cx('size-3.5 transition-transform', menuOpen ? 'rotate-180 text-on-accent' : 'text-muted')}><path d="M6 9l6 6 6-6" /></svg>
             </button>
             {menuOpen && (
-              <nav id="navmenu" aria-label={t('All pages')} onClick={(e) => { if ((e.target as HTMLElement).closest('a')) setMenuOpen(false); }} className="absolute left-0 top-[calc(100%+8px)] z-[45] max-h-[calc(100dvh-180px)] w-[min(300px,calc(100vw-32px))] overflow-y-auto rounded-2xl bg-card p-2 shadow-[0_14px_36px_rgba(40,60,140,.24)]">
+              <nav id="navmenu" aria-label={t('All pages')} onClick={(e) => { if ((e.target as HTMLElement).closest('a')) setMenuOpen(false); }} className="absolute start-0 top-[calc(100%+8px)] z-[45] max-h-[calc(100dvh-180px)] w-[min(300px,calc(100vw-32px))] overflow-y-auto rounded-2xl bg-card p-2 shadow-[0_14px_36px_rgba(40,60,140,.24)]">
                 <div className="px-3 pb-2 pt-1.5">
                   <p className="truncate font-bold">{orgName}</p>
                   {orgSwitcher}
@@ -123,8 +124,9 @@ export function AppShell({ theme, areas, more, orgName, orgSwitcher, email, toda
                   <Link href="/app/settings/storage" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="download" className="text-accent" />{t('Storage')}</Link>
                   <Link href="/account/security" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="shield" className="text-accent" />{t('Two-factor authentication')}</Link>
                   <Link href="/onboarding?new=1" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="plus" className="text-accent" />{t('Add another business')}</Link>
+                  <LanguageSwitch className="px-3 py-1.5" />
                   <form action="/auth/signout" method="post">
-                    <button className="flex w-full items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-left text-[14.5px] font-medium hover:bg-soft"><Icon k="logout" className="text-accent" />{t('Log out')}</button>
+                    <button className="flex w-full items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-start text-[14.5px] font-medium hover:bg-soft"><Icon k="logout" className="text-accent" />{t('Log out')}</button>
                   </form>
                 </div>
               </nav>
@@ -133,7 +135,7 @@ export function AppShell({ theme, areas, more, orgName, orgSwitcher, email, toda
           </div>
           <span className="flex flex-none items-center gap-2.5">
             <span className="text-[13px] text-muted max-[421px]:hidden">{today}</span>
-            <Link href="/help" className="inline-flex items-center gap-[7px] rounded-full bg-card py-[5px] pl-[5px] pr-3 text-[13.5px] font-bold text-accent-strong shadow-[var(--shadow-card)]">
+            <Link href="/help" className="inline-flex items-center gap-[7px] rounded-full bg-card py-[5px] ps-[5px] pe-3 text-[13.5px] font-bold text-accent-strong shadow-[var(--shadow-card)]">
               <span className="grid size-[22px] place-items-center rounded-full bg-accent text-[13px] font-extrabold text-white">?</span>{t('Need help?')}
             </Link>
           </span>
@@ -155,7 +157,7 @@ export function AppShell({ theme, areas, more, orgName, orgSwitcher, email, toda
       <main id="main" className="flex min-w-0 flex-col gap-[18px] pt-4">{children}</main>
 
       {fab && (
-        <Link href={fab.href} data-fab className="fixed bottom-[calc(84px+env(safe-area-inset-bottom,0px))] right-4 z-30 flex items-center gap-2 rounded-full bg-accent px-[18px] py-3.5 text-[15px] font-semibold text-white shadow-[0_10px_24px_rgba(91,127,245,.45)]">
+        <Link href={fab.href} data-fab className="fixed bottom-[calc(84px+env(safe-area-inset-bottom,0px))] end-4 z-30 flex items-center gap-2 rounded-full bg-accent px-[18px] py-3.5 text-[15px] font-semibold text-white shadow-[0_10px_24px_rgba(91,127,245,.45)]">
           <Icon k="plus" className="size-[18px]" />{t(fab.label)}
         </Link>
       )}

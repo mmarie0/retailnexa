@@ -69,7 +69,7 @@ export default async function CustomerPage({ params }: PageProps<'/app/wholesale
       )}
       {seeOrders && (
         <section className="flex flex-col gap-2">
-          <Eyebrow>{t('Orders &amp; quotes')}</Eyebrow>
+          <Eyebrow>{t('Orders & quotes')}</Eyebrow>
           {mine.length ? <ul className="flex flex-col gap-2">{mine.slice(0, 30).map((o) => (
             <Row key={o.id} href={`/app/wholesale/orders/${o.id}`} title={o.number} detail={fmtDate(o.order_date)} amount={money(o.total_cents)} badge={<OrderBadge status={o.status} kind={o.kind} />} />
           ))}</ul> : <p className="text-sm text-muted">{t('No orders yet.')}</p>}

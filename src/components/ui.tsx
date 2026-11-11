@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import type { ComponentProps, ReactNode } from 'react';
 import { cloneElement, isValidElement } from 'react';
-import { getT } from '@/lib/i18n/server';
 import { Tx } from './tx';
 
 export function cx(...parts: Array<string | false | null | undefined>) {
@@ -60,7 +59,7 @@ export function Input({ className, ...rest }: ComponentProps<'input'>) {
   return <input className={cx(inputBase, widthDefault(className), className)} {...rest} />;
 }
 export function Select({ className, ...rest }: ComponentProps<'select'>) {
-  return <select className={cx(inputBase, 'pr-8', widthDefault(className), className)} {...rest} />;
+  return <select className={cx(inputBase, 'pe-8', widthDefault(className), className)} {...rest} />;
 }
 export function Textarea({ className, ...rest }: ComponentProps<'textarea'>) {
   return <textarea className={cx(inputBase, 'min-h-28', widthDefault(className), className)} {...rest} />;
@@ -118,8 +117,7 @@ export function FormMessage({ state }: { state: { ok: boolean; message: string |
   );
 }
 
-export async function Logo({ className }: { className?: string }) {
-  const t = await getT();
+export function Logo({ className }: { className?: string }) {
   return (
     <span className={cx('inline-flex items-center gap-2 text-[21px] font-extrabold tracking-tight', className)}>
       <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
@@ -128,7 +126,7 @@ export async function Logo({ className }: { className?: string }) {
         <rect x="11.25" y="9" width="3.5" height="11" rx="1.5" fill="#7E99FA" />
         <rect x="16.5" y="5.5" width="3.5" height="14.5" rx="1.5" fill="#FF9B91" />
       </svg>
-      {t('RetailNexa')}
+      RetailNexa
     </span>
   );
 }

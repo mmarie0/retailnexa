@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, aging, agingBucket, committed, invoiceStatus, orderTotals, reorderSuggestion, scheduleGroups, splitPlan, standing, stockValue, tierPrice, withBalances } from './ledger';
+import { addDays, catalogFacets, filterCatalog, aging, agingBucket, committed, invoiceStatus, orderTotals, reorderSuggestion, scheduleGroups, splitPlan, standing, stockValue, tierPrice, withBalances } from './ledger';
 
 const inv = (id: string, due: string, total: number, extra: Partial<{ voided_at: string; customer_id: string }> = {}) => ({
   id, number: id, customer_id: extra.customer_id ?? 'c1', invoice_date: '2026-10-01', due_date: due, total_cents: total, cost_cents: 0, subtotal_cents: total, discount_cents: 0, voided_at: extra.voided_at ?? null,
@@ -59,5 +59,21 @@ describe('wholesale ledger rules', () => {
     expect(plan).toEqual([{ due_date: '2026-11-30', amount_cents: 3334 }, { due_date: '2026-12-14', amount_cents: 3333 }, { due_date: '2026-12-28', amount_cents: 3333 }]);
     expect(splitPlan(2, 3, today, 7)).toEqual([]);
     expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
+  });
+
+  it('catalog: categories with subcategories, filters and sorts', () => {
+    const it = (id: string, name: string, o: Partial<{ category: string; subcategory: string; brand: string; free: number; sort: number; sold: number }> = {}) =>
+      ({ id, name, sku: null, brand: o.brand ?? null, category: o.category ?? null, subcategory: o.subcategory ?? null, free: o.free ?? 1, sort: o.sort ?? 0, sold: o.sold ?? 0 });
+    const items = [it('a', 'Braid', { category: 'Hair', subcategory: 'Braiding', brand: 'Outre', sort: 2, sold: 5 }), it('b', 'Wig', { category: 'Hair', subcategory: 'Wigs', brand: 'Sensationnel', sort: 1, sold: 9, free: 0 }),
+      it('c', 'Comb', { category: 'Tools', sort: 3 }), it('d', 'Edge gel', { brand: 'Outre', sort: 0, sold: 9 })];
+    expect(catalogFacets(items)).toEqual({ categories: [{ name: 'Hair', subs: ['Braiding', 'Wigs'] }, { name: 'Tools', subs: [] }], brands: ['Outre', 'Sensationnel'] });
+    const ids = (f: Parameters<typeof filterCatalog>[1]) => filterCatalog(items, f).map((i) => i.id);
+    expect(ids({})).toEqual(['d', 'b', 'a', 'c']);
+    expect(ids({ sort: 'name' })).toEqual(['a', 'c', 'd', 'b']);
+    expect(ids({ sort: 'name_desc' })).toEqual(['b', 'd', 'c', 'a']);
+    expect(ids({ sort: 'popular' })).toEqual(['d', 'b', 'a', 'c']);
+    expect(ids({ category: 'Hair', subcategory: 'Wigs' })).toEqual(['b']);
+    expect(ids({ brand: 'Outre', inStock: true, sort: 'name' })).toEqual(['a', 'd']);
+    expect(ids({ q: 'braiding' })).toEqual(['a']);
   });
 });

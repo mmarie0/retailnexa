@@ -145,6 +145,42 @@ describe('wholesale core (W1)', () => {
     await expectDenied(as(owner, `delete from public.customer_payments where invoice_id = $1`, [inv2]));
   });
 
+  it('catalog: layout, photos, custom order and popularity', async () => {
+    await call(owner, 'save_catalog_layout', [org, j({ view: 'grid', size: 'l', images: false })], ['uuid', 'jsonb']);
+    expect((await sys(`select catalog_view, grid_size, grid_images from public.wholesale_settings where organization_id = $1`, [org]))[0]).toEqual({ catalog_view: 'grid', grid_size: 'l', grid_images: false });
+    await expectDenied(call(owner, 'save_catalog_layout', [org, j({ view: 'wall' })], ['uuid', 'jsonb']), /list or grid/);
+    await expectDenied(call(rep, 'save_catalog_layout', [org, j({ view: 'grid' })], ['uuid', 'jsonb']));
+    expect(Number(await one(owner, 'set_item_order', [org, [item2, item]], ['uuid', 'uuid[]']))).toBe(2);
+    expect((await sys(`select sort_order from public.items where id = any($1) order by sort_order`, [[item, item2]])).map((r) => r.sort_order)).toEqual([1, 2]);
+    // Photos: upload path must be the business's own item; reps can read but not upload.
+    const path = `${org}/${item2}/00000000-0000-4000-8000-000000000001.jpg`;
+    await expectDenied(as(rep, `insert into storage.objects (bucket_id, name) values ('item-images', $1)`, [path]));
+    await expectDenied(as(owner, `insert into storage.objects (bucket_id, name) values ('item-images', $1)`, [`${org}/${item2}/x.exe`]));
+    await expectDenied(as(owner, `insert into storage.objects (bucket_id, name) values ('item-images', $1)`, [`${retailOrg}/${item2}/00000000-0000-4000-8000-000000000002.jpg`]));
+    await expectDenied(call(owner, 'set_item_image', [org, item2, path], ['uuid', 'uuid', 'text']), /upload the photo first/);
+    await as(owner, `insert into storage.objects (bucket_id, name) values ('item-images', $1)`, [path]);
+    await call(owner, 'set_item_image', [org, item2, path], ['uuid', 'uuid', 'text']);
+    await expectDenied(call(owner, 'set_item_image', [org, item, path], ['uuid', 'uuid', 'text']), /upload the photo first/);
+    expect((await as(rep, `select name from storage.objects where bucket_id = 'item-images'`)).length).toBe(1);
+    expect(await as(viewer, `select name from storage.objects where bucket_id = 'item-images'`)).toEqual([]);
+    // Popularity: invoiced quantities (not void), visible to reps without invoice access.
+    const pop = await as<{ item_id: string; qty: string }>(rep, `select item_id, qty from public.item_popularity($1)`, [org]);
+    expect(pop.map((r) => [r.item_id, Number(r.qty)]).sort()).toEqual([[item, 12], [item2, 2]].sort());
+    expect(await as(viewer, `select * from public.item_popularity($1)`, [org])).toEqual([]);
+  });
+
+  it('only a superadmin who owns a business can mark it a demo', async () => {
+    const sa = await createUser('ws-sa');
+    await sys(`insert into auth.mfa_factors (user_id, status) values ($1, 'verified')`, [sa.id]);
+    await sys(`insert into public.platform_admins (user_id, role) values ($1, 'superadmin')`, [sa.id]);
+    const demo = await createOrg(sa, 'Demo Wholesale', 'wholesale');
+    await expectDenied(as(owner, `select public.admin_mark_demo($1)`, [org]));
+    await expectDenied(as({ ...sa, aal: 'aal2' }, `select public.admin_mark_demo($1)`, [org]), /own the demo/);
+    await as({ ...sa, aal: 'aal2' }, `select public.admin_mark_demo($1)`, [demo]);
+    expect((await sys(`select is_demo from public.organizations where id = $1`, [demo]))[0].is_demo).toBe(true);
+    await expectDenied(as(owner, `update public.organizations set is_demo = true where id = $1`, [org]));
+  });
+
   it('a read-only (canceled) business can’t write', async () => {
     await setSubscription(org, 'canceled', { products: ['wholesale'] });
     await expectDenied(call(owner, 'save_customer', [org, null, j({ name: 'Late' })], ['uuid', 'uuid', 'jsonb']));

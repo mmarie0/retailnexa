@@ -66,12 +66,12 @@ export default async function OrderPage({ params }: PageProps<'/app/wholesale/or
             </li>
           ))}
         </ul>
-        <dl className="ml-auto mt-3 grid w-full max-w-xs grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-[15px]">
-          <dt className="text-muted">{t('Subtotal')}</dt><dd className="num text-right">{money(o.subtotal_cents)}</dd>
-          {o.discount_cents > 0 && <><dt className="text-muted">{t('Discount')}</dt><dd className="num text-right">−{money(o.discount_cents)}</dd></>}
-          {o.shipping_cents > 0 && <><dt className="text-muted">{t('Shipping')}</dt><dd className="num text-right">{money(o.shipping_cents)}</dd></>}
-          <dt className="text-muted">{t('Tax (')}{o.tax_rate}%)</dt><dd className="num text-right">{money(o.tax_cents)}</dd>
-          <dt className="font-bold">{t('Total')}</dt><dd className="num text-right font-bold">{money(o.total_cents)}</dd>
+        <dl className="ms-auto mt-3 grid w-full max-w-xs grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-[15px]">
+          <dt className="text-muted">{t('Subtotal')}</dt><dd className="num text-end">{money(o.subtotal_cents)}</dd>
+          {o.discount_cents > 0 && <><dt className="text-muted">{t('Discount')}</dt><dd className="num text-end">−{money(o.discount_cents)}</dd></>}
+          {o.shipping_cents > 0 && <><dt className="text-muted">{t('Shipping')}</dt><dd className="num text-end">{money(o.shipping_cents)}</dd></>}
+          <dt className="text-muted">{t('Tax (')}{o.tax_rate}%)</dt><dd className="num text-end">{money(o.tax_cents)}</dd>
+          <dt className="font-bold">{t('Total')}</dt><dd className="num text-end font-bold">{money(o.total_cents)}</dd>
         </dl>
         {o.notes && <p className="mt-2 whitespace-pre-line text-sm text-muted">{o.notes}</p>}
       </Card>

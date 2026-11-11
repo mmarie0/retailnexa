@@ -91,7 +91,7 @@ export async function WholesaleOverview({ ctx, today, compact = false }: { ctx: 
         )}
         {see.orders && (
           <Card>
-            <h2 className="font-bold">{t('To pick &amp; ship')}</h2>
+            <h2 className="font-bold">{t('To pick & ship')}</h2>
             {toShip.length ? (
               <ul className="mt-2 flex flex-col gap-1.5 text-[15px]">
                 {toShip.slice(0, 6).map((o) => <li key={o.id} className="flex items-center justify-between gap-2"><Link href={`/app/wholesale/orders/${o.id}`} className="truncate hover:underline">{o.number} · {name.get(o.customer_id) ?? t('Customer')}</Link><OrderBadge status={o.status} /></li>)}

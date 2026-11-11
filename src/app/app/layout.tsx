@@ -18,7 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const tr = <P extends { label: string }>(p: P): P => ({ ...p, label: t(p.label) });
   const areas = visibleAreas(has, ctx.org.businessType).map((a) => ({ ...tr(a), pages: a.pages.map(tr) }));
   const more = visibleMore(has).map(tr);
-  const { data: orgRow } = await (await getSupabase()).from('organizations').select('timezone').eq('id', ctx.org.id).maybeSingle();
+  const { data: orgRow } = await (await getSupabase()).from('organizations').select('timezone, is_demo').eq('id', ctx.org.id).maybeSingle();
   const today = new Date().toLocaleDateString(locale === 'ar' ? 'ar-u-nu-latn' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: orgRow?.timezone ?? 'America/New_York' });
   // Add-button permissions the shell needs to pick the button for the current page (it follows client navigation).
   const fabPerms = ctx.access.canWrite ? [...new Set(Object.values(FAB).flatMap((f) => (f && has(f.perm) ? [f.perm] : [])))] : [];
@@ -36,6 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const theme = themeFrom((await cookies()).get(THEME_COOKIE)?.value);
   return (
     <AppShell theme={theme} areas={areas} more={more} orgName={ctx.org.name} orgSwitcher={switcher} email={ctx.user.email} today={today} fabPerms={fabPerms}>
+      {orgRow?.is_demo && <Notice tone="info">{t('Demo account: every name and number here is made up.')}</Notice>}
       {notice && (
         <Notice tone={notice.tone} action={can(ctx, 'billing.view') && <Link href="/app/billing" className={buttonClass('secondary', 'sm')}>{t('Go to billing')}</Link>}>
           {notice.message}

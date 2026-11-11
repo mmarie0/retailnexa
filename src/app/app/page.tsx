@@ -174,7 +174,7 @@ export default async function OverviewPage({ searchParams }: PageProps<'/app'>) 
   );
   const kv = (rows: [string, ReactNode][]) => (
     <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 text-[15px]">
-      {rows.map(([k, v]) => <div key={k} className="contents"><dt className="text-muted">{k}</dt><dd className="num text-right font-medium">{v}</dd></div>)}
+      {rows.map(([k, v]) => <div key={k} className="contents"><dt className="text-muted">{k}</dt><dd className="num text-end font-medium">{v}</dd></div>)}
     </dl>
   );
   const hbars = (rows: { label: string; cents: number }[]) => {
@@ -184,7 +184,7 @@ export default async function OverviewPage({ searchParams }: PageProps<'/app'>) 
         {rows.map((r) => (
           <li key={r.label} className="grid grid-cols-[minmax(0,9rem)_1fr_auto] items-center gap-2">
             <span className="truncate" title={r.label}>{r.label}</span>
-            <span aria-hidden className="h-2.5 rounded-r bg-soft"><span className="block h-full rounded-r bg-[#3f63de]" style={{ width: `${Math.max(1, (r.cents / mx) * 100)}%` }} /></span>
+            <span aria-hidden className="h-2.5 rounded-e bg-soft"><span className="block h-full rounded-e bg-[#3f63de]" style={{ width: `${Math.max(1, (r.cents / mx) * 100)}%` }} /></span>
             <span className="num">{money0(r.cents)}</span>
           </li>
         ))}
@@ -239,7 +239,7 @@ export default async function OverviewPage({ searchParams }: PageProps<'/app'>) 
             <span className="text-sm text-muted">{formatMoney(b.paid)} {t('of')} {formatMoney(b.total)} {t('paid')}{b.budget !== null ? t(' · budget {v0}', { v0: formatMoney(b.budget) }) : ''}</span>
           </span>
           <span role="img" aria-label={t('Paid {v0}, unpaid {v1}', { v0: formatMoney(b.paid), v1: formatMoney(b.left) })} className="relative flex h-2.5 rounded-md bg-soft">
-            <span className="h-full rounded-l-md bg-paid" style={{ width: `${(b.paid / scale) * 100}%` }} />
+            <span className="h-full rounded-s-md bg-paid" style={{ width: `${(b.paid / scale) * 100}%` }} />
             <span className="h-full bg-accent" style={{ width: `${(b.left / scale) * 100}%` }} />
             {b.budget !== null && <i className="absolute -top-1 -bottom-1 w-0.5 bg-ink" style={{ left: `calc(${Math.min(100, (b.budget / scale) * 100)}% - 1px)` }} />}
           </span>
@@ -325,7 +325,7 @@ export default async function OverviewPage({ searchParams }: PageProps<'/app'>) 
       {ctx.org.businessType === 'both' && <Eyebrow>{t('Retail')}</Eyebrow>}
       {out}
       <Link href="/app/customize" className="self-center rounded-full bg-card px-4 py-2 text-sm font-semibold text-accent-strong shadow-[var(--shadow-card)]">
-        <Icon k="repeat" className="mr-1.5 inline size-4" />{t('Customize this page')}
+        <Icon k="repeat" className="me-1.5 inline size-4" />{t('Customize this page')}
       </Link>
       {steps.length > 0 && (
         <Card>
