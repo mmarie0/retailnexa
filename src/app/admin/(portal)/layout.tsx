@@ -17,6 +17,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           { href: '/admin', label: 'Overview' },
           { href: '/admin/tenants', label: 'Customers' },
           ...(ctx.role === 'superadmin' ? [{ href: '/admin/import', label: 'Master import' }] : []),
+          { href: '/admin/demo', label: 'Demo accounts' },
           { href: '/admin/leads', label: 'Leads' },
           { href: '/admin/announcements', label: 'Announcements' },
           { href: '/admin/audit', label: 'Audit log' },

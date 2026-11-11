@@ -1006,6 +1006,23 @@ revoke all on function public.set_item_image(uuid, uuid, text), public.save_cata
 grant execute on function public.set_item_image(uuid, uuid, text), public.save_catalog_layout(uuid, jsonb), public.set_item_order(uuid, uuid[]), public.item_popularity(uuid, int) to authenticated;
 
 -- ---------------------------------------------------------------------------
+-- Demo accounts (made-up data to show prospects; never counted as customers)
+-- ---------------------------------------------------------------------------
+alter table public.organizations add column is_demo boolean not null default false;
+
+-- A superadmin marks a business they own as a demo (the app creates and fills it).
+create or replace function public.admin_mark_demo(p_org uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if not private.is_platform_admin(array['superadmin']::public.platform_role[]) then raise exception 'permission denied' using errcode = '42501'; end if;
+  if private.member_role(p_org) is distinct from 'owner' then raise exception 'you must own the demo business' using errcode = '42501'; end if;
+  update public.organizations set is_demo = true where id = p_org;
+  perform private.log_audit(p_org, 'platform_admin', 'organization.marked_demo', 'organization', p_org::text, '{}'::jsonb);
+end $$;
+revoke all on function public.admin_mark_demo(uuid) from public, anon;
+grant execute on function public.admin_mark_demo(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
 revoke all on function public.save_wholesale_settings(uuid, jsonb), public.save_price_tiers(uuid, jsonb), public.save_customer(uuid, uuid, jsonb), public.delete_customer(uuid, uuid),
   public.save_item(uuid, uuid, jsonb), public.adjust_stock(uuid, uuid, numeric, text), public.delete_item(uuid, uuid), public.save_sales_order(uuid, uuid, jsonb),
   public.set_order_status(uuid, uuid, text), public.set_line_picked(uuid, uuid, boolean), public.invoice_order(uuid, uuid, date), public.create_customer_invoice(uuid, jsonb),
