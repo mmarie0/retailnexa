@@ -37,7 +37,7 @@ export interface NavArea {
 export const BILLS_MORE: NavPage[] = [
   { key: 'reps', label: 'Rep schedule', href: '/app/bills/reps', icon: 'calendar', perm: 'bills.view' },
   { key: 'fixed', label: 'Fixed costs', href: '/app/bills/recurring', icon: 'repeat', perm: 'bills.view' },
-  { key: 'statements', label: 'Vendor statements', icon: 'doc' },
+  { key: 'statements', label: 'Vendor statements', href: '/app/bills/statements', icon: 'doc', perm: 'bills.view' },
   { key: 'bank', label: 'Bank', href: '/app/bank', icon: 'bank', perm: 'bank.view' },
   { key: 'balances', label: 'Location balances', href: '/app/bills/balances', icon: 'store', perm: 'bills.view' },
   { key: 'aging', label: 'What you owe by age', href: '/app/bills/aging', icon: 'clock', perm: 'bills.view' },
@@ -53,7 +53,7 @@ export const AREAS: NavArea[] = [
       { key: 'vendors', label: 'Vendors', href: '/app/vendors', icon: 'invoice', perm: 'vendors.view' },
       { key: 'invoices', label: 'Invoices', href: '/app/bills/invoices', icon: 'invoice', perm: 'invoices.view' },
       { key: 'more', label: 'More', href: '/app/bills/more', icon: 'doc', perm: 'bills.view',
-        match: ['/app/bills/recurring', '/app/bills/reps', '/app/bills/aging', '/app/bills/balances', '/app/bank', '/app/deposits'] },
+        match: ['/app/bills/recurring', '/app/bills/reps', '/app/bills/aging', '/app/bills/balances', '/app/bills/statements', '/app/bank', '/app/deposits'] },
     ],
   },
   {

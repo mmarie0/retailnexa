@@ -32,7 +32,7 @@ describe('app navigation (copied from the RetailNexa app)', () => {
     expect(areas.find((a) => a.key === 'bills')!.pages.map((p) => p.key)).toEqual([]);
     expect(areas.find((a) => a.key === 'sales')!.pages.map((p) => p.key)).toEqual(['daily', 'history', 'categories']);
     expect(areas.some((a) => a.key === 'books')).toBe(false);
-    expect(visibleMore(cashier).map((p) => p.key)).toEqual(['statements', 'deposits']);
+    expect(visibleMore(cashier).map((p) => p.key)).toEqual(['deposits']);
   });
 
   it('role defaults: every bottom tab either opens a page the role may see or is disabled (#123)', () => {
