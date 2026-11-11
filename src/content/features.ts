@@ -15,8 +15,9 @@ export interface Feature {
 export const RETAIL_FEATURES: Feature[] = [
   { title: 'Daily sales at a glance', body: 'Today, yesterday, the last 7 days and month to date, compared with the same weekdays last year. Import register reports from your POS as CSV or enter a day by hand.', status: 'available' },
   { title: 'Bills and vendors', body: 'Vendors with payment terms; bills entered by managers, approved by your accountant and paid in full or in parts; an aging report of what you owe.', status: 'available' },
-  { title: 'Monthly sales report', body: 'Upload your POS’s month-end report to keep transactions, average sale and monthly totals. RetailNexa works with the POS you already have; it isn’t a register.', status: 'in_development' },
-  { title: 'Staff, schedules and tasks', body: 'Shifts, time clock, timesheets and payroll prep. Assign tasks with photo proof and manager sign-off.', status: 'in_development' },
+  { title: 'Monthly sales report', body: 'Upload your POS’s month-end report to keep transactions, average sale and monthly totals. RetailNexa works with the POS you already have; it isn’t a register.', status: 'available' },
+  { title: 'Staff, schedules and payroll records', body: 'Employees, weekly schedules, labor % and pay-run records with paystubs. Pay runs are records only; no tax filing.', status: 'available' },
+  { title: 'Time clock and tasks', body: 'Clock in and out, timesheets, and tasks with photo proof and manager sign-off.', status: 'in_development' },
   { title: 'Multiple stores', body: 'Run several locations under one account and see them separately or combined.', status: 'available' },
 ];
 

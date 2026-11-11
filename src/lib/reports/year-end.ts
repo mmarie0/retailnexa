@@ -107,6 +107,7 @@ export async function yearEndXlsx(title: string, sheets: Sheet[]): Promise<Buffe
       const t = ws.addRow(s.columns.map((c, i) => (i === 0 ? 'Total' : c.money ? s.rows.reduce((a, r) => a + Number(r[c.key] ?? 0), 0) / 100 : null)));
       t.font = { bold: true };
     }
+    if (!s.rows.length) ws.addRow(['Nothing recorded for this year yet.']);
     if (s.note) ws.addRow([]).getCell(1).value = s.note;
   }
   return Buffer.from(await wb.xlsx.writeBuffer());
