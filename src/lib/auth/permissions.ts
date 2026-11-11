@@ -85,6 +85,8 @@ export const PERMISSIONS = {
   'wholesale.orders.view': { label: 'View wholesale orders', sensitive: false },
   'wholesale.orders.create': { label: 'Create wholesale orders', sensitive: false },
   'wholesale.orders.approve': { label: 'Approve wholesale orders', sensitive: false },
+  'wholesale.receivables.view': { label: 'View wholesale invoices, balances and customer payments', sensitive: false },
+  'wholesale.receivables.manage': { label: 'Invoice wholesale orders and record customer payments', sensitive: true },
   'commissions.view': { label: 'View commissions', sensitive: true },
   'commissions.manage': { label: 'Configure and pay commissions', sensitive: true },
   'ai.ask': { label: 'Use Ask RetailNexa (limited to own permissions)', sensitive: false },
@@ -103,7 +105,7 @@ export const ROLE_DEFAULTS: Record<MemberRole, readonly Permission[]> = {
     'reports.view', 'inventory.view', 'inventory.manage', 'pos.use', 'pos.refund',
     'employees.view', 'schedule.view', 'schedule.manage',
     'tasks.view', 'tasks.manage', 'tasks.complete', 'maintenance.view', 'maintenance.complete',
-    'wholesale.orders.view', 'wholesale.orders.create', 'ai.ask',
+    'wholesale.orders.view', 'wholesale.orders.create', 'wholesale.receivables.view', 'ai.ask',
   ],
   accountant: [
     'org.view', 'locations.view', 'dashboard.view', 'sales.view', 'cash.view',
@@ -111,6 +113,7 @@ export const ROLE_DEFAULTS: Record<MemberRole, readonly Permission[]> = {
     'invoices.view', 'invoices.upload', 'accounting.view', 'accounting.post', 'accounting.close',
     'bank.view', 'reports.view', 'reports.export', 'profit.view', 'payroll.view',
     'inventory.view', 'commissions.view', 'audit.view', 'data.export', 'billing.view', 'ai.ask',
+    'wholesale.receivables.view', 'wholesale.receivables.manage',
   ],
   sales_rep: [
     'org.view', 'dashboard.view', 'inventory.view', 'wholesale.orders.view', 'wholesale.orders.create',
