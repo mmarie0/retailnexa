@@ -78,3 +78,20 @@ language sql stable security invoker set search_path = '' as $$
 $$;
 revoke all on function public.bill_month_totals(uuid, date, date) from public, anon;
 grant execute on function public.bill_month_totals(uuid, date, date) to authenticated;
+
+-- Paid payroll between two dates: gross pay plus employer taxes of non-void
+-- runs, summed in the database (#168: the API returns at most 1,000 rows, so
+-- summing lines in the app under-counted long ranges). Invoker: the pay_runs
+-- and pay_run_lines RLS (payroll.view, store limits) decides what counts.
+create or replace function public.payroll_paid(p_org uuid, p_from date, p_to date)
+returns table (cents bigint, runs int)
+language sql stable security invoker set search_path = '' as $$
+  select coalesce(sum(l.gross_cents + l.employer_tax_cents), 0)::bigint, count(distinct r.id)::int
+    from public.pay_runs r
+    left join public.pay_run_lines l on l.run_id = r.id and l.organization_id = r.organization_id
+   where r.organization_id = p_org and r.voided_at is null
+     and p_from is not null and p_to is not null and p_to - p_from between 0 and 1200
+     and r.pay_date between p_from and p_to
+$$;
+revoke all on function public.payroll_paid(uuid, date, date) from public, anon;
+grant execute on function public.payroll_paid(uuid, date, date) to authenticated;

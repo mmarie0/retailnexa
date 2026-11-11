@@ -30,17 +30,12 @@ export async function billTotals(sb: Sb, org: string, from: string, to: string) 
     .map((r) => [String(r.month).slice(0, 7), { total: Number(r.total_cents), paid: Number(r.paid_cents) }]));
 }
 
-/** What pay runs (not void) paid between the dates: gross pay plus employer taxes. Payroll is business-wide. */
+/** What pay runs (not void) paid between the dates: gross pay plus employer taxes, summed in the database (#168). */
 export async function payrollPaid(sb: Sb, org: string, from: string, to: string): Promise<{ cents: number; runs: number }> {
-  const { data: runs, error } = await sb.from('pay_runs').select('id').eq('organization_id', org).is('voided_at', null)
-    .gte('pay_date', from).lte('pay_date', to).limit(500);
+  const { data, error } = await sb.rpc('payroll_paid', { p_org: org, p_from: from, p_to: to });
   if (error) throw error;
-  const ids = (runs ?? []).map((r) => r.id as string);
-  if (!ids.length) return { cents: 0, runs: 0 };
-  const { data: lines, error: e2 } = await sb.from('pay_run_lines').select('gross_cents, employer_tax_cents')
-    .eq('organization_id', org).in('run_id', ids).limit(5000);
-  if (e2) throw e2;
-  return { cents: (lines ?? []).reduce((a, l) => a + Number(l.gross_cents) + Number(l.employer_tax_cents), 0), runs: ids.length };
+  const row = ((data ?? []) as { cents: number; runs: number }[])[0];
+  return { cents: Number(row?.cents ?? 0), runs: Number(row?.runs ?? 0) };
 }
 
 /** Payroll the schedule says the dates will cost (hourly from shifts or regular weeks, salary per day, with burden). */

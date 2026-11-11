@@ -89,3 +89,26 @@ describe('bill_month_totals', () => {
     expect(await as(emp, `select * from public.bill_month_totals($1, '2026-10-01', '2026-11-30')`, [org])).toEqual([]);
   });
 });
+
+describe('payroll_paid (#168)', () => {
+  it('sums every line of non-void runs in the database, past the 1,000-row API cap; RLS decides who sees it', async () => {
+    // 21 employees × 52 weekly runs = 1,092 lines of $100 gross + $7.65 employer tax.
+    await sys(`insert into public.employees (organization_id, location_id, name) select $1, $2, 'PP ' || g from generate_series(1, 21) g`, [org, A]);
+    await sys(`insert into public.pay_runs (organization_id, pay_date, period_start, period_end)
+               select $1, d::date, (d - interval '6 days')::date, d::date from generate_series('2025-01-04'::date, '2025-12-27'::date, interval '7 days') d`, [org]);
+    await sys(`insert into public.pay_run_lines (organization_id, run_id, employee_id, pay_type, hours, rate_cents, regular_cents, gross_cents, net_cents, employer_tax_cents)
+               select $1, r.id, e.id, 'hourly', 10, 1000, 10000, 10000, 10000, 765
+                 from public.pay_runs r cross join public.employees e
+                where r.organization_id = $1 and e.organization_id = $1 and e.name like 'PP %'`, [org]);
+    const [{ n }] = await sys<{ n: string }>(`select count(*) as n from public.pay_run_lines where organization_id = $1`, [org]);
+    expect(Number(n)).toBe(1092);
+    const [{ id: voidRun }] = await sys<{ id: string }>(`select id from public.pay_runs where organization_id = $1 order by pay_date desc limit 1`, [org]);
+    await sys(`update public.pay_runs set voided_at = now() where id = $1`, [voidRun]);
+    const [row] = await as<{ cents: string; runs: number }>(owner, `select cents, runs from public.payroll_paid($1, '2025-01-01', '2025-12-31')`, [org]);
+    expect([Number(row.cents), row.runs]).toEqual([51 * 21 * 10765, 51]);
+    expect(await as(emp, `select cents, runs from public.payroll_paid($1, '2025-01-01', '2025-12-31')`, [org])).toEqual([{ cents: '0', runs: 0 }]);
+    expect(await as(outsider, `select cents, runs from public.payroll_paid($1, '2025-01-01', '2025-12-31')`, [org])).toEqual([{ cents: '0', runs: 0 }]);
+    expect(await as(owner, `select cents, runs from public.payroll_paid($1, '2020-01-01', '2025-12-31')`, [org])).toEqual([{ cents: '0', runs: 0 }]);
+    await expectDenied(as({ kind: 'anon' } as never, `select * from public.payroll_paid($1, '2025-01-01', '2025-12-31')`, [org]));
+  });
+});
