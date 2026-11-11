@@ -56,26 +56,31 @@ export async function yearEndData(ctx: OrgContext, year: number): Promise<YearEn
       tax_cents: Number(d.sales_tax_cents), cash_cents: Number(d.cash_cents), card_cents: Number(d.card_cents), transactions: d.transaction_count }));
   }
   if (seeProfit) {
-    const [{ data: ps }, { data: ds }] = await Promise.all([
-      sb.from('partners').select('id, name, pct, is_active').eq('organization_id', org).order('sort'),
-      sb.from('distributions').select('id').eq('organization_id', org).gte('dist_date', from).lte('dist_date', to).limit(1000),
-    ]);
-    if ((ps ?? []).length) {
-      const ids = (ds ?? []).map((d) => d.id as string);
-      const shares = ids.length ? (await sb.from('distribution_shares').select('id, partner_id, share_cents').eq('organization_id', org).in('distribution_id', ids).limit(1000)).data ?? [] : [];
-      const pays = shares.length ? (await sb.from('distribution_payments').select('share_id, amount_cents').eq('organization_id', org).in('share_id', shares.map((s) => s.id as string)).limit(1000)).data ?? [] : [];
-      out.partners = (ps ?? []).filter((p) => p.is_active || shares.some((s) => s.partner_id === p.id)).map((p) => {
-        const mine = shares.filter((s) => s.partner_id === p.id);
-        return { name: p.name as string, pct: p.is_active ? Number(p.pct) : 0, distributed_cents: mine.reduce((a, s) => a + Number(s.share_cents), 0),
-          paid_cents: pays.filter((x) => mine.some((s) => s.id === x.share_id)).reduce((a, x) => a + Number(x.amount_cents), 0) };
-      });
+    // Every distribution, share and payment in the year, paged and chunked; errors fail the export (#174).
+    const ps = await pageAll<{ id: string; name: string; pct: number; is_active: boolean }>((a, b) => sb.from('partners').select('id, name, pct, is_active').eq('organization_id', org).order('sort').order('id').range(a, b));
+    const ds = await pageAll<{ id: string }>((a, b) => sb.from('distributions').select('id').eq('organization_id', org).gte('dist_date', from).lte('dist_date', to).order('id').range(a, b), 100);
+    const ids = ds.map((d) => d.id);
+    const shares: { id: string; partner_id: string; share_cents: number }[] = [];
+    for (let i = 0; i < ids.length; i += 100) {
+      shares.push(...await pageAll<(typeof shares)[number]>((a, b) => sb.from('distribution_shares').select('id, partner_id, share_cents').eq('organization_id', org).in('distribution_id', ids.slice(i, i + 100)).order('id').range(a, b)));
     }
+    const paid = new Map<string, number>();
+    for (let i = 0; i < shares.length; i += 100) {
+      const rows = await pageAll<{ share_id: string; amount_cents: number }>((a, b) => sb.from('distribution_payments').select('id, share_id, amount_cents').eq('organization_id', org).in('share_id', shares.slice(i, i + 100).map((s) => s.id)).order('id').range(a, b));
+      for (const r of rows) paid.set(r.share_id, (paid.get(r.share_id) ?? 0) + Number(r.amount_cents));
+    }
+    // Always a Partner split sheet (empty when there are no partners yet), as the page lists it (#177).
+    out.partners = ps.filter((p) => p.is_active || shares.some((s) => s.partner_id === p.id)).map((p) => {
+      const mine = shares.filter((s) => s.partner_id === p.id);
+      return { name: p.name, pct: p.is_active ? Number(p.pct) : 0, distributed_cents: mine.reduce((a, s) => a + Number(s.share_cents), 0), paid_cents: mine.reduce((a, s) => a + (paid.get(s.id) ?? 0), 0) };
+    });
   }
   if (seeBank) {
     const lines = await pageAll<{ posted_on: string; amount_cents: number }>((a, b) => sb.from('bank_lines').select('id, posted_on, amount_cents').eq('organization_id', org).gte('posted_on', from).lte('posted_on', to).order('id').range(a, b), 60);
     const by = new Map<string, { out_cents: number; in_cents: number }>();
     for (const l of lines) { const k = l.posted_on.slice(0, 7), v = by.get(k) ?? { out_cents: 0, in_cents: 0 }; if (Number(l.amount_cents) < 0) v.out_cents -= Number(l.amount_cents); else v.in_cents += Number(l.amount_cents); by.set(k, v); }
-    if (by.size) out.bankByMonth = [...by].sort().map(([ym, v]) => ({ ym, ...v }));
+    // Always a Bank spending sheet (empty with no statements), as the page lists it (#177).
+    out.bankByMonth = [...by].sort().map(([ym, v]) => ({ ym, ...v }));
   }
   return out;
 }

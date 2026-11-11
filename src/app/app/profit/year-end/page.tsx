@@ -28,8 +28,8 @@ export default async function YearEndPage({ searchParams }: PageProps<'/app/prof
     can(ctx, 'bills.view') && 'Expenses by vendor (month by month) and All bills',
     can(ctx, 'payroll.view') && 'Payroll by employee and Pay runs',
     can(ctx, 'sales.view') && 'Daily sales',
-    'Partner split',
-    can(ctx, 'bank.view') && 'Bank spending by month',
+    'Partner split (empty until you set up partners)',
+    can(ctx, 'bank.view') && 'Bank spending by month (empty until you import a bank statement)',
   ].filter(Boolean) as string[];
 
   return (

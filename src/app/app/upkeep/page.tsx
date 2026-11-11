@@ -136,7 +136,7 @@ export default async function UpkeepPage() {
           <p className="mt-1 text-sm text-muted">Tap one to add it. Each starts as due now; mark it done or set when it was last done.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {suggestions.map((t) => (
-              <ActionForm key={t.i} action={saveTask} className="contents" render={() => null}>
+              <ActionForm key={t.i} action={saveTask} className="contents" quiet>
                 <input type="hidden" name="template" value={t.i} />
                 <button type="submit" className="rounded-full bg-soft px-3.5 py-1.5 text-sm font-semibold hover:bg-line">+ {t.name} <span className="font-normal text-muted">· {everyText(t)}</span></button>
               </ActionForm>

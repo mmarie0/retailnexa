@@ -26,6 +26,14 @@ describe('year-end report (#111)', () => {
     expect(s.find((x) => x.name === 'Partner split')!.rows.map((r) => r.of)).toEqual([22800, 15200]);
     expect(s.find((x) => x.name === 'Payroll by employee')!.rows[0]).toMatchObject({ e: 'Ana', cost: 68896 });
   });
+  it('empty partner and bank lists still make their sheets (#177)', async () => {
+    const sheets = yearEndSheets({ year: 2026, businessName: 'x', partners: [], bankByMonth: [] });
+    expect(sheets.map((x) => x.name)).toEqual(['Partner split', 'Bank spending']);
+    const { Workbook } = await import('exceljs');
+    const wb = new Workbook();
+    await wb.xlsx.load((await yearEndXlsx('x', sheets)) as unknown as ArrayBuffer);
+    expect(wb.getWorksheet('Bank spending')!.getRow(3).getCell(1).value).toBe('Nothing recorded for this year yet.');
+  });
   it('sheets the person can’t see are left out', () => {
     expect(yearEndSheets({ year: 2026, businessName: 'x', days: [] }).map((x) => x.name)).toEqual(['Daily sales']);
   });

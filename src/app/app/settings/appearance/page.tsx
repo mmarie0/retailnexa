@@ -13,7 +13,7 @@ export default async function AppearancePage() {
   await getOrgContext();
   const cur = themeFrom((await cookies()).get(THEME_COOKIE)?.value);
   const opt = (t: (typeof THEMES)[number]) => (
-    <ActionForm key={t.id} action={setTheme} className="contents" render={() => null}>
+    <ActionForm key={t.id} action={setTheme} className="contents" quiet>
       <input type="hidden" name="theme" value={t.id} />
       <button type="submit" aria-pressed={cur === t.id}
         className={cx('flex items-center gap-3 rounded-[16px] bg-card p-3 text-left shadow-[var(--shadow-card)]', cur === t.id && 'ring-2 ring-accent')}>

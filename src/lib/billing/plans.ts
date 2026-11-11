@@ -32,6 +32,9 @@ export const SHIPPED_PLAN_FEATURES = new Set([
   'Bills, vendors and recurring bills',
   'Bank reconciliation and cash flow',
   'Double-entry bookkeeping and reports',
+  'Monthly sales report and sales history',
+  'Staff schedules, payroll records and labor %',
+  'Profit by month, partners and year-end report',
 ]);
 
 export const PLANS: Record<ProductKey, PlanDef> = {
@@ -40,14 +43,17 @@ export const PLANS: Record<ProductKey, PlanDef> = {
     name: 'Retail',
     monthlyCents: 12999,
     extraLocationCents: 9999,
-    summary: 'For stores: sales, bills, vendors, bank and bookkeeping. Staff tools are coming soon.',
+    summary: 'For stores: sales, bills, vendors, bank, staff schedules and payroll records, profit and bookkeeping.',
     includes: [
       'First store location included',
       'Daily sales and register reports',
       'Bills, vendors and recurring bills',
       'Bank reconciliation and cash flow',
-      'Staff schedules, time clock and tasks (coming soon)',
+      'Monthly sales report and sales history',
+      'Staff schedules, payroll records and labor %',
+      'Profit by month, partners and year-end report',
       'Double-entry bookkeeping and reports',
+      'Time clock and tasks with photo proof (coming soon)',
     ],
   },
   wholesale: {
