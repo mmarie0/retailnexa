@@ -12,10 +12,11 @@ const DESC: Record<string, string> = {
   fixed: 'Rent, card fees and other monthly bills',
   statements: 'Check a statement against your invoices',
   bank: 'Match checks, ACH and card deposits',
+  balances: 'What your other stores owe you, and what you owe them',
   aging: 'Open bills by how late they are',
   deposits: 'Cash and card deposits, sales tax and owner draws',
 };
-const TONE: Record<string, string> = { reps: 'coral', fixed: 'indigo', statements: 'lav', bank: 'blue', aging: 'coral', deposits: 'indigo' };
+const TONE: Record<string, string> = { balances: 'lav', reps: 'coral', fixed: 'indigo', statements: 'lav', bank: 'blue', aging: 'coral', deposits: 'indigo' };
 
 /** Bills → More, as in the RetailNexa app. */
 export default async function BillsMorePage() {

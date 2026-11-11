@@ -41,7 +41,7 @@ export default async function CustomizePage() {
       </Card>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <StepButton op="reset" id="" label="Reset to the standard layout" wide>Reset to standard</StepButton>
-        <Link href="/app" className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white">Done</Link>
+        <Link href="/app" className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-paper">Done</Link>
       </div>
       <p className="text-sm text-muted">Half-size boxes (Projected payroll, Projected profit) sit side by side when they’re next to each other. Cash boxes aren’t offered.</p>
     </>

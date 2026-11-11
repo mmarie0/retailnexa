@@ -69,6 +69,8 @@ export async function savePartners(_p: ActionState, form: FormData): Promise<Act
       const id = String(form.get(`id-${i}`) ?? '');
       rows.push({ id: z.string().uuid().safeParse(id).success ? id : null, name: name.slice(0, 80), pct, active: form.get(`active-${i}`) === 'on' });
     }
+    const names = rows.map((r) => r.name.trim().toLowerCase());
+    if (new Set(names).size !== names.length) return fail('Each partner needs a different name.');
     const total = rows.filter((r) => r.active).reduce((a, r) => a + Math.round(r.pct * 100), 0);
     if (rows.some((r) => r.active) && total !== 10000) return fail(`Active partners add up to ${(total / 100).toFixed(2)}%. They need to add up to 100%.`);
     const { error } = await (await getSupabase()).rpc('save_partners', { p_org: g.ctx.org.id, p: rows });

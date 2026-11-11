@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
+import { THEME_COOKIE, themeFrom } from '@/lib/themes';
 import { can, getOrgContext, getSupabase } from '@/lib/auth/context';
 import { isPermission } from '@/lib/auth/permissions';
 import { Notice, Select, buttonClass } from '@/components/ui';
@@ -26,8 +28,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ) : undefined;
 
   const notice = ctx.access.notice;
+  const theme = themeFrom((await cookies()).get(THEME_COOKIE)?.value);
   return (
-    <AppShell areas={areas} more={more} orgName={ctx.org.name} orgSwitcher={switcher} email={ctx.user.email} today={today} fabPerms={fabPerms}>
+    <AppShell theme={theme} areas={areas} more={more} orgName={ctx.org.name} orgSwitcher={switcher} email={ctx.user.email} today={today} fabPerms={fabPerms}>
       {notice && (
         <Notice tone={notice.tone} action={can(ctx, 'billing.view') && <Link href="/app/billing" className={buttonClass('secondary', 'sm')}>Go to billing</Link>}>
           {notice.message}

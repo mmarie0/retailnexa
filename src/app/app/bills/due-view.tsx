@@ -107,7 +107,7 @@ export function DueView({ ym, curYm, today, K, F, bills, templates, vendorName, 
           const c = kindCount(k);
           return (
             <Link key={k} href={href({ k })} aria-current={K === k ? 'page' : undefined}
-              className={cx('flex min-w-0 flex-col items-center rounded-[10px] px-1.5 py-2', K === k ? 'bg-accent text-white' : 'text-ink hover:bg-soft')}>
+              className={cx('flex min-w-0 flex-col items-center rounded-[10px] px-1.5 py-2', K === k ? 'bg-accent text-on-accent' : 'text-ink hover:bg-soft')}>
               <b className="text-sm">{KIND_L[k]}</b>
               <span className={cx('num max-w-full truncate text-[11px]', K === k ? 'text-white/90' : 'text-muted')}>{c.n} · {money0(c.left)} left</span>
             </Link>

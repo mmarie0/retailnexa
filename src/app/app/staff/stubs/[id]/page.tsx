@@ -50,7 +50,7 @@ export default async function RunStubsPage({ params, searchParams }: PageProps<'
       <nav aria-label="Filter" className="no-print flex flex-wrap gap-1.5">
         {(['all', 'cash', 'check', 'ach'] as const).map((m) => (
           <Link key={m} href={`/app/staff/stubs/${id}${q({ method: m })}`} aria-current={method === m ? 'page' : undefined}
-            className={cx('rounded-full px-3 py-1.5 text-sm font-semibold', method === m ? 'bg-accent text-white' : 'bg-card text-muted shadow-[var(--shadow-card)]')}>
+            className={cx('rounded-full px-3 py-1.5 text-sm font-semibold', method === m ? 'bg-accent text-on-accent' : 'bg-card text-muted shadow-[var(--shadow-card)]')}>
             {m === 'all' ? `All (${all.length})` : `${PAY_METHOD_LABEL[m]} (${all.filter((l) => l.pay_method === m).length})`}
           </Link>
         ))}

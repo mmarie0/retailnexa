@@ -48,7 +48,9 @@ function BrandMark() {
 
 const soonPill = <span className="ml-auto rounded-full bg-soft px-2 py-0.5 text-[11px] font-bold text-muted">Soon</span>;
 
-export function AppShell({ areas, more, orgName, orgSwitcher, email, today, fabPerms, children }: {
+export function AppShell({ theme, areas, more, orgName, orgSwitcher, email, today, fabPerms, children }: {
+  /** Theme id from Appearance (#116); "sky" is the default look. */
+  theme: string;
   areas: NavArea[];
   /** Bills → More pages this user may see; listed directly in the menu. */
   more: NavPage[];
@@ -79,15 +81,16 @@ export function AppShell({ areas, more, orgName, orgSwitcher, email, today, fabP
   const firstHref = (a: NavArea) => a.pages.find((p) => p.href)?.href;
 
   return (
+    <div data-theme={theme === 'sky' ? undefined : theme} className="min-h-dvh">
     <div className="mx-auto min-h-dvh max-w-[820px] px-4 pb-[170px]">
       <header className="sticky top-0 z-20 -mx-4 bg-paper px-4 pt-3">
         <div className="flex items-center justify-between gap-3">
           <div ref={menuRef} className="relative flex min-w-0 items-center gap-2.5">
             <button type="button" aria-label="Menu" aria-haspopup="menu" aria-expanded={menuOpen} aria-controls="navmenu" onClick={() => setMenuOpen((o) => !o)}
-              className={cx('inline-flex flex-none items-center gap-1.5 rounded-xl px-2.5 py-[7px] text-[13.5px] font-bold shadow-[var(--shadow-card)]', menuOpen ? 'bg-accent text-white' : 'bg-card text-ink')}>
+              className={cx('inline-flex flex-none items-center gap-1.5 rounded-xl px-2.5 py-[7px] text-[13.5px] font-bold shadow-[var(--shadow-card)]', menuOpen ? 'bg-accent text-on-accent' : 'bg-card text-ink')}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="size-[18px]"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
               <span className="max-[421px]:hidden">Menu</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true" className={cx('size-3.5 transition-transform', menuOpen ? 'rotate-180 text-white' : 'text-muted')}><path d="M6 9l6 6 6-6" /></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true" className={cx('size-3.5 transition-transform', menuOpen ? 'rotate-180 text-on-accent' : 'text-muted')}><path d="M6 9l6 6 6-6" /></svg>
             </button>
             {menuOpen && (
               <nav id="navmenu" aria-label="All pages" onClick={(e) => { if ((e.target as HTMLElement).closest('a')) setMenuOpen(false); }} className="absolute left-0 top-[calc(100%+8px)] z-[45] max-h-[calc(100dvh-180px)] w-[min(300px,calc(100vw-32px))] overflow-y-auto rounded-2xl bg-card p-2 shadow-[0_14px_36px_rgba(40,60,140,.24)]">
@@ -111,6 +114,9 @@ export function AppShell({ areas, more, orgName, orgSwitcher, email, today, fabP
                 ))}
                 <div className="border-t border-soft py-1">
                   <p className="truncate px-3 pb-1 pt-1.5 text-[12.5px] text-muted" title={email}>{email}</p>
+                  <Link href="/app/help" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="doc" className="text-accent" />Help</Link>
+                  <Link href="/app/settings/appearance" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="settings" className="text-accent" />Appearance</Link>
+                  <Link href="/app/settings/storage" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="download" className="text-accent" />Storage</Link>
                   <Link href="/account/security" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="shield" className="text-accent" />Two-factor authentication</Link>
                   <Link href="/onboarding?new=1" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="plus" className="text-accent" />Add another business</Link>
                   <form action="/auth/signout" method="post">
@@ -165,13 +171,14 @@ export function AppShell({ areas, more, orgName, orgSwitcher, email, today, fabP
             }
             return (
               <Link key={a.key} href={href} aria-current={on ? 'page' : undefined}
-                className={cx('flex flex-col items-center gap-[3px] rounded-xl px-0.5 py-1.5 text-[11.5px] font-semibold', on ? 'bg-accent text-white' : 'text-muted hover:text-ink')}>
+                className={cx('flex flex-col items-center gap-[3px] rounded-xl px-0.5 py-1.5 text-[11.5px] font-semibold', on ? 'bg-accent text-on-accent' : 'text-muted hover:text-ink')}>
                 <Icon k={a.icon} className="size-[22px]" />{a.label}
               </Link>
             );
           })}
         </div>
       </nav>
+    </div>
     </div>
   );
 }

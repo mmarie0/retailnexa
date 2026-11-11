@@ -107,6 +107,7 @@ export const FAB: Record<string, { label: string; href: string; perm: string } |
   team: { label: 'Add employee', href: '/app/staff#add', perm: 'employees.manage' },
   payroll: { label: 'New pay run', href: '/app/staff/payroll#new', perm: 'payroll.manage' },
   balances: { label: 'Add balance', href: '/app/bills/balances#add', perm: 'bills.create' },
+  tasks: { label: 'Add task', href: '/app/upkeep#add', perm: 'tasks.manage' },
 };
 
 const allowed = (p: NavPage, can: (perm: string) => boolean) =>
