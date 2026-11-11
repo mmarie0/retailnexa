@@ -12,10 +12,12 @@ import { loadCustomers, loadExpected, loadOrders, loadReceivables, loadSettings,
 import { InvoiceBadge, OrderBadge, Row, Warnings, money } from '../../_ui';
 import { deleteCustomer, saveCustomer } from '../../actions';
 import { CustomerFields } from '../fields';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Customer' };
 
 export default async function CustomerPage({ params }: PageProps<'/app/wholesale/customers/[id]'>) {
+  const t = await getT();
   const ctx = await wsContext();
   const { id } = await params;
   const seeMoney = can(ctx, 'wholesale.receivables.view'), seeOrders = can(ctx, 'wholesale.orders.view');
@@ -39,14 +41,14 @@ export default async function CustomerPage({ params }: PageProps<'/app/wholesale
   return (
     <>
       <PageHeader title={c.name} description={[tier ? `${tier.name} pricing${tier.pct ? ` (${tier.pct}% off)` : ''}` : 'List price', termsLabel(c.terms), c.is_active ? null : 'Inactive'].filter(Boolean).join(' · ')}
-        actions={can(ctx, 'wholesale.orders.create') && ctx.access.canWrite && c.is_active ? <LinkButton href={`/app/wholesale/order?customer=${c.id}`} size="sm">Create order</LinkButton> : undefined} />
+        actions={can(ctx, 'wholesale.orders.create') && ctx.access.canWrite && c.is_active ? <LinkButton href={`/app/wholesale/order?customer=${c.id}`} size="sm">{t('Create order')}</LinkButton> : undefined} />
       <Warnings list={s.warnings} />
       {seeMoney && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat block="blue" label="Balance" value={money(s.balance)} sub={c.credit_limit_cents != null ? `Limit ${money(c.credit_limit_cents)}` : 'No credit limit'} />
-          <Stat block={s.overdue ? 'coral' : undefined} label="Overdue" value={money(s.overdue)} sub={`${s.overdueCount} invoice${s.overdueCount === 1 ? '' : 's'}`} />
-          <Stat label="Promised" value={money(plan.reduce((t, e) => t + e.amount_cents, 0))} sub={plan[0] ? `Next ${fmtDate(plan[0].due_date)}` : 'No payment plan'} />
-          <Stat label="Sales, last 12 months" value={money(sales12)} sub={lastPay ? `Last paid ${fmtDate(lastPay.paid_on)} · ${methodLabel(lastPay.method)}` : 'No payments yet'} />
+          <Stat block="blue" label={t('Balance')} value={money(s.balance)} sub={c.credit_limit_cents != null ? t('Limit {v0}', { v0: money(c.credit_limit_cents) }) : t('No credit limit')} />
+          <Stat block={s.overdue ? 'coral' : undefined} label={t('Overdue')} value={money(s.overdue)} sub={t('{v0} invoice{v1}', { v0: s.overdueCount, v1: s.overdueCount === 1 ? '' : 's' })} />
+          <Stat label={t('Promised')} value={money(plan.reduce((t, e) => t + e.amount_cents, 0))} sub={plan[0] ? t('Next {v0}', { v0: fmtDate(plan[0].due_date) }) : t('No payment plan')} />
+          <Stat label={t('Sales, last 12 months')} value={money(sales12)} sub={lastPay ? t('Last paid {v0} · {v1}', { v0: fmtDate(lastPay.paid_on), v1: methodLabel(lastPay.method) }) : t('No payments yet')} />
         </div>
       )}
       <Card>
@@ -58,32 +60,32 @@ export default async function CustomerPage({ params }: PageProps<'/app/wholesale
       </Card>
       {seeMoney && (
         <section className="flex flex-col gap-2">
-          <Eyebrow>Invoices</Eyebrow>
+          <Eyebrow>{t('Invoices')}</Eyebrow>
           {inv.length ? <ul className="flex flex-col gap-2">{inv.slice(0, 50).map((i) => (
-            <Row key={i.id} href={`/app/wholesale/invoices/${i.id}`} title={i.number} detail={`${fmtDate(i.invoice_date)} · due ${fmtDate(i.due_date)}`} amount={money(i.balance || i.total_cents)} badge={<InvoiceBadge s={i.status} />} />
-          ))}</ul> : <p className="text-sm text-muted">No invoices yet.</p>}
-          {plan.length > 0 && <Link href={`/app/wholesale/payments?customer=${c.id}`} className="text-sm font-semibold text-accent-strong">Payment plan · {plan.length} payment{plan.length === 1 ? '' : 's'} expected</Link>}
+            <Row key={i.id} href={`/app/wholesale/invoices/${i.id}`} title={i.number} detail={t('{v0} · due {v1}', { v0: fmtDate(i.invoice_date), v1: fmtDate(i.due_date) })} amount={money(i.balance || i.total_cents)} badge={<InvoiceBadge s={i.status} />} />
+          ))}</ul> : <p className="text-sm text-muted">{t('No invoices yet.')}</p>}
+          {plan.length > 0 && <Link href={`/app/wholesale/payments?customer=${c.id}`} className="text-sm font-semibold text-accent-strong">{t('Payment plan ·')} {plan.length} {t('payment')}{plan.length === 1 ? '' : 's'} {t('expected')}</Link>}
         </section>
       )}
       {seeOrders && (
         <section className="flex flex-col gap-2">
-          <Eyebrow>Orders &amp; quotes</Eyebrow>
+          <Eyebrow>{t('Orders & quotes')}</Eyebrow>
           {mine.length ? <ul className="flex flex-col gap-2">{mine.slice(0, 30).map((o) => (
             <Row key={o.id} href={`/app/wholesale/orders/${o.id}`} title={o.number} detail={fmtDate(o.order_date)} amount={money(o.total_cents)} badge={<OrderBadge status={o.status} kind={o.kind} />} />
-          ))}</ul> : <p className="text-sm text-muted">No orders yet.</p>}
+          ))}</ul> : <p className="text-sm text-muted">{t('No orders yet.')}</p>}
         </section>
       )}
       {manage && (
         <Card>
           <details>
-            <summary className="cursor-pointer text-lg font-bold">Edit customer</summary>
-            <ActionForm action={saveCustomer} className="mt-3 flex flex-col gap-3"><CustomerFields c={c} tiers={tiers} defaultTerms={settings.default_terms} /><div><SubmitButton>Save changes</SubmitButton></div></ActionForm>
-            <ActionForm action={deleteCustomer} className="mt-3"><input type="hidden" name="id" value={c.id} /><SubmitButton variant="danger" size="sm">Delete customer</SubmitButton></ActionForm>
-            <p className="mt-1 text-sm text-muted">A customer with orders or invoices is made inactive instead, so history stays.</p>
+            <summary className="cursor-pointer text-lg font-bold">{t('Edit customer')}</summary>
+            <ActionForm action={saveCustomer} className="mt-3 flex flex-col gap-3"><CustomerFields c={c} tiers={tiers} defaultTerms={settings.default_terms} /><div><SubmitButton>{t('Save changes')}</SubmitButton></div></ActionForm>
+            <ActionForm action={deleteCustomer} className="mt-3"><input type="hidden" name="id" value={c.id} /><SubmitButton variant="danger" size="sm">{t('Delete customer')}</SubmitButton></ActionForm>
+            <p className="mt-1 text-sm text-muted">{t('A customer with orders or invoices is made inactive instead, so history stays.')}</p>
           </details>
         </Card>
       )}
-      {!seeMoney && !seeOrders && <Notice>Your role can’t see this customer’s orders or invoices.</Notice>}
+      {!seeMoney && !seeOrders && <Notice>{t('Your role can’t see this customer’s orders or invoices.')}</Notice>}
     </>
   );
 }

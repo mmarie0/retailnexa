@@ -23,10 +23,10 @@ export function DataTable<T>({ columns, rows, rowKey, caption, onRowClick, activ
     <div className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-card">
       <table className="w-full border-collapse text-[15px]">
         {caption && <caption className="sr-only">{caption}</caption>}
-        <thead className="hidden bg-soft text-left text-sm text-muted md:table-header-group">
+        <thead className="hidden bg-soft text-start text-sm text-muted md:table-header-group">
           <tr>
             {columns.map((c) => (
-              <th key={c.key} scope="col" className={cx('px-4 py-2.5 font-semibold', c.align === 'right' && 'text-right')}>{c.header}</th>
+              <th key={c.key} scope="col" className={cx('px-4 py-2.5 font-semibold', c.align === 'right' && 'text-end')}>{c.header}</th>
             ))}
           </tr>
         </thead>
@@ -50,12 +50,12 @@ export function DataTable<T>({ columns, rows, rowKey, caption, onRowClick, activ
                       'md:px-4 md:py-2.5',
                       i === 0 ? 'block font-semibold md:table-cell md:font-normal' : 'flex justify-between gap-4 py-0.5 text-sm md:table-cell md:text-[15px]',
                       c.hideOnMobile && 'hidden md:table-cell',
-                      c.align === 'right' && 'md:text-right num',
+                      c.align === 'right' && 'md:text-end num',
                     )}
                   >
                     {i > 0 && <span className="text-muted md:hidden">{c.header}</span>}
                     {onRowClick && i === 0 ? (
-                      <button type="button" className="text-left font-semibold underline-offset-2 hover:underline" onClick={(e) => { e.stopPropagation(); onRowClick(row); }}>
+                      <button type="button" className="text-start font-semibold underline-offset-2 hover:underline" onClick={(e) => { e.stopPropagation(); onRowClick(row); }}>
                         {c.cell(row)}
                       </button>
                     ) : (

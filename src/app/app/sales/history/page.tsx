@@ -56,9 +56,9 @@ export default async function HistoryPage({ searchParams }: PageProps<'/app/sale
             <a href={`/app/sales/history/export?y=${year}`} download className="text-sm font-semibold text-accent-strong">Download CSV</a>
           </div>
           <table className="w-full min-w-[980px] text-[14px]">
-            <thead className="text-left"><tr>
-              <th className="px-4 py-2">Month</th><th className="px-2 text-right">Sales</th><th className="px-2 text-right">Gross</th><th className="px-2 text-right">Tax</th><th className="px-2 text-right">Cash</th><th className="px-2 text-right">Card</th>
-              <th className="px-2 text-right">Cash %</th><th className="px-2 text-right">Card %</th><th className="px-2 text-right">Store card</th><th className="px-2 text-right">Points</th><th className="px-2 text-right">Txns</th><th className="px-2 text-right">Avg sale</th><th className="px-4">From</th>
+            <thead className="text-start"><tr>
+              <th className="px-4 py-2">Month</th><th className="px-2 text-end">Sales</th><th className="px-2 text-end">Gross</th><th className="px-2 text-end">Tax</th><th className="px-2 text-end">Cash</th><th className="px-2 text-end">Card</th>
+              <th className="px-2 text-end">Cash %</th><th className="px-2 text-end">Card %</th><th className="px-2 text-end">Store card</th><th className="px-2 text-end">Points</th><th className="px-2 text-end">Txns</th><th className="px-2 text-end">Avg sale</th><th className="px-4">From</th>
             </tr></thead>
             <tbody>
               {yearRows.map((ym) => {
@@ -69,11 +69,11 @@ export default async function HistoryPage({ searchParams }: PageProps<'/app/sale
                   <tr key={ym} className="border-t border-line">
                     <td className="px-4 py-2 font-semibold">{MON[+ym.slice(5) - 1]}{ly && m && <span className={cx('block text-xs font-normal', m.sales >= ly.sales ? 'text-paid' : 'text-late')}>{(pctChange(m.sales, ly.sales) ?? 0) >= 0 ? '▲' : '▼'} {Math.abs(pctChange(m.sales, ly.sales) ?? 0).toFixed(1)}%</span>}</td>
                     {m ? <>
-                      <td className="num px-2 text-right font-semibold">{formatMoney(m.sales)}</td><td className="num px-2 text-right">{formatMoney(m.gross)}</td><td className="num px-2 text-right">{formatMoney(m.tax)}</td>
-                      <td className="num px-2 text-right">{formatMoney(m.cash)}</td><td className="num px-2 text-right">{formatMoney(m.card)}</td>
-                      <td className="num px-2 text-right">{pct(share(m.cash, tender))}</td><td className="num px-2 text-right">{pct(share(m.card, tender))}</td>
-                      <td className="num px-2 text-right">{formatMoney(m.storeCard)}</td><td className="num px-2 text-right">{formatMoney(m.points)}</td>
-                      <td className="num px-2 text-right">{m.transactions?.toLocaleString('en-US') ?? '—'}</td><td className="num px-2 text-right">{avgSale(m) === null ? '—' : formatMoney(avgSale(m)!)}</td>
+                      <td className="num px-2 text-end font-semibold">{formatMoney(m.sales)}</td><td className="num px-2 text-end">{formatMoney(m.gross)}</td><td className="num px-2 text-end">{formatMoney(m.tax)}</td>
+                      <td className="num px-2 text-end">{formatMoney(m.cash)}</td><td className="num px-2 text-end">{formatMoney(m.card)}</td>
+                      <td className="num px-2 text-end">{pct(share(m.cash, tender))}</td><td className="num px-2 text-end">{pct(share(m.card, tender))}</td>
+                      <td className="num px-2 text-end">{formatMoney(m.storeCard)}</td><td className="num px-2 text-end">{formatMoney(m.points)}</td>
+                      <td className="num px-2 text-end">{m.transactions?.toLocaleString('en-US') ?? '—'}</td><td className="num px-2 text-end">{avgSale(m) === null ? '—' : formatMoney(avgSale(m)!)}</td>
                       <td className="px-4">{m.source === 'report' ? <Badge tone="info">Monthly report</Badge> : m.source === 'mixed' ? <Badge>Both</Badge> : <span className="text-xs text-muted">{m.days} daily report{m.days === 1 ? '' : 's'}</span>}</td>
                     </> : <td colSpan={12} className="px-2 py-2 text-muted">No sales recorded</td>}
                   </tr>
@@ -89,10 +89,10 @@ export default async function HistoryPage({ searchParams }: PageProps<'/app/sale
         <Card className="overflow-x-auto p-0">
           <h2 className="px-4 pt-4 text-lg font-bold">Years side by side</h2>
           <table className="w-full min-w-[860px] text-[13px]">
-            <thead className="text-left"><tr><th className="px-4 py-2">Year</th>{MON.map((m) => <th key={m} className="px-1.5 text-right">{m}</th>)}<th className="px-4 text-right">Total</th></tr></thead>
+            <thead className="text-start"><tr><th className="px-4 py-2">Year</th>{MON.map((m) => <th key={m} className="px-1.5 text-end">{m}</th>)}<th className="px-4 text-end">Total</th></tr></thead>
             <tbody>{years.map((y) => {
               const ms = MON.map((_, i) => byYm.get(`${y}-${String(i + 1).padStart(2, '0')}`));
-              return <tr key={y} className="border-t border-line"><td className="px-4 py-2 font-semibold">{y}</td>{ms.map((m, i) => <td key={i} className="num px-1.5 text-right">{m ? k(m.sales) : '—'}</td>)}<td className="num px-4 text-right font-semibold">{formatMoney(sum(ms, (m) => m.sales))}</td></tr>;
+              return <tr key={y} className="border-t border-line"><td className="px-4 py-2 font-semibold">{y}</td>{ms.map((m, i) => <td key={i} className="num px-1.5 text-end">{m ? k(m.sales) : '—'}</td>)}<td className="num px-4 text-end font-semibold">{formatMoney(sum(ms, (m) => m.sales))}</td></tr>;
             })}</tbody>
           </table>
         </Card>

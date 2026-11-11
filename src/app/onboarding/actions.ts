@@ -7,6 +7,7 @@ import { getSupabase, requireUser } from '@/lib/auth/context';
 import { setActiveOrgCookie } from '@/lib/auth/org-cookie';
 import { fail, friendlyError, type ActionState } from '@/lib/actions';
 import { TIMEZONE_IDS } from '@/lib/timezones';
+import { getT } from '@/lib/i18n/server';
 
 const schema = z.object({
   name: z.string().trim().min(2, 'Enter your business name').max(120),
@@ -17,12 +18,13 @@ const schema = z.object({
 });
 
 export async function createOrganization(_p: ActionState, form: FormData): Promise<ActionState> {
+  const t = await getT();
   await requireUser('/onboarding');
   const parsed = schema.safeParse(Object.fromEntries(form));
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
     for (const i of parsed.error.issues) fieldErrors[String(i.path[0])] ??= i.message;
-    return fail('Check the highlighted fields.', fieldErrors);
+    return fail(t('Check the highlighted fields.'), fieldErrors);
   }
   const supabase = await getSupabase();
   const { data: orgId, error } = await supabase.rpc('create_organization', {

@@ -63,15 +63,15 @@ export default async function CategoriesPage({ searchParams }: PageProps<'/app/s
           </div>
           <Card className="overflow-x-auto p-0">
             <table className="w-full min-w-[720px] text-[14px]">
-              <thead className="text-left"><tr><th className="px-4 py-2">Category</th><th className="px-2 text-right">Sales</th><th className="px-2">Share</th><th className="px-2 text-right">Qty</th><th className="px-2 text-right">vs {label(prev).split(' ')[0]}</th><th className="px-4 text-right">vs {ly.slice(0, 4)}</th></tr></thead>
+              <thead className="text-start"><tr><th className="px-4 py-2">Category</th><th className="px-2 text-end">Sales</th><th className="px-2">Share</th><th className="px-2 text-end">Qty</th><th className="px-2 text-end">vs {label(prev).split(' ')[0]}</th><th className="px-4 text-end">vs {ly.slice(0, 4)}</th></tr></thead>
               <tbody>{cmp.map((c) => (
                 <tr key={c.category} className={cx('border-t border-line', !c.cents && 'text-muted')}>
                   <td className="px-4 py-2 font-semibold">{c.category}</td>
-                  <td className="num px-2 text-right">{formatMoney(c.cents)}</td>
+                  <td className="num px-2 text-end">{formatMoney(c.cents)}</td>
                   <td className="px-2"><span className="flex items-center gap-2"><span className="h-2 w-24 rounded bg-soft"><span className="block h-2 rounded bg-accent" style={{ width: `${(c.cents / max) * 100}%` }} /></span><span className="num text-xs">{c.sharePct === null ? '—' : `${c.sharePct.toFixed(1)}%`}</span></span></td>
-                  <td className="num px-2 text-right">{c.qty ?? '—'}</td>
-                  <td className="num px-2 text-right">{delta(c.vsPrevPct)}</td>
-                  <td className="num px-4 text-right">{delta(c.vsLastYearPct)}</td>
+                  <td className="num px-2 text-end">{c.qty ?? '—'}</td>
+                  <td className="num px-2 text-end">{delta(c.vsPrevPct)}</td>
+                  <td className="num px-4 text-end">{delta(c.vsLastYearPct)}</td>
                 </tr>
               ))}</tbody>
             </table>

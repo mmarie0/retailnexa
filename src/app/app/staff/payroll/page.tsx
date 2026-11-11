@@ -113,7 +113,7 @@ export default async function PayrollPage({ searchParams }: PageProps<'/app/staf
               <input type="hidden" name="idempotency_key" value={randomUUID()} />
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[860px] text-[14px]">
-                  <thead className="text-left"><tr><th className="py-1">Pay</th><th>Employee</th><th>Hours</th><th>OT hrs</th><th>Bonus</th><th>Pay (from schedule)</th><th>Take back advances</th><th>Paid by</th></tr></thead>
+                  <thead className="text-start"><tr><th className="py-1">Pay</th><th>Employee</th><th>Hours</th><th>OT hrs</th><th>Bonus</th><th>Pay (from schedule)</th><th>Take back advances</th><th>Paid by</th></tr></thead>
                   <tbody>
                     {suggested.map((l) => {
                       const advs = open.filter((a) => a.employee_id === l.employee_id);
@@ -121,7 +121,7 @@ export default async function PayrollPage({ searchParams }: PageProps<'/app/staf
                       return (
                         <tr key={id} className="border-t border-line align-top">
                           <td className="py-2"><input type="hidden" name="employee_id" value={id} /><input type="checkbox" name={`inc-${id}`} defaultChecked aria-label={`Pay ${l.name}`} className="size-4 accent-[#3f63de]" /></td>
-                          <td className="py-2 pr-2 font-semibold">{l.name}<input type="hidden" name={`name-${id}`} value={l.name} />
+                          <td className="py-2 pe-2 font-semibold">{l.name}<input type="hidden" name={`name-${id}`} value={l.name} />
                             <span className="block text-xs font-normal text-muted">{l.pay_type === 'salary' ? 'Salary' : `${formatMoney(l.rate_cents)}/hr`}</span></td>
                           <td><input name={`hours-${id}`} inputMode="decimal" defaultValue={l.hours} aria-label={`${l.name} hours`} className="num w-16 rounded-lg bg-soft px-2 py-1" /></td>
                           <td><input name={`ot-${id}`} inputMode="decimal" defaultValue={l.overtime_hours} aria-label={`${l.name} overtime hours`} className="num w-14 rounded-lg bg-soft px-2 py-1" /></td>

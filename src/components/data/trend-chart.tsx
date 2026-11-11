@@ -129,15 +129,15 @@ export function TrendChart({ title, points, currentLabel, previousLabel, format 
       ) : (
         <div id={`${id}-table`} className="max-h-72 overflow-auto rounded-lg border border-line">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-soft text-left">
-              <tr><th className="px-3 py-2">Day</th><th className="px-3 py-2 text-right">{currentLabel}</th><th className="px-3 py-2 text-right">{previousLabel}</th></tr>
+            <thead className="sticky top-0 bg-soft text-start">
+              <tr><th className="px-3 py-2">Day</th><th className="px-3 py-2 text-end">{currentLabel}</th><th className="px-3 py-2 text-end">{previousLabel}</th></tr>
             </thead>
             <tbody>
               {points.map((p) => (
                 <tr key={p.label} className="border-t border-line">
                   <td className="px-3 py-1.5">{p.label}</td>
-                  <td className="num px-3 py-1.5 text-right">{format(p.current)}</td>
-                  <td className="num px-3 py-1.5 text-right">{p.previous == null ? '—' : format(p.previous)}</td>
+                  <td className="num px-3 py-1.5 text-end">{format(p.current)}</td>
+                  <td className="num px-3 py-1.5 text-end">{p.previous == null ? '—' : format(p.previous)}</td>
                 </tr>
               ))}
             </tbody>

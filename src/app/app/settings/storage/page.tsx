@@ -33,7 +33,7 @@ export default async function StoragePage() {
         <Card key={g.title}>
           <Eyebrow>{g.title}</Eyebrow>
           <dl className="mt-2 grid grid-cols-[1fr_auto] gap-y-1.5 text-[15px]">
-            {g.rows.map(([k, label]) => <div key={k} className="contents"><dt className="text-muted">{label}</dt><dd className="num text-right font-medium">{n(k).toLocaleString('en-US')}</dd></div>)}
+            {g.rows.map(([k, label]) => <div key={k} className="contents"><dt className="text-muted">{label}</dt><dd className="num text-end font-medium">{n(k).toLocaleString('en-US')}</dd></div>)}
           </dl>
         </Card>
       ))}

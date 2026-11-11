@@ -50,18 +50,18 @@ export default async function ProfitPage({ searchParams }: PageProps<'/app/profi
 
       <Card className="overflow-x-auto p-0">
         <table className="w-full min-w-[640px] text-[14.5px]">
-          <thead className="text-left text-xs uppercase tracking-[.06em] text-muted">
-            <tr><th className="px-4 py-2.5">Month</th><th className="px-2 text-right">Sales + tax</th><th className="px-2 text-right">Bills</th><th className="px-2 text-right">Payroll</th><th className="px-2 text-right">Other stores</th><th className="px-4 text-right">Profit</th></tr>
+          <thead className="text-start text-xs uppercase tracking-[.06em] text-muted">
+            <tr><th className="px-4 py-2.5">Month</th><th className="px-2 text-end">Sales + tax</th><th className="px-2 text-end">Bills</th><th className="px-2 text-end">Payroll</th><th className="px-2 text-end">Other stores</th><th className="px-4 text-end">Profit</th></tr>
           </thead>
           <tbody>
             {months.length === 0 ? <tr><td colSpan={6} className="px-4 py-3 text-muted">No months yet.</td></tr> : [...months].reverse().map((m) => (
               <tr key={m.ym} className="border-t border-line">
                 <td className="px-4 py-2 font-semibold">{mon(m.ym)} {m.projected && <Badge>On pace</Badge>}{m.manual !== null && <Badge tone="info">By hand</Badge>}</td>
-                <td className="num px-2 text-right">{m.sales === null ? '—' : money0(m.sales + m.tax)}</td>
-                <td className="num px-2 text-right">{money0(m.bills)}</td>
-                <td className="num px-2 text-right">{money0(m.payroll)}</td>
-                <td className="num px-2 text-right">{m.balancesIn || m.balancesOut ? `${m.balancesIn - m.balancesOut >= 0 ? '+' : '−'}${money0(Math.abs(m.balancesIn - m.balancesOut))}` : '—'}</td>
-                <td className={cx('num px-4 text-right font-bold', m.profit !== null && m.profit < 0 && 'text-late')}>{m.profit === null ? '—' : money0(m.profit)}{m.manual !== null && m.formula !== null ? <span className="block text-xs font-normal text-muted">formula {money0(m.formula)}</span> : null}</td>
+                <td className="num px-2 text-end">{m.sales === null ? '—' : money0(m.sales + m.tax)}</td>
+                <td className="num px-2 text-end">{money0(m.bills)}</td>
+                <td className="num px-2 text-end">{money0(m.payroll)}</td>
+                <td className="num px-2 text-end">{m.balancesIn || m.balancesOut ? `${m.balancesIn - m.balancesOut >= 0 ? '+' : '−'}${money0(Math.abs(m.balancesIn - m.balancesOut))}` : '—'}</td>
+                <td className={cx('num px-4 text-end font-bold', m.profit !== null && m.profit < 0 && 'text-late')}>{m.profit === null ? '—' : money0(m.profit)}{m.manual !== null && m.formula !== null ? <span className="block text-xs font-normal text-muted">formula {money0(m.formula)}</span> : null}</td>
               </tr>
             ))}
           </tbody>

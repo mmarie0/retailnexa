@@ -66,8 +66,8 @@ export default async function BillsPage({ searchParams }: PageProps<'/app/bills/
       ) : (
         <Card className="overflow-x-auto p-0">
           <table className="w-full min-w-[640px] text-[15px]">
-            <thead className="text-left text-sm text-muted">
-              <tr><th className="px-5 py-3 font-semibold">Vendor</th><th className="px-3 font-semibold">Bill #</th><th className="px-3 font-semibold">Store</th><th className="px-3 font-semibold">Due</th><th className="px-3 font-semibold">Status</th><th className="px-5 text-right font-semibold">Open</th></tr>
+            <thead className="text-start text-sm text-muted">
+              <tr><th className="px-5 py-3 font-semibold">Vendor</th><th className="px-3 font-semibold">Bill #</th><th className="px-3 font-semibold">Store</th><th className="px-3 font-semibold">Due</th><th className="px-3 font-semibold">Status</th><th className="px-5 text-end font-semibold">Open</th></tr>
             </thead>
             <tbody>
               {bills.map((b) => {
@@ -78,9 +78,9 @@ export default async function BillsPage({ searchParams }: PageProps<'/app/bills/
                     <td className="px-5 py-2.5"><Link href={`/app/bills/${b.id}`} className="font-semibold text-accent-strong">{vendorName.get(b.vendor_id) ?? 'Vendor'}</Link></td>
                     <td className="px-3">{b.bill_number}</td>
                     <td className="px-3 text-sm">{b.location_id ? storeName.get(b.location_id) ?? 'Store' : 'Whole business'}</td>
-                    <td className="px-3">{fmtDate(b.due_date)}{late > 0 && <span className="ml-2 text-sm font-semibold text-late">{late}d late</span>}</td>
+                    <td className="px-3">{fmtDate(b.due_date)}{late > 0 && <span className="ms-2 text-sm font-semibold text-late">{late}d late</span>}</td>
                     <td className="px-3"><Badge tone={STATUS_TONE[b.status as BillStatus]}>{STATUS_LABEL[b.status as BillStatus]}</Badge></td>
-                    <td className="num px-5 text-right">{formatMoney(openCents)}<span className="block text-sm text-muted">of {formatMoney(Number(b.total_cents))}</span></td>
+                    <td className="num px-5 text-end">{formatMoney(openCents)}<span className="block text-sm text-muted">of {formatMoney(Number(b.total_cents))}</span></td>
                   </tr>
                 );
               })}

@@ -19,12 +19,14 @@ import { billTotals, monthReports, payrollPaid, salesRollups, scheduledPayroll }
 import { RangeView } from './_dashboard/range-view';
 import { Icon } from './app-shell';
 import { WholesaleOverview } from './wholesale/_overview';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Overview' };
 
 const money0 = (c: number) => formatMoney(Math.round(c / 100) * 100).replace(/\.00$/, '');
 
 export default async function OverviewPage({ searchParams }: PageProps<'/app'>) {
+  const t = await getT();
   const ctx = await getOrgContext();
   const sp = await searchParams;
   const supabase = await getSupabase();
@@ -165,14 +167,14 @@ export default async function OverviewPage({ searchParams }: PageProps<'/app'>) 
     <section className="flex flex-col gap-2.5 rounded-[18px] bg-card p-4 shadow-[var(--shadow-card)]">
       <div className="flex items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 font-bold"><Icon k={icon} className="size-5 text-accent" />{title}</h2>
-        {href && <Link href={href} className="text-sm font-semibold text-accent-strong">View ›</Link>}
+        {href && <Link href={href} className="text-sm font-semibold text-accent-strong">{t('View ›')}</Link>}
       </div>
       {body}
     </section>
   );
   const kv = (rows: [string, ReactNode][]) => (
     <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 text-[15px]">
-      {rows.map(([k, v]) => <div key={k} className="contents"><dt className="text-muted">{k}</dt><dd className="num text-right font-medium">{v}</dd></div>)}
+      {rows.map(([k, v]) => <div key={k} className="contents"><dt className="text-muted">{k}</dt><dd className="num text-end font-medium">{v}</dd></div>)}
     </dl>
   );
   const hbars = (rows: { label: string; cents: number }[]) => {
@@ -182,7 +184,7 @@ export default async function OverviewPage({ searchParams }: PageProps<'/app'>) 
         {rows.map((r) => (
           <li key={r.label} className="grid grid-cols-[minmax(0,9rem)_1fr_auto] items-center gap-2">
             <span className="truncate" title={r.label}>{r.label}</span>
-            <span aria-hidden className="h-2.5 rounded-r bg-soft"><span className="block h-full rounded-r bg-[#3f63de]" style={{ width: `${Math.max(1, (r.cents / mx) * 100)}%` }} /></span>
+            <span aria-hidden className="h-2.5 rounded-e bg-soft"><span className="block h-full rounded-e bg-[#3f63de]" style={{ width: `${Math.max(1, (r.cents / mx) * 100)}%` }} /></span>
             <span className="num">{money0(r.cents)}</span>
           </li>
         ))}
@@ -192,7 +194,7 @@ export default async function OverviewPage({ searchParams }: PageProps<'/app'>) 
 
   const T: Record<TileId, () => { half?: boolean; node: ReactNode } | ReactNode | null> = {
     quick: () => quick.length ? (
-      <nav aria-label="Quick actions" className="grid grid-cols-[repeat(auto-fit,minmax(96px,1fr))] gap-2">
+      <nav aria-label={t('Quick actions')} className="grid grid-cols-[repeat(auto-fit,minmax(96px,1fr))] gap-2">
         {quick.map((q) => (
           <Link key={q.href} href={q.href} className={cx('flex flex-col items-center gap-1.5 rounded-[16px] px-2 py-3 text-sm font-semibold shadow-[var(--shadow-card)] hover:opacity-90', q.main ? 'blk blue' : 'bg-card')}>
             <Icon k={q.icon} className="size-6" />{q.label}
@@ -201,43 +203,43 @@ export default async function OverviewPage({ searchParams }: PageProps<'/app'>) 
       </nav>
     ) : null,
     sales: () => sales ? (
-      <section aria-label="Sales" className="flex flex-col gap-3">
-        <Stat hero block="blue" label={`${monthName} so far`} value={formatMoney(sales.monthToDate.netCents)} sub={<Change pct={sales.monthToDate.changePct} vs="last year" />} href="/app/sales" />
+      <section aria-label={t('Sales')} className="flex flex-col gap-3">
+        <Stat hero block="blue" label={t('{v0} so far', { v0: monthName })} value={formatMoney(sales.monthToDate.netCents)} sub={<Change pct={sales.monthToDate.changePct} vs="last year" />} href="/app/sales" />
         <div className="grid grid-cols-3 gap-2.5 max-[520px]:grid-cols-1">
-          <Stat label="Today" value={sales.today.netCents === null ? '—' : formatMoney(sales.today.netCents)} sub={sales.today.netCents === null ? 'Not recorded yet' : 'Net sales'} href="/app/sales" />
-          <Stat label="Yesterday" value={sales.yesterday.netCents === null ? '—' : formatMoney(sales.yesterday.netCents)} sub={sales.yesterday.netCents === null ? 'Not recorded' : 'Net sales'} href="/app/sales" />
-          <Stat label="Last 7 days" value={formatMoney(sales.last7.netCents)} sub={<Change pct={sales.last7.changePct} vs="prior week" />} />
+          <Stat label={t('Today')} value={sales.today.netCents === null ? '—' : formatMoney(sales.today.netCents)} sub={sales.today.netCents === null ? t('Not recorded yet') : t('Net sales')} href="/app/sales" />
+          <Stat label={t('Yesterday')} value={sales.yesterday.netCents === null ? '—' : formatMoney(sales.yesterday.netCents)} sub={sales.yesterday.netCents === null ? t('Not recorded') : t('Net sales')} href="/app/sales" />
+          <Stat label={t('Last 7 days')} value={formatMoney(sales.last7.netCents)} sub={<Change pct={sales.last7.changePct} vs="prior week" />} />
         </div>
       </section>
     ) : perm.sales && canSales ? (
       <Card>
-        <h2 className="text-lg font-bold">Bring in your sales</h2>
-        <p className="mt-1 text-muted">Import your POS daily report, or upload your monthly sales report at month end, to see sales here.</p>
-        <Link href="/app/sales/import" className="mt-3 inline-block font-semibold text-accent-strong">Add sales</Link>
+        <h2 className="text-lg font-bold">{t('Bring in your sales')}</h2>
+        <p className="mt-1 text-muted">{t('Import your POS daily report, or upload your monthly sales report at month end, to see sales here.')}</p>
+        <Link href="/app/sales/import" className="mt-3 inline-block font-semibold text-accent-strong">{t('Add sales')}</Link>
       </Card>
     ) : null,
     payroll: () => payPaid && paySched !== null ? { half: true, node: (
-      <Stat block="indigo" label="Projected payroll" value={money0(payProj!)} href="/app/staff/payroll"
-        sub={<>Paid so far {money0(payPaid.cents)}{salesForPace?.net ? <><br />{((payProj! / salesForPace.net) * 100).toFixed(1)}% of sales</> : null}</>} />
+      <Stat block="indigo" label={t('Projected payroll')} value={money0(payProj!)} href="/app/staff/payroll"
+        sub={<>{t('Paid so far')} {money0(payPaid.cents)}{salesForPace?.net ? <><br />{((payProj! / salesForPace.net) * 100).toFixed(1)}{t('% of sales')}</> : null}</>} />
     ) } : null,
     profit: () => perm.profit && billMonth && payProj !== null ? { half: true, node: (
-      <Stat block="sunset" label="Projected profit" value={profit === null ? '—' : money0(profit)}
-        sub={<>Sales + tax − bills − payroll<br />{new Date(`${lym}-01T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', year: 'numeric' })}: <b>{lyProfit === null ? '—' : money0(lyProfit)}</b> <Pct v={pct(profit, lyProfit)} /></>} />
+      <Stat block="sunset" label={t('Projected profit')} value={profit === null ? '—' : money0(profit)}
+        sub={<>{t('Sales + tax − bills − payroll')}<br />{new Date(`${lym}-01T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', year: 'numeric' })}: <b>{lyProfit === null ? '—' : money0(lyProfit)}</b> <Pct v={pct(profit, lyProfit)} /></>} />
     ) } : null,
     bills: () => billMonth && billMonth.count > 0 ? (() => {
       const b = billMonth, scale = Math.max(b.budget ?? 0, b.total) || 1;
       return (
         <Link href="/app/bills" className="flex flex-col gap-2 rounded-[18px] bg-card p-4 shadow-[var(--shadow-card)] hover:opacity-90">
           <span className="flex items-baseline justify-between gap-2">
-            <Eyebrow>Bills this month</Eyebrow>
-            {b.late > 0 && <span className="text-xs font-bold text-late">{b.late} overdue</span>}
+            <Eyebrow>{t('Bills this month')}</Eyebrow>
+            {b.late > 0 && <span className="text-xs font-bold text-late">{b.late} {t('overdue')}</span>}
           </span>
           <span className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="num text-[22px] font-medium">{formatMoney(b.left)} <span className="text-sm text-muted">left to pay</span></span>
-            <span className="text-sm text-muted">{formatMoney(b.paid)} of {formatMoney(b.total)} paid{b.budget !== null ? ` · budget ${formatMoney(b.budget)}` : ''}</span>
+            <span className="num text-[22px] font-medium">{formatMoney(b.left)} <span className="text-sm text-muted">{t('left to pay')}</span></span>
+            <span className="text-sm text-muted">{formatMoney(b.paid)} {t('of')} {formatMoney(b.total)} {t('paid')}{b.budget !== null ? t(' · budget {v0}', { v0: formatMoney(b.budget) }) : ''}</span>
           </span>
-          <span role="img" aria-label={`Paid ${formatMoney(b.paid)}, unpaid ${formatMoney(b.left)}`} className="relative flex h-2.5 rounded-md bg-soft">
-            <span className="h-full rounded-l-md bg-paid" style={{ width: `${(b.paid / scale) * 100}%` }} />
+          <span role="img" aria-label={t('Paid {v0}, unpaid {v1}', { v0: formatMoney(b.paid), v1: formatMoney(b.left) })} className="relative flex h-2.5 rounded-md bg-soft">
+            <span className="h-full rounded-s-md bg-paid" style={{ width: `${(b.paid / scale) * 100}%` }} />
             <span className="h-full bg-accent" style={{ width: `${(b.left / scale) * 100}%` }} />
             {b.budget !== null && <i className="absolute -top-1 -bottom-1 w-0.5 bg-ink" style={{ left: `calc(${Math.min(100, (b.budget / scale) * 100)}% - 1px)` }} />}
           </span>
@@ -247,15 +249,15 @@ export default async function OverviewPage({ searchParams }: PageProps<'/app'>) 
     salesChart: () => sales ? <Card><DailySalesChart points={sales.daily} /></Card> : null,
     billsToPay: () => ap ? (
       <div className="grid grid-cols-2 gap-3">
-        <Stat block="indigo" label="Bills to pay" value={formatMoney(ap.unpaidCents)} sub={ap.drafts ? `${ap.drafts} draft${ap.drafts === 1 ? '' : 's'} awaiting approval` : `${formatMoney(ap.dueNext7Cents)} due this week`} href="/app/bills" />
-        <Stat label="Overdue bills" value={formatMoney(ap.overdueCents)} tone={ap.overdueCents > 0 ? 'late' : undefined} sub={ap.overdueCount ? `${ap.overdueCount} bill${ap.overdueCount === 1 ? '' : 's'} past due` : 'Nothing overdue'} href="/app/bills" />
+        <Stat block="indigo" label={t('Bills to pay')} value={formatMoney(ap.unpaidCents)} sub={ap.drafts ? t('{v0} draft{v1} awaiting approval', { v0: ap.drafts, v1: ap.drafts === 1 ? '' : 's' }) : t('{v0} due this week', { v0: formatMoney(ap.dueNext7Cents) })} href="/app/bills" />
+        <Stat label={t('Overdue bills')} value={formatMoney(ap.overdueCents)} tone={ap.overdueCents > 0 ? 'late' : undefined} sub={ap.overdueCount ? t('{v0} bill{v1} past due', { v0: ap.overdueCount, v1: ap.overdueCount === 1 ? '' : 's' }) : t('Nothing overdue')} href="/app/bills" />
       </div>
     ) : null,
     books: () => pl ? (
       <div className="grid grid-cols-2 gap-3">
-        <Stat block="lav" label={`${monthName} gross profit`} value={formatMoney(pl.grossProfit)} href={can(ctx, 'accounting.view') ? '/app/accounting/profit-loss' : undefined}
-          sub={pl.cogs.total === 0 && pl.revenue.total > 0 ? 'Cost of goods not tracked yet' : marginPct === null ? 'No sales yet' : `${marginPct.toFixed(2)}% margin`} />
-        <Stat label={`${monthName} operating profit`} value={formatMoney(pl.operatingProfit)} sub={`After ${formatMoney(pl.operatingExpenses.total)} expenses`} />
+        <Stat block="lav" label={t('{v0} gross profit', { v0: monthName })} value={formatMoney(pl.grossProfit)} href={can(ctx, 'accounting.view') ? '/app/accounting/profit-loss' : undefined}
+          sub={pl.cogs.total === 0 && pl.revenue.total > 0 ? t('Cost of goods not tracked yet') : marginPct === null ? t('No sales yet') : t('{v0}% margin', { v0: marginPct.toFixed(2) })} />
+        <Stat label={t('{v0} operating profit', { v0: monthName })} value={formatMoney(pl.operatingProfit)} sub={t('After {v0} expenses', { v0: formatMoney(pl.operatingExpenses.total) })} />
       </div>
     ) : null,
     upcoming: () => {
@@ -268,14 +270,14 @@ export default async function OverviewPage({ searchParams }: PageProps<'/app'>) 
             {list.slice(0, 8).map((b) => (
               <li key={b.id} className="flex items-center gap-3 py-1.5">
                 <span className="w-16 shrink-0 text-sm text-muted">{new Date(`${b.dueDate}T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', day: 'numeric' })}</span>
-                <span className="min-w-0 flex-1 truncate">{b.name}{b.stage === 'scheduled' ? <span className="text-muted"> (recurring)</span> : null}</span>
+                <span className="min-w-0 flex-1 truncate">{b.name}{b.stage === 'scheduled' ? <span className="text-muted"> {t('(recurring)')}</span> : null}</span>
                 <b className="num font-medium">{formatMoney(b.leftCents)}</b>
               </li>
             ))}
           </ul>
-          <p className="flex justify-between border-t border-line pt-2 font-bold"><span>Total</span><span className="num">{formatMoney(list.reduce((a, b) => a + b.leftCents, 0))}</span></p>
+          <p className="flex justify-between border-t border-line pt-2 font-bold"><span>{t('Total')}</span><span className="num">{formatMoney(list.reduce((a, b) => a + b.leftCents, 0))}</span></p>
         </>
-      ) : <p className="text-muted">Nothing due in the next 7 days.</p>, '/app/bills');
+      ) : <p className="text-muted">{t('Nothing due in the next 7 days.')}</p>, '/app/bills');
     },
     spend: () => {
       if (!items) return null;
@@ -287,10 +289,10 @@ export default async function OverviewPage({ searchParams }: PageProps<'/app'>) 
       if (rest) top.push({ label: `${rows.length - 6} others`, cents: rest });
       return section(`Spend by vendor · ${monthName}`, 'bills', rows.length ? (
         <>
-          <p><span className="num text-[24px] font-medium">{money0(billMonth!.total)}</span> <span className="text-sm text-muted">{items.cur.length} bills, {rows.length} vendors</span></p>
+          <p><span className="num text-[24px] font-medium">{money0(billMonth!.total)}</span> <span className="text-sm text-muted">{items.cur.length} {t('bills,')} {rows.length} {t('vendors')}</span></p>
           {hbars(top)}
         </>
-      ) : <p className="text-muted">No bills this month yet.</p>, '/app/bills');
+      ) : <p className="text-muted">{t('No bills this month yet.')}</p>, '/app/bills');
     },
     lySpend: () => lySpend ? section('Spend vs last year', 'bills', kv([
       [`${shortMonth(lym)} bills`, lySpend.lastYearMonth === null ? '—' : money0(lySpend.lastYearMonth)],
@@ -320,25 +322,25 @@ export default async function OverviewPage({ searchParams }: PageProps<'/app'>) 
     <>
       {head}
       {ctx.org.businessType === 'both' && <WholesaleOverview ctx={ctx} today={today} compact />}
-      {ctx.org.businessType === 'both' && <Eyebrow>Retail</Eyebrow>}
+      {ctx.org.businessType === 'both' && <Eyebrow>{t('Retail')}</Eyebrow>}
       {out}
       <Link href="/app/customize" className="self-center rounded-full bg-card px-4 py-2 text-sm font-semibold text-accent-strong shadow-[var(--shadow-card)]">
-        <Icon k="repeat" className="mr-1.5 inline size-4" />Customize this page
+        <Icon k="repeat" className="me-1.5 inline size-4" />{t('Customize this page')}
       </Link>
       {steps.length > 0 && (
         <Card>
-          <h2 className="text-lg font-bold">Get set up</h2>
+          <h2 className="text-lg font-bold">{t('Get set up')}</h2>
           <ol className="mt-3 flex flex-col gap-2">
             {steps.map((s) => (
               <li key={s.label} className="flex items-center justify-between gap-3 rounded-xl bg-soft px-4 py-3">
                 <Link href={s.href} className="font-semibold hover:underline">{s.label}</Link>
-                {s.done ? <Badge tone="good">Done</Badge> : <Badge>To do</Badge>}
+                {s.done ? <Badge tone="good">{t('Done')}</Badge> : <Badge>{t('To do')}</Badge>}
               </li>
             ))}
           </ol>
         </Card>
       )}
-      {layout.length === 0 && <Notice>Your Overview is empty. <Link href="/app/customize" className="font-semibold underline">Add some boxes</Link>.</Notice>}
+      {layout.length === 0 && <Notice>{t('Your Overview is empty.')} <Link href="/app/customize" className="font-semibold underline">{t('Add some boxes')}</Link>.</Notice>}
     </>
   );
 }
@@ -348,26 +350,27 @@ const addDaysIso = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z
 const shortMonth = (ym: string) => new Date(`${ym}-01T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', year: 'numeric' });
 
 /** Month / week / last week / 30 days / this year / last year / custom (#108). */
-function RangeBar({ range, today }: { range: ReturnType<typeof rangeFor>; today: string }) {
+async function RangeBar({ range, today }: { range: ReturnType<typeof rangeFor>; today: string }) {
+  const t = await getT();
   const cur = range?.key ?? '';
   return (
     <div className="flex flex-col gap-2">
-      <nav aria-label="Date range" className="flex gap-1.5 overflow-x-auto pb-1">
+      <nav aria-label={t('Date range')} className="flex gap-1.5 overflow-x-auto pb-1">
         {RANGES.filter(([k]) => k !== 'custom').map(([k, label]) => (
           <Link key={k} href={k ? `/app?r=${k}` : '/app'} aria-current={cur === k ? 'page' : undefined}
             className={cx('whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold', cur === k ? 'bg-ink text-paper' : 'bg-card text-ink shadow-[var(--shadow-card)]')}>{label}</Link>
         ))}
       </nav>
-      <form action="/app" className="flex flex-wrap items-end gap-2" aria-label="Custom dates">
+      <form action="/app" className="flex flex-wrap items-end gap-2" aria-label={t('Custom dates')}>
         <input type="hidden" name="r" value="custom" />
-        <label className="flex flex-col gap-1 text-xs font-semibold text-muted">From
+        <label className="flex flex-col gap-1 text-xs font-semibold text-muted">{t('From')}
           <input type="date" name="from" defaultValue={range?.from ?? addDaysIso(today, -29)} max={today} className="rounded-[10px] border border-line bg-card px-2.5 py-1.5 text-sm text-ink" />
         </label>
-        <label className="flex flex-col gap-1 text-xs font-semibold text-muted">To
+        <label className="flex flex-col gap-1 text-xs font-semibold text-muted">{t('To')}
           <input type="date" name="to" defaultValue={range?.to ?? today} className="rounded-[10px] border border-line bg-card px-2.5 py-1.5 text-sm text-ink" />
         </label>
-        <button className={cx('rounded-full px-3.5 py-1.5 text-sm font-semibold', cur === 'custom' ? 'bg-ink text-paper' : 'bg-card shadow-[var(--shadow-card)]')}>Custom</button>
-        {range && <span className="text-sm text-muted">{daysBetween(range.from, range.to) + 1} days</span>}
+        <button className={cx('rounded-full px-3.5 py-1.5 text-sm font-semibold', cur === 'custom' ? 'bg-ink text-paper' : 'bg-card shadow-[var(--shadow-card)]')}>{t('Custom')}</button>
+        {range && <span className="text-sm text-muted">{daysBetween(range.from, range.to) + 1} {t('days')}</span>}
       </form>
     </div>
   );

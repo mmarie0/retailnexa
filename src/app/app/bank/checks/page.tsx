@@ -90,14 +90,14 @@ export default async function ChecksPage({ searchParams }: PageProps<'/app/bank/
       ) : (
         <Card className="overflow-x-auto p-0">
           <table className="w-full min-w-[560px] text-[14.5px]">
-            <thead className="text-left text-xs uppercase tracking-[.06em] text-muted"><tr><th className="px-4 py-2.5">Date</th><th className="px-2">Check #</th><th className="px-2">Payee</th><th className="px-2 text-right">Amount</th><th className="px-4">Status</th></tr></thead>
+            <thead className="text-start text-xs uppercase tracking-[.06em] text-muted"><tr><th className="px-4 py-2.5">Date</th><th className="px-2">Check #</th><th className="px-2">Payee</th><th className="px-2 text-end">Amount</th><th className="px-4">Status</th></tr></thead>
             <tbody>
               {[...inMonth, ...outstanding.filter((c) => !c.date.startsWith(ym))].map((c) => (
                 <tr key={c.id} className="border-t border-line">
                   <td className="px-4 py-2">{fmtDate(c.date)}</td>
                   <td className="num px-2">{c.number ?? '—'}</td>
                   <td className="px-2">{c.payee}</td>
-                  <td className="num px-2 text-right">{formatMoney(c.amountCents)}</td>
+                  <td className="num px-2 text-end">{formatMoney(c.amountCents)}</td>
                   <td className="px-4">{c.clearedOn ? <Badge tone="good">Cleared {fmtDate(c.clearedOn)}</Badge> : <Badge tone={c.stale ? 'danger' : 'warning'}>Outstanding {c.days} day{c.days === 1 ? '' : 's'}</Badge>}</td>
                 </tr>
               ))}

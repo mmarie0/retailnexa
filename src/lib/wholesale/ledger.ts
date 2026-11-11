@@ -103,7 +103,7 @@ export function standing(c: CustomerLite, invoices: InvoiceWithBalance[], today:
   const certExpired = c.tax_exempt && !!c.cert_expiry && c.cert_expiry < today;
   const warnings = [
     c.on_hold && 'On hold',
-    late.length > 0 && `${late.length} overdue invoice${late.length === 1 ? '' : 's'}`,
+    late.length > 0 && 'Overdue invoices',
     overLimit && 'Over credit limit',
     certExpired && 'Resale certificate expired',
   ].filter(Boolean) as string[];
@@ -160,3 +160,39 @@ export function splitPlan(totalCents: number, n: number, first: string, everyDay
 }
 
 export const fmtQty = (q: number) => (Number.isInteger(Number(q)) ? String(Number(q)) : Number(q).toFixed(3).replace(/0+$/, ''));
+
+export type CatalogSort = 'custom' | 'name' | 'name_desc' | 'popular';
+export const CATALOG_SORTS: [CatalogSort, string][] = [['custom', 'Your order'], ['name', 'Name A–Z'], ['name_desc', 'Name Z–A'], ['popular', 'Most popular']];
+export interface CatalogItem { id: string; name: string; sku: string | null; brand: string | null; category: string | null; subcategory: string | null; free: number; sort: number; sold: number }
+export interface CatalogFilter { q?: string; category?: string; subcategory?: string; brand?: string; inStock?: boolean; sort?: CatalogSort }
+
+/** Categories with their subcategories, and brands, for the filter chips (A–Z). */
+export function catalogFacets(items: CatalogItem[]) {
+  const cats = new Map<string, Set<string>>();
+  const brands = new Set<string>();
+  for (const i of items) {
+    if (i.brand) brands.add(i.brand);
+    if (!i.category) continue;
+    if (!cats.has(i.category)) cats.set(i.category, new Set());
+    if (i.subcategory) cats.get(i.category)!.add(i.subcategory);
+  }
+  const az = (a: string, b: string) => a.localeCompare(b);
+  return { categories: [...cats].sort(([a], [b]) => az(a, b)).map(([name, subs]) => ({ name, subs: [...subs].sort(az) })), brands: [...brands].sort(az) };
+}
+
+/** Filter and sort the order screen's catalog. Ties fall back to name. */
+export function filterCatalog<T extends CatalogItem>(items: T[], f: CatalogFilter): T[] {
+  const q = f.q?.trim().toLowerCase();
+  const out = items.filter((i) =>
+    (!q || [i.name, i.sku, i.brand, i.category, i.subcategory].some((v) => v?.toLowerCase().includes(q)))
+    && (!f.category || i.category === f.category)
+    && (!f.subcategory || i.subcategory === f.subcategory)
+    && (!f.brand || i.brand === f.brand)
+    && (!f.inStock || i.free > 0));
+  const byName = (a: T, b: T) => a.name.localeCompare(b.name);
+  const sort = f.sort ?? 'custom';
+  return out.sort(sort === 'name' ? byName
+    : sort === 'name_desc' ? (a, b) => byName(b, a)
+    : sort === 'popular' ? (a, b) => b.sold - a.sold || byName(a, b)
+    : (a, b) => a.sort - b.sort || byName(a, b));
+}

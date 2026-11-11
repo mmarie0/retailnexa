@@ -129,8 +129,8 @@ export function DueView({ ym, curYm, today, K, F, bills, templates, vendorName, 
         </div>
         <div role="img" aria-label={`Paid ${formatMoney(t.paid)}, unpaid ${formatMoney(t.left)}${budget ? `, budget ${formatMoney(budget.cents)}` : ''}`}
           className="relative mt-1 flex h-2.5 rounded-md bg-white/25">
-          <span className="h-full rounded-l-md bg-white" style={{ width: `${(t.paid / scale) * 100}%` }} />
-          <span className={cx('h-full bg-white/55', !t.paid && 'rounded-l-md')} style={{ width: `${(t.left / scale) * 100}%` }} />
+          <span className="h-full rounded-s-md bg-white" style={{ width: `${(t.paid / scale) * 100}%` }} />
+          <span className={cx('h-full bg-white/55', !t.paid && 'rounded-s-md')} style={{ width: `${(t.left / scale) * 100}%` }} />
           {budget && <i className="absolute -top-1 -bottom-1 w-0.5 bg-[#1d1d40]" style={{ left: `calc(${Math.min(100, (budget.cents / scale) * 100)}% - 1px)` }} />}
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
@@ -230,7 +230,7 @@ export function DueView({ ym, curYm, today, K, F, bills, templates, vendorName, 
             <li key={x.ym} className="contents">
               <Link href={href({ m: x.ym })} className="text-sm font-semibold">{ymLabel(x.ym, true)}</Link>
               <span className="relative h-3 overflow-hidden rounded bg-soft" role="img" aria-label={`${formatMoney(x.total)} due${x.budget !== null ? `, budget ${formatMoney(x.budget)}` : ''}`}>
-                <span className={cx('absolute inset-y-0 left-0 rounded', x.budget !== null && x.total > x.budget ? 'bg-late' : 'bg-accent')} style={{ width: `${(x.total / fmax) * 100}%` }} />
+                <span className={cx('absolute inset-y-0 start-0 rounded', x.budget !== null && x.total > x.budget ? 'bg-late' : 'bg-accent')} style={{ width: `${(x.total / fmax) * 100}%` }} />
                 {x.budget !== null && <b className="absolute inset-y-0 w-0.5 bg-ink" style={{ left: `calc(${(x.budget / fmax) * 100}% - 1px)` }} />}
               </span>
               <span className="num text-sm">{moneyShort(x.total)}{x.budget !== null ? ` / ${moneyShort(x.budget)}` : ''}</span>

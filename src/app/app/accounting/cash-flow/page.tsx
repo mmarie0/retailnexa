@@ -16,12 +16,12 @@ const dayBefore = (d: string) => new Date(Date.parse(`${d}T00:00:00Z`) - 86_400_
 function Section({ title, lines, total }: { title: string; lines: FlowLine[]; total: number }) {
   return (
     <tbody>
-      <tr><th colSpan={2} scope="colgroup" className="px-5 pb-1 pt-4 text-left text-sm font-bold uppercase tracking-wide text-muted">{title}</th></tr>
+      <tr><th colSpan={2} scope="colgroup" className="px-5 pb-1 pt-4 text-start text-sm font-bold uppercase tracking-wide text-muted">{title}</th></tr>
       {lines.length === 0 && <tr><td colSpan={2} className="px-5 py-1.5 text-muted">Nothing in this period</td></tr>}
       {lines.map((l) => (
-        <tr key={l.id}><td className="px-5 py-1.5">{l.label}</td><td className={cx('num px-5 text-right', l.amount < 0 && 'text-late')}>{formatMoney(l.amount)}</td></tr>
+        <tr key={l.id}><td className="px-5 py-1.5">{l.label}</td><td className={cx('num px-5 text-end', l.amount < 0 && 'text-late')}>{formatMoney(l.amount)}</td></tr>
       ))}
-      <tr className="border-t border-line font-semibold"><td className="px-5 py-2">Net cash from {title.toLowerCase()}</td><td className="num px-5 text-right">{formatMoney(total)}</td></tr>
+      <tr className="border-t border-line font-semibold"><td className="px-5 py-2">Net cash from {title.toLowerCase()}</td><td className="num px-5 text-end">{formatMoney(total)}</td></tr>
     </tbody>
   );
 }
@@ -73,9 +73,9 @@ export default async function CashFlowPage({ searchParams }: PageProps<'/app/acc
           <Section title="Investing activities" lines={cf.investing} total={cf.investingTotal} />
           <Section title="Financing activities" lines={cf.financing} total={cf.financingTotal} />
           <tbody>
-            <tr className="border-t-2 border-ink/20 font-bold"><td className="px-5 py-3">Net change in cash</td><td className={cx('num px-5 text-right', cf.netChange < 0 && 'text-late')}>{formatMoney(cf.netChange)}</td></tr>
-            <tr><td className="px-5 py-1.5 text-muted">Cash and bank at start</td><td className="num px-5 text-right text-muted">{formatMoney(cf.cashStart)}</td></tr>
-            <tr className="font-semibold"><td className="px-5 py-1.5">Cash and bank at end</td><td className="num px-5 text-right">{formatMoney(cf.cashEnd)}</td></tr>
+            <tr className="border-t-2 border-ink/20 font-bold"><td className="px-5 py-3">Net change in cash</td><td className={cx('num px-5 text-end', cf.netChange < 0 && 'text-late')}>{formatMoney(cf.netChange)}</td></tr>
+            <tr><td className="px-5 py-1.5 text-muted">Cash and bank at start</td><td className="num px-5 text-end text-muted">{formatMoney(cf.cashStart)}</td></tr>
+            <tr className="font-semibold"><td className="px-5 py-1.5">Cash and bank at end</td><td className="num px-5 text-end">{formatMoney(cf.cashEnd)}</td></tr>
           </tbody>
         </table>
       </Card>
