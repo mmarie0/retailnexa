@@ -105,6 +105,13 @@ describe('profit partners (#104)', () => {
       ['Partner A', true, 50], ['Partner B', false, 33.33], ['Partner C', false, 33.34], ['Partner D', true, 50],
     ]);
   });
+  it('names that differ only in case, or a repeated id, are refused and nothing changes (#171)', async () => {
+    const before = await sys(`select id, name, pct, is_active from public.partners where organization_id = $1 order by id`, [org]);
+    await expectDenied(as(owner, `select public.save_partners($1, $2::jsonb)`, [org, JSON.stringify([{ name: 'Ann', pct: 60 }, { name: ' ann ', pct: 40 }])]), /different name/);
+    const [{ id }] = await sys<{ id: string }>(`select id from public.partners where organization_id = $1 and is_active limit 1`, [org]);
+    await expectDenied(as(owner, `select public.save_partners($1, $2::jsonb)`, [org, JSON.stringify([{ id, name: 'X', pct: 50 }, { id, name: 'Y', pct: 50 }])]), /different name/);
+    expect(await sys(`select id, name, pct, is_active from public.partners where organization_id = $1 order by id`, [org])).toEqual(before);
+  });
   it('read: profit.view and every store; others see nothing', async () => {
     expect((await as(acct, `select id from public.distributions where organization_id = $1`, [org])).length).toBe(1);
     expect(await as(mgrA, `select id from public.distributions where organization_id = $1`, [org])).toEqual([]);

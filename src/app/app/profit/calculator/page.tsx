@@ -44,7 +44,7 @@ export default async function CalculatorPage({ searchParams }: PageProps<'/app/p
   const nextMonthEarlyBills = monthItems(next, rows, templates, names, today).filter((i) => i.dueDate <= `${next}-15`).reduce((a, i) => a + i.leftCents, 0);
   const unrunPayroll = Math.max(0, sched - paid.cents);
   const owedToStores = openTotals(bal.balances).iOwe;
-  const input = { safe: cents(sp.safe, 0), bank: cents(sp.bank, 0), reserve: cents(sp.reserve, 50_000_00) };
+  const input = { safe: cents(sp.safe, 0), bank: cents(sp.bank, 0), reserve: cents(sp.reserve, 0) };
   const r = cashYouCanTake({ ...input, nextMonthEarlyBills, unpaidThisMonth, unrunPayroll, owedToStores });
   const $ = (c: number) => (c / 100).toFixed(2);
   const line = (label: string, v: number, sign = '−') => (
@@ -58,7 +58,7 @@ export default async function CalculatorPage({ searchParams }: PageProps<'/app/p
       <form action="/app/profit/calculator" className="grid gap-3 sm:grid-cols-4">
         <Field label="Cash in the safe" htmlFor="c-safe"><Input id="c-safe" name="safe" inputMode="decimal" className="num" defaultValue={$(input.safe)} /></Field>
         <Field label="Bank balance" htmlFor="c-bank"><Input id="c-bank" name="bank" inputMode="decimal" className="num" defaultValue={$(input.bank)} /></Field>
-        <Field label="Keep at least" htmlFor="c-res" hint="Your reserve"><Input id="c-res" name="reserve" inputMode="decimal" className="num" defaultValue={$(input.reserve)} /></Field>
+        <Field label="Keep at least" htmlFor="c-res" hint="Your own cushion; leave 0 if none"><Input id="c-res" name="reserve" inputMode="decimal" className="num" defaultValue={$(input.reserve)} /></Field>
         <div className="self-end"><SubmitButton>Work it out</SubmitButton></div>
       </form>
       <Stat hero block={r.short ? 'coral' : 'sunset'} label="Cash you can take" value={formatMoney(r.take)} sub={r.short ? `You’re ${formatMoney(r.short)} short of what’s set aside.` : 'After everything below is covered.'} />

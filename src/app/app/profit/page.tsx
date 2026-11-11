@@ -42,8 +42,10 @@ export default async function ProfitPage({ searchParams }: PageProps<'/app/profi
       <ProfitTabs active="/app/profit" />
       <ReadOnlyNotice show={can(ctx, 'org.manage') && !ctx.access.canWrite} />
       {(!canBills || !canPay) && <Notice>Some parts are left out because you can’t see {[!canBills && 'bills', !canPay && 'payroll'].filter(Boolean).join(' or ')}.</Notice>}
-      <Stat hero block="sunset" label={`${year} profit so far`} value={money0(sum.total)}
-        sub={<>{sum.months} month{sum.months === 1 ? '' : 's'} · average {sum.average === null ? '—' : money0(sum.average)} a month{sum.margin !== null ? ` · ${sum.margin.toFixed(1)}% of sales` : ''}{projectedYear !== null ? <><br />On pace for {money0(projectedYear)} this year</> : null}</>} />
+      {sum.months === 0 ? (
+        <Card><h2 className="text-lg font-bold">No profit to show for {year} yet</h2><p className="mt-1 text-muted">Profit appears once sales are recorded for a month (or you enter a month by hand below).</p></Card>
+      ) : <Stat hero block="sunset" label={`${year} profit so far`} value={money0(sum.total)}
+        sub={<>{sum.months} month{sum.months === 1 ? '' : 's'} · average {sum.average === null ? '—' : money0(sum.average)} a month{sum.margin !== null ? ` · ${sum.margin.toFixed(1)}% of sales` : ''}{projectedYear !== null ? <><br />On pace for {money0(projectedYear)} this year</> : null}</>} />}
       {cur && <p className="text-sm text-muted">{mon(cur.ym)} is {cur.projected ? 'projected: sales on pace and payroll as scheduled' : 'entered by hand'}.</p>}
 
       <Card className="overflow-x-auto p-0">
