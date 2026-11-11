@@ -11,7 +11,7 @@ import { switchOrganization } from './org-actions';
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getOrgContext();
   const has = (p: string) => isPermission(p) && can(ctx, p);
-  const areas = visibleAreas(has);
+  const areas = visibleAreas(has, ctx.org.businessType);
   const more = visibleMore(has);
   const { data: orgRow } = await (await getSupabase()).from('organizations').select('timezone').eq('id', ctx.org.id).maybeSingle();
   const today = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: orgRow?.timezone ?? 'America/New_York' });

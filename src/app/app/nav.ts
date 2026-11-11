@@ -8,10 +8,12 @@
  * Pure data + functions so the shell and its tests share one source.
  */
 
-export type AreaKey = 'home' | 'bills' | 'sales' | 'staff' | 'upkeep' | 'books' | 'business';
+export type AreaKey = 'home' | 'orders' | 'customers' | 'inventory' | 'bills' | 'sales' | 'staff' | 'upkeep' | 'books' | 'business';
+export type BusinessType = 'retail' | 'wholesale' | 'both';
 export type IconKey =
   | 'home' | 'bills' | 'sales' | 'staff' | 'upkeep' | 'invoice' | 'calendar' | 'repeat' | 'doc' | 'bank'
-  | 'profit' | 'clock' | 'card' | 'book' | 'settings' | 'shield' | 'team' | 'store' | 'download' | 'plus' | 'logout';
+  | 'profit' | 'clock' | 'card' | 'book' | 'settings' | 'shield' | 'team' | 'store' | 'download' | 'plus' | 'logout'
+  | 'cart' | 'box' | 'tag';
 
 export interface NavPage {
   key: string;
@@ -28,10 +30,25 @@ export interface NavArea {
   key: AreaKey;
   label: string;
   icon: IconKey;
-  /** Shown as one of the five bottom tabs. */
+  /** Shown as one of the five bottom tabs (for the business type; see BOTTOM). */
   bottom: boolean;
+  /** Which side of the business the section belongs to; missing = every business. */
+  side?: 'retail' | 'wholesale';
   pages: NavPage[];
 }
+
+/**
+ * The five bottom tabs for each account type. Retail is unchanged; Wholesale
+ * gets the Wholesale Ledger's sections; Both shows both menus (the rest stay in
+ * the Menu).
+ */
+export const BOTTOM: Record<BusinessType, AreaKey[]> = {
+  retail: ['home', 'bills', 'sales', 'staff', 'upkeep'],
+  wholesale: ['home', 'orders', 'customers', 'inventory', 'bills'],
+  both: ['home', 'orders', 'bills', 'sales', 'staff'],
+};
+/** Retail-only sections a Wholesale account doesn't see (daily register sales). */
+const RETAIL_ONLY: AreaKey[] = ['sales'];
 
 /** Tabs for Bills → More (same order as the live app). */
 export const BILLS_MORE: NavPage[] = [
@@ -46,6 +63,26 @@ export const BILLS_MORE: NavPage[] = [
 
 export const AREAS: NavArea[] = [
   { key: 'home', label: 'Overview', icon: 'home', bottom: true, pages: [{ key: 'home', label: 'Overview', href: '/app', icon: 'home' }] },
+  {
+    key: 'orders', label: 'Orders', icon: 'cart', bottom: false, side: 'wholesale',
+    pages: [
+      { key: 'ws-new', label: 'Create order', href: '/app/wholesale/order', icon: 'cart', perm: 'wholesale.orders.create' },
+      { key: 'ws-orders', label: 'Orders', href: '/app/wholesale/orders', icon: 'doc', perm: 'wholesale.orders.view' },
+      { key: 'ws-invoices', label: 'Invoices', href: '/app/wholesale/invoices', icon: 'invoice', perm: 'wholesale.receivables.view' },
+      { key: 'ws-payments', label: 'Payments', href: '/app/wholesale/payments', icon: 'card', perm: 'wholesale.receivables.view' },
+    ],
+  },
+  {
+    key: 'customers', label: 'Customers', icon: 'team', bottom: false, side: 'wholesale',
+    pages: [
+      { key: 'ws-customers', label: 'Customers', href: '/app/wholesale/customers', icon: 'team', perm: ['wholesale.customers.manage', 'wholesale.orders.view', 'wholesale.receivables.view'] },
+      { key: 'ws-tiers', label: 'Price tiers', href: '/app/wholesale/tiers', icon: 'tag', perm: 'wholesale.catalog.manage' },
+    ],
+  },
+  {
+    key: 'inventory', label: 'Inventory', icon: 'box', bottom: false, side: 'wholesale',
+    pages: [{ key: 'ws-items', label: 'Inventory', href: '/app/wholesale/inventory', icon: 'box', perm: ['inventory.view', 'wholesale.catalog.manage'] }],
+  },
   {
     key: 'bills', label: 'Bills', icon: 'bills', bottom: true,
     pages: [
@@ -93,6 +130,7 @@ export const AREAS: NavArea[] = [
       { key: 'team', label: 'Team', href: '/app/settings/team', icon: 'team', perm: 'members.view' },
       { key: 'billing', label: 'Billing', href: '/app/billing', icon: 'card', perm: 'billing.view' },
       { key: 'support', label: 'Support access', href: '/app/settings/support-access', icon: 'shield', perm: 'org.manage' },
+      { key: 'ws-settings', label: 'Wholesale settings', href: '/app/wholesale/settings', icon: 'settings', perm: 'wholesale.catalog.manage' },
     ],
   },
 ];
@@ -108,15 +146,29 @@ export const FAB: Record<string, { label: string; href: string; perm: string } |
   payroll: { label: 'New pay run', href: '/app/staff/payroll#new', perm: 'payroll.manage' },
   balances: { label: 'Add balance', href: '/app/bills/balances#add', perm: 'bills.create' },
   tasks: { label: 'Add task', href: '/app/upkeep#add', perm: 'tasks.manage' },
+  'ws-orders': { label: 'Create order', href: '/app/wholesale/order', perm: 'wholesale.orders.create' },
+  'ws-invoices': { label: 'New invoice', href: '/app/wholesale/invoices/new', perm: 'wholesale.receivables.manage' },
+  'ws-customers': { label: 'Add customer', href: '/app/wholesale/customers#add', perm: 'wholesale.customers.manage' },
+  'ws-items': { label: 'Add item', href: '/app/wholesale/inventory#add', perm: 'wholesale.catalog.manage' },
 };
 
 const allowed = (p: NavPage, can: (perm: string) => boolean) =>
   !p.perm || (Array.isArray(p.perm) ? p.perm.some(can) : can(p.perm));
 
-/** Areas with only the pages this user may see (unbuilt "Soon" pages always show). */
-export function visibleAreas(can: (perm: string) => boolean): NavArea[] {
+/**
+ * Areas for this business type with only the pages this user may see (unbuilt
+ * "Soon" pages always show). The five bottom tabs come first, in tab order.
+ */
+export function visibleAreas(can: (perm: string) => boolean, type: BusinessType = 'retail'): NavArea[] {
+  const bottom = BOTTOM[type];
+  const shown = AREAS.filter((a) => {
+    if (a.side === 'wholesale') return type !== 'retail';
+    if (type === 'wholesale' && RETAIL_ONLY.includes(a.key)) return false;
+    return true;
+  }).map((a) => ({ ...a, bottom: bottom.includes(a.key), pages: a.pages.filter((p) => allowed(p, can) && (type !== 'retail' || !p.key.startsWith('ws-'))) }));
+  const order = (a: NavArea) => (a.bottom ? bottom.indexOf(a.key) : bottom.length + AREAS.indexOf(AREAS.find((x) => x.key === a.key)!));
   // The five bottom tabs always show (same layout as the app); a tab with no page this person may open is shown disabled.
-  return AREAS.map((a) => ({ ...a, pages: a.pages.filter((p) => allowed(p, can)) })).filter((a) => a.bottom || a.pages.length > 0);
+  return shown.filter((a) => a.bottom || a.pages.length > 0).sort((x, y) => order(x) - order(y));
 }
 
 export function visibleMore(can: (perm: string) => boolean): NavPage[] {

@@ -56,4 +56,33 @@ describe('app navigation (copied from the RetailNexa app)', () => {
     expect(fabFor('/app/sales', () => true)?.label).toBe('Add daily report');
     expect(fabFor('/app/accounting', () => true)).toBeNull();
   });
+
+  it('account types: retail is unchanged, wholesale gets the Ledger sections, both shows both menus', () => {
+    const all = () => true;
+    const retail = visibleAreas(all, 'retail');
+    expect(retail.filter((a) => a.bottom).map((a) => a.key)).toEqual(['home', 'bills', 'sales', 'staff', 'upkeep']);
+    expect(retail.some((a) => ['orders', 'customers', 'inventory'].includes(a.key))).toBe(false);
+    expect(retail.flatMap((a) => a.pages).some((p) => p.key.startsWith('ws-'))).toBe(false);
+    expect(visibleAreas(all)).toEqual(retail);
+
+    const ws = visibleAreas(all, 'wholesale');
+    expect(ws.filter((a) => a.bottom).map((a) => a.key)).toEqual(['home', 'orders', 'customers', 'inventory', 'bills']);
+    expect(ws.some((a) => a.key === 'sales')).toBe(false);
+    expect(ws.find((a) => a.key === 'orders')!.pages.map((p) => p.label)).toEqual(['Create order', 'Orders', 'Invoices', 'Payments']);
+    expect(ws.some((a) => a.key === 'staff' && !a.bottom)).toBe(true);
+
+    const both = visibleAreas(all, 'both');
+    expect(both.filter((a) => a.bottom).map((a) => a.key)).toEqual(['home', 'orders', 'bills', 'sales', 'staff']);
+    expect(both.filter((a) => !a.bottom).map((a) => a.key)).toEqual(['customers', 'inventory', 'upkeep', 'books', 'business']);
+
+    expect(locate('/app/wholesale/orders/123e4567-e89b-12d3-a456-426614174000')).toEqual({ area: 'orders', page: 'ws-orders' });
+    expect(locate('/app/wholesale/customers')).toEqual({ area: 'customers', page: 'ws-customers' });
+    expect(fabFor('/app/wholesale/inventory', all)?.label).toBe('Add item');
+  });
+
+  it('wholesale role defaults: a sales rep can order but not see invoices', () => {
+    const rep = new Set<string>(ROLE_DEFAULTS.sales_rep);
+    const orders = visibleAreas((p) => rep.has(p), 'wholesale').find((a) => a.key === 'orders')!;
+    expect(orders.pages.map((p) => p.key)).toEqual(['ws-new', 'ws-orders']);
+  });
 });

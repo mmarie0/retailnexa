@@ -27,6 +27,9 @@ const PATHS: Record<IconKey, ReactNode> = {
   store: <><path d="M4 9l1.5-5h13L20 9" /><path d="M4 9h16v2a3 3 0 01-5.3 1.9A3 3 0 0112 14a3 3 0 01-2.7-1.1A3 3 0 014 11z" /><path d="M5 13.5V20h14v-6.5M10 20v-4h4v4" /></>,
   download: <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />,
   plus: <path d="M12 5v14M5 12h14" />,
+  cart: <><path d="M3 4h2l2.2 10.2a1 1 0 001 .8h9.3a1 1 0 001-.8L20 8H6.2" /><circle cx="9" cy="19" r="1.4" /><circle cx="17" cy="19" r="1.4" /></>,
+  box: <><path d="M3.5 7.5L12 3l8.5 4.5v9L12 21l-8.5-4.5z" /><path d="M3.5 7.5L12 12l8.5-4.5M12 12v9" /></>,
+  tag: <><path d="M3 12V4h8l10 10-8 8z" /><circle cx="7.5" cy="8.5" r="1.4" /></>,
   logout: <><path d="M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3" /><path d="M10 16l-4-4 4-4M6 12h10" /></>,
 };
 export function Icon({ k, className }: { k: IconKey; className?: string }) {
