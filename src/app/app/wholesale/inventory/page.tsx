@@ -11,7 +11,7 @@ import { loadItems, loadOpenLines, loadSettings, wsContext, type Item } from '..
 import { Pills, SearchBox, money, money0 } from '../_ui';
 import { adjustStock, deleteItem, saveItem } from '../actions';
 
-export const metadata: Metadata = { title: 'Inventory' };
+export const metadata: Metadata = { title: 'Products & inventory' };
 
 function ItemFields({ it, markup }: { it?: Item; markup: number }) {
   const p = it?.id ?? 'new';
@@ -24,7 +24,8 @@ function ItemFields({ it, markup }: { it?: Item; markup: number }) {
       <div className="sm:col-span-2"><Field label="Item name" htmlFor={`${p}-name`}><Input id={`${p}-name`} name="name" defaultValue={it?.name} required maxLength={160} /></Field></div>
       {f('sku', 'SKU (optional)', 60)}
       {f('brand', 'Brand (optional)', 60)}
-      {f('category', 'Category (optional)', 60)}
+      {f('category', 'Category (optional)', 60, 'Hair')}
+      {f('subcategory', 'Subcategory (optional)', 60, 'Braiding hair')}
       {f('upc', 'UPC / barcode (optional)', 40)}
       {f('vendor', 'Vendor (optional)', 120)}
       {f('bin', 'Bin / shelf (optional)', 30, 'A-12')}
@@ -59,14 +60,14 @@ export default async function InventoryPage({ searchParams }: PageProps<'/app/wh
   const shown = rows
     .filter(({ it }) => (f === 'inactive' ? !it.is_active : it.is_active))
     .filter((r) => (f === 'reorder' ? r.reorder !== null : f === 'out' ? r.free <= 0 : true))
-    .filter(({ it }) => !q || [it.name, it.sku, it.upc, it.brand, it.category, it.vendor, it.bin].some((v) => v?.toLowerCase().includes(q)));
+    .filter(({ it }) => !q || [it.name, it.sku, it.upc, it.brand, it.category, it.subcategory, it.vendor, it.bin].some((v) => v?.toLowerCase().includes(q)));
   const value = stockValue(items);
   const catalog = can(ctx, 'wholesale.catalog.manage') && ctx.access.canWrite, adjust = can(ctx, 'inventory.manage') && ctx.access.canWrite;
   const seeCost = can(ctx, 'wholesale.catalog.manage') || can(ctx, 'inventory.manage');
 
   return (
     <>
-      <PageHeader title="Inventory" description="What’s on hand, what open orders are holding, what’s free to sell, and what to reorder." />
+      <PageHeader title="Products & inventory" description="Your products: what’s on hand, what open orders are holding, what’s free to sell, and what to reorder." />
       <ReadOnlyNotice show={(can(ctx, 'wholesale.catalog.manage') || can(ctx, 'inventory.manage')) && !ctx.access.canWrite} />
       {items.length > 0 && (
         <div className="grid grid-cols-3 gap-3 max-[520px]:grid-cols-1">
@@ -90,7 +91,7 @@ export default async function InventoryPage({ searchParams }: PageProps<'/app/wh
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-bold">{it.name}</p>
-                    <p className="text-sm text-muted">{[it.sku && `SKU ${it.sku}`, it.brand, it.bin && `Bin ${it.bin}`, it.case_pack && `${it.case_pack}/case`].filter(Boolean).join(' · ') || 'No SKU'}</p>
+                    <p className="text-sm text-muted">{[it.sku && `SKU ${it.sku}`, it.brand, [it.category, it.subcategory].filter(Boolean).join(' › ') || null, it.bin && `Bin ${it.bin}`, it.case_pack && `${it.case_pack}/case`].filter(Boolean).join(' · ') || 'No SKU'}</p>
                   </div>
                   <div className="text-right">
                     <p className="num font-semibold">{money(it.price_cents)}{seeCost && <span className="font-normal text-muted"> · cost {money(it.cost_cents)}</span>}</p>
