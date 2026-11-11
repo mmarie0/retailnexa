@@ -169,6 +169,18 @@ describe('wholesale core (W1)', () => {
     expect(await as(viewer, `select * from public.item_popularity($1)`, [org])).toEqual([]);
   });
 
+  it('only a superadmin who owns a business can mark it a demo', async () => {
+    const sa = await createUser('ws-sa');
+    await sys(`insert into auth.mfa_factors (user_id, status) values ($1, 'verified')`, [sa.id]);
+    await sys(`insert into public.platform_admins (user_id, role) values ($1, 'superadmin')`, [sa.id]);
+    const demo = await createOrg(sa, 'Demo Wholesale', 'wholesale');
+    await expectDenied(as(owner, `select public.admin_mark_demo($1)`, [org]));
+    await expectDenied(as({ ...sa, aal: 'aal2' }, `select public.admin_mark_demo($1)`, [org]), /own the demo/);
+    await as({ ...sa, aal: 'aal2' }, `select public.admin_mark_demo($1)`, [demo]);
+    expect((await sys(`select is_demo from public.organizations where id = $1`, [demo]))[0].is_demo).toBe(true);
+    await expectDenied(as(owner, `update public.organizations set is_demo = true where id = $1`, [org]));
+  });
+
   it('a read-only (canceled) business can’t write', async () => {
     await setSubscription(org, 'canceled', { products: ['wholesale'] });
     await expectDenied(call(owner, 'save_customer', [org, null, j({ name: 'Late' })], ['uuid', 'uuid', 'jsonb']));
