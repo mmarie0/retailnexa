@@ -18,6 +18,7 @@ import { Change, Pct, Stat } from './_dashboard/tiles';
 import { billTotals, monthReports, payrollPaid, salesRollups, scheduledPayroll } from './_dashboard/data';
 import { RangeView } from './_dashboard/range-view';
 import { Icon } from './app-shell';
+import { WholesaleOverview } from './wholesale/_overview';
 
 export const metadata: Metadata = { title: 'Overview' };
 
@@ -27,6 +28,19 @@ export default async function OverviewPage({ searchParams }: PageProps<'/app'>) 
   const ctx = await getOrgContext();
   const sp = await searchParams;
   const supabase = await getSupabase();
+  if (ctx.org.businessType === 'wholesale') {
+    // Wholesale accounts get the Wholesale Ledger's overview instead of retail sales and bills.
+    const { data: tz } = await supabase.from('organizations').select('timezone').eq('id', ctx.org.id).maybeSingle();
+    return (
+      <>
+        <div className="flex items-baseline justify-between gap-2.5">
+          <h1 className="text-[26px] font-extrabold tracking-[-.02em]">{ctx.org.name}</h1>
+          <span className="text-[13px] text-muted">{ROLE_LABELS[ctx.org.role]}</span>
+        </div>
+        <WholesaleOverview ctx={ctx} today={todayIn(tz?.timezone)} />
+      </>
+    );
+  }
   const [{ count: locations }, { count: members }, { data: announcements }, { data: orgRow }, { data: saved }] = await Promise.all([
     supabase.from('locations').select('id', { count: 'exact', head: true }).eq('organization_id', ctx.org.id).eq('is_active', true),
     can(ctx, 'members.view')
@@ -305,6 +319,8 @@ export default async function OverviewPage({ searchParams }: PageProps<'/app'>) 
   return (
     <>
       {head}
+      {ctx.org.businessType === 'both' && <WholesaleOverview ctx={ctx} today={today} compact />}
+      {ctx.org.businessType === 'both' && <Eyebrow>Retail</Eyebrow>}
       {out}
       <Link href="/app/customize" className="self-center rounded-full bg-card px-4 py-2 text-sm font-semibold text-accent-strong shadow-[var(--shadow-card)]">
         <Icon k="repeat" className="mr-1.5 inline size-4" />Customize this page
