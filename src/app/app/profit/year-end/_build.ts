@@ -1,11 +1,19 @@
 import 'server-only';
 import { can, getSupabase, type OrgContext } from '@/lib/auth/context';
-import { pageAll } from '@/lib/page-all';
+import { pageAll as pageAllRaw } from '@/lib/page-all';
 import type { YearEndInput } from '@/lib/reports/year-end';
 import { loadMonths } from '../../sales/history/_load';
 import { loadProfitYear } from '../_data';
 
 /** Everything the year-end workbook needs, limited to what this person may see (each sheet needs its own permission). */
+/** Thrown when a read stops at its page cap: the workbook goes to an accountant, so it never hands over a sheet that stopped short. */
+export class ExportTooLargeError extends Error {}
+const pageAll = async <T,>(read: Parameters<typeof pageAllRaw<T>>[0], max?: number): Promise<T[]> => {
+  const rows = await pageAllRaw<T>(read, max);
+  if (rows.truncated) throw new ExportTooLargeError('This year has more records than the export can read in one go. Contact support and we’ll export it for you.');
+  return rows;
+};
+
 export async function yearEndData(ctx: OrgContext, year: number): Promise<YearEndInput> {
   const sb = await getSupabase();
   const from = `${year}-01-01`, to = `${year}-12-31`;

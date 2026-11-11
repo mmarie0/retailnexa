@@ -62,7 +62,7 @@ export default function Home() {
         <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 md:grid-cols-3">
           {[
             { title: 'For retail stores', body: 'Register reports, bills, vendors, bank matching, staff schedules and payroll records, profit and partners.', href: '/solutions/retail' },
-            { title: 'For wholesale', body: 'Catalog with case packs, customer pricing and credit, sales rep ordering, picking and invoicing.', href: '/solutions/wholesale' },
+            { title: 'For wholesale', body: 'Bookkeeping, bills and vendors today. Catalog with case packs, customer pricing, sales rep ordering, picking and invoicing are coming soon.', href: '/solutions/wholesale' },
             { title: 'For the books', body: 'Double-entry accounting underneath it all, so your profit and loss actually reconciles.', href: '/solutions/accounting' },
           ].map((c) => (
             <Link key={c.href} href={c.href} className="group block border-t-2 border-white/40 pt-4">
