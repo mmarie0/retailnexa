@@ -32,7 +32,7 @@ export function DueCalendar({ ym, today, items, showKind, canAdd }: { ym: string
       <button key={iso} type="button" onClick={() => setSel(on ? null : iso)} aria-pressed={on}
         aria-label={`${longDay(iso)}${list.length ? `, ${list.length} due, ${usd(sum)}` : ''}`}
         className={cx('flex min-h-[54px] min-w-0 flex-col items-center gap-0.5 rounded-xl border px-0.5 py-1 text-[13px]',
-          on ? 'border-transparent bg-accent text-white' : 'bg-card', iso === today && !on ? 'border-accent' : 'border-transparent')}>
+          on ? 'border-transparent bg-accent text-on-accent' : 'bg-card', iso === today && !on ? 'border-accent' : 'border-transparent')}>
         <span>{d}</span>
         <span className="flex h-1.5 gap-0.5">{list.slice(0, 3).map((b) => <i key={b.id} className={cx('size-1.5 rounded-full', DOT[b.dot])} />)}</span>
         {list.length > 0 && <span className={cx('num max-w-full overflow-hidden text-[10px] whitespace-nowrap', on ? 'text-white' : 'text-muted')}>{short(sum)}</span>}

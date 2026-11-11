@@ -37,7 +37,7 @@ export default async function YearEndPage({ searchParams }: PageProps<'/app/prof
       <h1 className="text-[26px] font-extrabold tracking-[-.02em]">Year-end report</h1>
       <ProfitTabs active="/app/profit/year-end" />
       <nav aria-label="Year" className="flex gap-1.5">
-        {years.map((y) => <Link key={y} href={`/app/profit/year-end?y=${y}`} aria-current={y === year ? 'page' : undefined} className={cx('rounded-full px-3.5 py-1.5 text-sm font-semibold', y === year ? 'bg-accent-strong text-white' : 'bg-card shadow-[var(--shadow-card)]')}>{y}</Link>)}
+        {years.map((y) => <Link key={y} href={`/app/profit/year-end?y=${y}`} aria-current={y === year ? 'page' : undefined} className={cx('rounded-full px-3.5 py-1.5 text-sm font-semibold', y === year ? 'bg-accent text-on-accent' : 'bg-card shadow-[var(--shadow-card)]')}>{y}</Link>)}
       </nav>
       {year === +today.slice(0, 4) && <Notice>{year} is still in progress: this covers January 1 through today.</Notice>}
       {missing.length > 0 && <Notice tone="warning">No bills or no payroll recorded for {missing.join(', ')}. Profit for those months reads high until they’re added (or enter the month by hand on Profit).</Notice>}
@@ -52,7 +52,7 @@ export default async function YearEndPage({ searchParams }: PageProps<'/app/prof
         <h2 className="text-lg font-bold">What’s in the Excel file</h2>
         <ul className="mt-2 list-disc pl-5 text-[15px]">{sheets.map((s) => <li key={s}>{s}</li>)}</ul>
         {can(ctx, 'reports.export')
-          ? <a href={`/app/profit/year-end/xlsx?y=${year}`} className="mt-3 inline-flex rounded-full bg-accent-strong px-4 py-2 font-semibold text-white">Download {year} Excel report</a>
+          ? <a href={`/app/profit/year-end/xlsx?y=${year}`} className="mt-3 inline-flex rounded-full bg-accent px-4 py-2 font-semibold text-on-accent">Download {year} Excel report</a>
           : <p className="mt-3 text-sm text-muted">Downloading needs the Export reports permission.</p>}
         <p className="mt-2 text-sm text-muted">Built from what’s in RetailNexa. Your accountant should check it against your bank statements and POS reports.</p>
       </Card>

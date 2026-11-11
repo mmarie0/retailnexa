@@ -133,7 +133,7 @@ export default async function VendorsPage({ searchParams }: PageProps<'/app/vend
             <nav aria-label="Sort" className="flex flex-wrap gap-1.5">
               {SORTS.map(([k, l]) => (
                 <Link key={k} href={qs({ sort: k })} aria-current={sort === k ? 'page' : undefined}
-                  className={cx('rounded-full px-3 py-1.5 text-sm font-semibold', sort === k ? 'bg-accent text-white' : 'bg-card text-muted shadow-[var(--shadow-card)] hover:text-ink')}>{l}</Link>
+                  className={cx('rounded-full px-3 py-1.5 text-sm font-semibold', sort === k ? 'bg-accent text-on-accent' : 'bg-card text-muted shadow-[var(--shadow-card)] hover:text-ink')}>{l}</Link>
               ))}
             </nav>
           )}

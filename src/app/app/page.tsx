@@ -339,7 +339,7 @@ function RangeBar({ range, today }: { range: ReturnType<typeof rangeFor>; today:
       <nav aria-label="Date range" className="flex gap-1.5 overflow-x-auto pb-1">
         {RANGES.filter(([k]) => k !== 'custom').map(([k, label]) => (
           <Link key={k} href={k ? `/app?r=${k}` : '/app'} aria-current={cur === k ? 'page' : undefined}
-            className={cx('whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold', cur === k ? 'bg-ink text-white' : 'bg-card text-ink shadow-[var(--shadow-card)]')}>{label}</Link>
+            className={cx('whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold', cur === k ? 'bg-ink text-paper' : 'bg-card text-ink shadow-[var(--shadow-card)]')}>{label}</Link>
         ))}
       </nav>
       <form action="/app" className="flex flex-wrap items-end gap-2" aria-label="Custom dates">
@@ -350,7 +350,7 @@ function RangeBar({ range, today }: { range: ReturnType<typeof rangeFor>; today:
         <label className="flex flex-col gap-1 text-xs font-semibold text-muted">To
           <input type="date" name="to" defaultValue={range?.to ?? today} className="rounded-[10px] border border-line bg-card px-2.5 py-1.5 text-sm text-ink" />
         </label>
-        <button className={cx('rounded-full px-3.5 py-1.5 text-sm font-semibold', cur === 'custom' ? 'bg-ink text-white' : 'bg-card shadow-[var(--shadow-card)]')}>Custom</button>
+        <button className={cx('rounded-full px-3.5 py-1.5 text-sm font-semibold', cur === 'custom' ? 'bg-ink text-paper' : 'bg-card shadow-[var(--shadow-card)]')}>Custom</button>
         {range && <span className="text-sm text-muted">{daysBetween(range.from, range.to) + 1} days</span>}
       </form>
     </div>
