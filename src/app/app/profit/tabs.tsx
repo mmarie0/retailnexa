@@ -6,6 +6,7 @@ const TABS = [
   { href: '/app/profit/partners', label: 'Partners' },
   { href: '/app/profit/calculator', label: 'Calculator' },
   { href: '/app/profit/report', label: 'Report' },
+  { href: '/app/profit/year-end', label: 'Year-end' },
 ];
 
 export function ProfitTabs({ active }: { active: string }) {
