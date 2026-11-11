@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { randomUUID } from 'node:crypto';
+import { pageAll } from '@/lib/page-all';
 import { can, getOrgContext } from '@/lib/auth/context';
 import { ActionForm } from '@/components/action-form';
 import { SubmitButton } from '@/components/submit-button';
@@ -32,19 +33,20 @@ export default async function PayrollPage({ searchParams }: PageProps<'/app/staf
   const periodStartParam = typeof sp.ps === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(sp.ps) ? sp.ps : null;
   const period = periodStartParam ? payPeriod(periodStartParam, s.rules) : payPeriod(addDays(s.today, -7 * s.rules.pay_every_weeks), s.rules);
   // The pay period may fall outside the loaded range when picked by hand.
-  const { data: periodShifts } = await s.supabase.from('shifts').select('employee_id, work_date, off, start_time, end_time, lunch_min, actual_in, actual_out')
-    .eq('organization_id', ctx.org.id).gte('work_date', period.start).lte('work_date', period.end).limit(5000);
-  const pidx = new Map((periodShifts ?? []).map((x) => [`${x.employee_id}|${x.work_date}`, x]));
+  // Paged: the API returns at most 1,000 rows per read (#169).
+  const periodShifts = await pageAll<{ employee_id: string; work_date: string }>((a, b) => s.supabase.from('shifts').select('employee_id, work_date, off, start_time, end_time, lunch_min, actual_in, actual_out')
+    .eq('organization_id', ctx.org.id).gte('work_date', period.start).lte('work_date', period.end).order('work_date').order('employee_id').range(a, b));
+  const pidx = new Map(periodShifts.map((x) => [`${x.employee_id}|${x.work_date}`, x]));
   const [{ data: runs }, { data: advances }] = await Promise.all([
     s.supabase.from('pay_runs').select('id, pay_date, period_start, period_end, note, voided_at').eq('organization_id', ctx.org.id)
       .gte('pay_date', from).lte('pay_date', to).order('pay_date', { ascending: false }),
     s.supabase.from('employee_advances').select('id, employee_id, advance_date, amount_cents, note, repaid_run_id').eq('organization_id', ctx.org.id).is('repaid_run_id', null).order('advance_date'),
   ]);
   const monthRuns = (runs ?? []) as Run[];
-  const { data: lines } = monthRuns.length
-    ? await s.supabase.from('pay_run_lines').select('run_id, employee_id, hours, overtime_hours, regular_cents, overtime_cents, bonus_cents, gross_cents, advance_cents, net_cents, employer_tax_cents')
-      .eq('organization_id', ctx.org.id).in('run_id', monthRuns.map((r) => r.id))
-    : { data: [] as Line[] };
+  const lines = monthRuns.length
+    ? await pageAll<Line>((a, b) => s.supabase.from('pay_run_lines').select('id, run_id, employee_id, hours, overtime_hours, regular_cents, overtime_cents, bonus_cents, gross_cents, advance_cents, net_cents, employer_tax_cents')
+      .eq('organization_id', ctx.org.id).in('run_id', monthRuns.map((r) => r.id)).order('id').range(a, b))
+    : ([] as Line[]);
   const liveIds = new Set(monthRuns.filter((r) => !r.voided_at).map((r) => r.id));
   const monthLines = ((lines ?? []) as Line[]).filter((l) => liveIds.has(l.run_id));
   const n = (v: unknown) => Number(v ?? 0);

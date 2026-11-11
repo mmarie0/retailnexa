@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { pageAll } from '@/lib/page-all';
 import { can, getOrgContext } from '@/lib/auth/context';
 import { ActionForm } from '@/components/action-form';
 import { SubmitButton } from '@/components/submit-button';
@@ -71,8 +72,8 @@ export default async function EmployeesPage() {
   const weekly = current.reduce((a, e) => a + weeklyCost(e, s.pays.get(e.id), s.rules), 0);
   let labor: ReturnType<typeof laborMonth> | null = null;
   if (s.seePay && can(ctx, 'sales.view')) {
-    const { data } = await s.supabase.from('sales_days').select('business_date, gross_sales_cents').eq('organization_id', ctx.org.id).is('voided_at', null)
-      .gte('business_date', `${cur}-01`).lte('business_date', s.today).limit(2000);
+    const data = await pageAll<{ business_date: string; gross_sales_cents: number }>((a, b) => s.supabase.from('sales_days').select('business_date, gross_sales_cents').eq('organization_id', ctx.org.id).is('voided_at', null)
+      .gte('business_date', `${cur}-01`).lte('business_date', s.today).order('business_date').order('id').range(a, b));
     const sales = new Map<string, number>();
     for (const r of data ?? []) sales.set(r.business_date, (sales.get(r.business_date) ?? 0) + Number(r.gross_sales_cents));
     labor = laborMonth(cur, s.today, sales, s.employees, s.pays, s.idx, s.rules);

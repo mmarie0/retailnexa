@@ -15,7 +15,10 @@ describe('app navigation (copied from the RetailNexa app)', () => {
     expect(locate('/app/bank')).toEqual({ area: 'bills', page: 'more' });
     expect(locate('/app/vendors')).toEqual({ area: 'bills', page: 'vendors' });
     expect(locate('/app/sales/import')).toEqual({ area: 'sales', page: 'daily' });
-    expect(locate('/app/accounting/profit-loss')).toEqual({ area: 'sales', page: 'profit' });
+    expect(locate('/app/accounting/profit-loss')).toEqual({ area: 'books', page: 'accounting' });
+    expect(locate('/app/profit')).toEqual({ area: 'sales', page: 'profit' });
+    expect(locate('/app/profit/partners')).toEqual({ area: 'sales', page: 'profit' });
+    expect(locate('/app/bills/balances')).toEqual({ area: 'bills', page: 'more' });
     expect(locate('/app/accounting/balance-sheet')).toEqual({ area: 'books', page: 'accounting' });
     expect(locate('/app/settings/team')).toEqual({ area: 'business', page: 'team' });
     expect(locate('/app/settings/export')).toEqual({ area: 'books', page: 'export' });
@@ -29,7 +32,7 @@ describe('app navigation (copied from the RetailNexa app)', () => {
     expect(areas.find((a) => a.key === 'bills')!.pages.map((p) => p.key)).toEqual([]);
     expect(areas.find((a) => a.key === 'sales')!.pages.map((p) => p.key)).toEqual(['daily', 'history', 'categories']);
     expect(areas.some((a) => a.key === 'books')).toBe(false);
-    expect(visibleMore(cashier).map((p) => p.key)).toEqual(['statements', 'deposits']);
+    expect(visibleMore(cashier).map((p) => p.key)).toEqual(['deposits']);
   });
 
   it('role defaults: every bottom tab either opens a page the role may see or is disabled (#123)', () => {
