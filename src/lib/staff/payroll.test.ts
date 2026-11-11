@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_RULES, dayHours, indexShifts, laborDay, laborMonth, payPeriod, periodLines, shiftHours, t12, weekStart, weeklyCost,
+  DEFAULT_RULES, dayHours, payLineError, indexShifts, laborDay, laborMonth, payPeriod, periodLines, shiftHours, t12, weekStart, weeklyCost,
   type Employee, type Pay, type Shift,
 } from './payroll';
 
@@ -70,5 +70,13 @@ describe('pay runs', () => {
   });
   it('12-hour labels', () => {
     expect([t12('09:00'), t12('17:30'), t12('00:00'), t12('12:00')]).toEqual(['9a', '5:30p', '12a', '12p']);
+  });
+});
+
+describe('pay-run messages (#166)', () => {
+  it('are plain ASCII so they read the same as the database messages', () => {
+    const m = payLineError('Ana');
+    expect(m).toBe('Check Ana: hours 0 to 400, overtime no more than hours, bonus 0 to 10,000 dollars.');
+    expect(/^[\x20-\x7e]*$/.test(m)).toBe(true);
   });
 });
