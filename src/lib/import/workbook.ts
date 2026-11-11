@@ -17,8 +17,14 @@ export async function readWorkbook(buf: ArrayBuffer, maxRows = 20_000): Promise<
   }
   // Not a zip at all: often a CSV that was renamed to .xlsx.
   if (!(head[0] === 0x50 && head[1] === 0x4b)) {
-    const text = new TextDecoder().decode(buf.slice(0, 2_000_000));
-    if (/[,;\t]/.test(text.split(/\r?\n/)[0] ?? '') && !/\u0000/.test(text)) return [{ name: 'Sheet1', rows: parseCsv(text).slice(0, maxRows + 1) }];
+    // Never cut a CSV short without saying so (#159).
+    if (buf.byteLength > 8 * 1024 * 1024) throw new WorkbookError('This file isn’t an Excel workbook and is too large to read here. Upload it as a .csv file.');
+    const text = new TextDecoder().decode(buf);
+    if (/[,;\t]/.test(text.split(/\r?\n/)[0] ?? '') && !/\u0000/.test(text)) {
+      const rows = parseCsv(text);
+      if (rows.length > maxRows + 1) throw new WorkbookError(`That file has more than ${maxRows.toLocaleString('en-US')} rows. Upload it as a .csv file or split it.`);
+      return [{ name: 'Sheet1', rows }];
+    }
     throw new WorkbookError('This file isn’t an Excel workbook. Save it as .xlsx or CSV and try again.');
   }
   try {
@@ -29,7 +35,9 @@ export async function readWorkbook(buf: ArrayBuffer, maxRows = 20_000): Promise<
     const sheets = wb.worksheets.filter((ws) => ws.state !== 'hidden' && ws.state !== 'veryHidden').map((ws) => {
       const rows: string[][] = [];
       ws.eachRow({ includeEmpty: false }, (row) => {
-        rows.push((row.values as unknown[]).slice(1).map(cellText)); total++;
+        // Stop as soon as the cap is passed instead of building every row first (#159).
+        if (++total > maxRows + 1) throw new WorkbookError(`That workbook has more than ${maxRows.toLocaleString('en-US')} rows. Split it or save each kind as its own CSV.`);
+        rows.push((row.values as unknown[]).slice(1).map(cellText));
       });
       return { name: ws.name, rows };
     });

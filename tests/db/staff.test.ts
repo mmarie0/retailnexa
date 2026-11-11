@@ -160,4 +160,27 @@ describe('#102 staff', () => {
       expect(await sys(`select 1 from public.pay_runs where organization_id = $1`, [o])).toHaveLength(0);
     });
   });
+
+  describe('#157 Lows', () => {
+    const run = (lines: object[], key: string | null, period: [string, string], note: string | null = null) =>
+      as<{ id: string }>(owner, `select public.create_pay_run($1, '2026-04-20', $2, $3, $4::jsonb, $5, $6) as id`, [org, period[0], period[1], JSON.stringify(lines), note, key]);
+
+    it('overtime hours are paid at the regular rate while overtime is off; on, they get the multiplier', async () => {
+      await as(owner, `select public.save_staff_settings($1, true, false, 40, 1.5, 0, 1, 12)`, [org]);
+      const [{ id: off }] = await run([{ employee_id: ana, hours: 10, overtime_hours: 4 }], null, ['2026-04-05', '2026-04-11']);
+      expect((await sys<{ o: string; r: string; g: string }>(`select overtime_hours as o, regular_cents as r, gross_cents as g from public.pay_run_lines where run_id = $1`, [off]))[0])
+        .toEqual({ o: '0.00', r: '15000', g: '15000' });
+      await as(owner, `select public.save_staff_settings($1, true, true, 40, 1.5, 0, 1, 12)`, [org]);
+      const [{ id: on }] = await run([{ employee_id: ana, hours: 10, overtime_hours: 4 }], null, ['2026-04-12', '2026-04-18']);
+      expect((await sys<{ g: string }>(`select gross_cents as g from public.pay_run_lines where run_id = $1`, [on]))[0].g).toBe(String(6 * 1500 + 4 * 2250));
+    });
+
+    it('a request key only replays the same request; the overlap error isn’t a unique-violation code', async () => {
+      await run([{ employee_id: ben, hours: 0 }], 'low-key-0001', ['2026-03-01', '2026-03-07'], 'first');
+      await expectDenied(run([{ employee_id: ben, hours: 0 }], 'low-key-0001', ['2026-03-01', '2026-03-07'], 'changed'), /already saved with different details/);
+      const err = await run([{ employee_id: ben, hours: 0 }], null, ['2026-03-05', '2026-03-11']).catch((e: { code?: string; message: string }) => e);
+      expect(err).toMatchObject({ code: '22023' });
+      expect((err as Error).message).toMatch(/^Ben is already in a pay run for these dates; void that run first$/);
+    });
+  });
 });

@@ -374,3 +374,29 @@ describe('#146 tab names and #155 limits', () => {
     expect(read).toBe(false);
   });
 });
+
+describe('#159 import follow-ups', () => {
+  it('names that mix vendors with another kind are not guessed', async () => {
+    const { kindFromName } = await import('./bundle');
+    for (const n of ['Vendor statements', 'Vendor transactions', 'Bank vendors', 'Daily vendors', 'Vendor sales']) expect(kindFromName(`a.xlsx › ${n}`)).toBeNull();
+    expect(kindFromName('a.xlsx › AP vendors')).toBe('bill');
+    expect(kindFromName('a.xlsx › Preferred vendors')).toBe('vendor');
+    expect(kindFromName('a.xlsx › Vendor list')).toBe('vendor');
+  });
+
+  it('a CSV renamed to .xlsx is refused past the row cap instead of cut', async () => {
+    const { readWorkbook } = await import('./workbook');
+    const csv = new TextEncoder().encode('Vendor,Amount\n' + 'Hair Zone,5\n'.repeat(30)).buffer as ArrayBuffer;
+    await expect(readWorkbook(csv, 20)).rejects.toThrow(/more than 20 rows/);
+    expect((await readWorkbook(csv, 40))[0].rows).toHaveLength(31);
+  });
+
+  it('exceljs stops at the row cap', async () => {
+    const { Workbook } = await import('exceljs');
+    const { readWorkbook } = await import('./workbook');
+    const wb = new Workbook();
+    const ws = wb.addWorksheet('Bills');
+    for (let i = 0; i < 50; i++) ws.addRow(['x', i]);
+    await expect(readWorkbook((await wb.xlsx.writeBuffer()) as ArrayBuffer, 20)).rejects.toThrow(/more than 20 rows/);
+  });
+});
