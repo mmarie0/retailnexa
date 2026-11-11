@@ -81,7 +81,10 @@ export const AREAS: NavArea[] = [
   },
   {
     key: 'inventory', label: 'Inventory', icon: 'box', bottom: false, side: 'wholesale',
-    pages: [{ key: 'ws-items', label: 'Inventory', href: '/app/wholesale/inventory', icon: 'box', perm: ['inventory.view', 'wholesale.catalog.manage'] }],
+    pages: [
+      { key: 'ws-items', label: 'Inventory', href: '/app/wholesale/inventory', icon: 'box', perm: ['inventory.view', 'wholesale.catalog.manage'] },
+      { key: 'ws-catalog', label: 'Order screen', href: '/app/wholesale/catalog', icon: 'tag', perm: 'wholesale.catalog.manage' },
+    ],
   },
   {
     key: 'bills', label: 'Bills', icon: 'bills', bottom: true,

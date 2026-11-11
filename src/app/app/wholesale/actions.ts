@@ -109,7 +109,7 @@ export async function saveItem(_p: ActionState, form: FormData): Promise<ActionS
   try {
     const ctx = await guard('wholesale.catalog.manage'); if (isState(ctx)) return ctx;
     const f = z.object({
-      id: optUuid, name: z.string().trim().min(1, 'Enter the item name').max(160), sku: text(60), upc: text(40), brand: text(60), category: text(60),
+      id: optUuid, name: z.string().trim().min(1, 'Enter the item name').max(160), sku: text(60), upc: text(40), brand: text(60), category: text(60), subcategory: text(60),
       vendor: text(120), bin: text(30), unit: text(20),
       case_pack: z.coerce.number().int().min(1).max(100000).or(z.literal('')).default(''),
       reorder_at: z.coerce.number().min(0).max(100000000).or(z.literal('')).default(''),
@@ -361,5 +361,43 @@ export async function receiveExpected(_p: ActionState, form: FormData): Promise<
     if (error) throw error;
     done();
     return ok(`Received and applied to ${Number(data)} invoice${Number(data) === 1 ? '' : 's'}, oldest first.`);
+  } catch (e) { return failFrom(e); }
+}
+
+// ---------------------------------------------------------------- catalog look
+export async function saveLayout(_p: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const ctx = await guard('wholesale.catalog.manage'); if (isState(ctx)) return ctx;
+    const f = z.object({ view: z.enum(['list', 'grid']), size: z.enum(['s', 'm', 'l']).default('m') }).safeParse(fields(form));
+    if (!f.success) return fail('Pick list or grid.');
+    const { error } = await (await getSupabase()).rpc('save_catalog_layout', { p_org: ctx.org.id, p: { ...f.data, images: form.getAll('images').includes('true') } });
+    if (error) throw error;
+    done();
+    return ok('Saved. The order screen now opens this way for everyone.');
+  } catch (e) { return failFrom(e); }
+}
+
+/** Save the drag-and-drop order (item ids, first to last). */
+export async function saveItemOrder(ids: string[]): Promise<ActionState> {
+  try {
+    const ctx = await guard('wholesale.catalog.manage'); if (isState(ctx)) return ctx;
+    const list = z.array(uuid).min(1).max(5000).safeParse(ids);
+    if (!list.success) return fail('Nothing to save.');
+    const { error } = await (await getSupabase()).rpc('set_item_order', { p_org: ctx.org.id, p_ids: list.data });
+    if (error) throw error;
+    done();
+    return ok('Order saved.');
+  } catch (e) { return failFrom(e); }
+}
+
+/** After the browser uploads a photo to item-images, point the item at it (or clear it with path null). */
+export async function setItemImage(itemId: string, path: string | null): Promise<ActionState> {
+  try {
+    const ctx = await guard('wholesale.catalog.manage'); if (isState(ctx)) return ctx;
+    if (!uuid.safeParse(itemId).success || (path !== null && !path.startsWith(`${ctx.org.id}/${itemId}/`))) return fail('That photo doesn’t belong to this item.');
+    const { error } = await (await getSupabase()).rpc('set_item_image', { p_org: ctx.org.id, p_item: itemId, p_path: path });
+    if (error) throw error;
+    done();
+    return ok(path ? 'Photo saved.' : 'Photo removed.');
   } catch (e) { return failFrom(e); }
 }
