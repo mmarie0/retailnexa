@@ -5,7 +5,7 @@ import { getSupabase } from '@/lib/auth/context';
 import { Notice, PageHeader } from '@/components/ui';
 import { committed, standing, withBalances } from '@/lib/wholesale/ledger';
 import { ReadOnlyNotice } from '../../read-only-notice';
-import { loadCustomers, loadItems, loadOpenLines, loadOrders, loadReceivables, loadSettings, loadTiers, wsContext } from '../_data';
+import { loadCustomers, loadItems, loadOpenLines, loadOrders, loadReceivables, loadSettings, loadTiers, wsContext, loadPopularity, itemImageUrls } from '../_data';
 import { saveOrder } from '../actions';
 import { OrderBuilder, type BuilderInitial } from './builder';
 import { builderData } from './data';
@@ -36,14 +36,16 @@ export default async function CreateOrderPage({ searchParams }: PageProps<'/app/
       lines: (ol ?? []).map((l) => ({ key: l.id, item_id: l.item_id, name: l.name, sku: l.sku, qty: Number(l.qty), price_cents: Number(l.price_cents) })),
     };
   } else if (typeof sp.customer === 'string') initial = { customer_id: sp.customer };
+  const [sold, images] = await Promise.all([loadPopularity(ctx.org.id), settings.grid_images ? itemImageUrls(items.filter((i) => i.is_active)) : Promise.resolve(new Map<string, string>())]);
+  const layout = { view: settings.catalog_view, size: settings.grid_size, images: settings.grid_images };
   const held = committed(lines.filter((l) => l.order_id !== editId));
   const inv = withBalances(rec.invoices, rec.payments, ctx.today);
-  const { bc, bi } = builderData(customers, tiers, items, (id) => (items.find((i) => i.id === id)?.qty ?? 0) - (held.get(id) ?? 0), (c) => standing(c, inv, ctx.today).warnings, initial?.customer_id);
+  const { bc, bi } = builderData(customers, tiers, items, (id) => (items.find((i) => i.id === id)?.qty ?? 0) - (held.get(id) ?? 0), (c) => standing(c, inv, ctx.today).warnings, initial?.customer_id, { sold, images });
   return (
     <>
       <PageHeader title={initial?.id ? 'Edit order' : 'Create order'} description="Pick the customer, tap quantities, then review. Prices follow the customer’s tier; you can change any price before saving." />
       <ReadOnlyNotice show={!ctx.access.canWrite} />
-      {ctx.access.canWrite && (bc.length ? <OrderBuilder mode="order" action={saveOrder} customers={bc} items={bi} taxRate={settings.tax_rate} today={ctx.today} initial={initial} />
+      {ctx.access.canWrite && (bc.length ? <OrderBuilder mode="order" action={saveOrder} customers={bc} items={bi} taxRate={settings.tax_rate} today={ctx.today} initial={initial} layout={layout} />
         : <Notice>Add a customer first, on the Customers page.</Notice>)}
     </>
   );
