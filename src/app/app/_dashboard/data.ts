@@ -4,6 +4,7 @@ import { addDays } from '@/lib/dashboard/overview';
 import type { Report, Rollup } from '@/lib/dashboard/overview';
 import { laborDay } from '@/lib/staff/payroll';
 import { loadStaff } from '../staff/_data';
+import { pageAll } from '@/lib/page-all';
 
 type Sb = Awaited<ReturnType<typeof getSupabase>>;
 
@@ -16,10 +17,9 @@ export async function salesRollups(sb: Sb, org: string, from: string, to: string
 
 /** Uploaded monthly reports whose month starts within [from, to]. */
 export async function monthReports(sb: Sb, org: string, from: string, to: string): Promise<Report[]> {
-  const { data, error } = await sb.from('sales_months').select('location_id, month, sales_cents, tax_cents')
-    .eq('organization_id', org).gte('month', from).lte('month', to);
-  if (error) throw error;
-  return ((data ?? []) as Report[]).map((r) => ({ ...r, sales_cents: Number(r.sales_cents), tax_cents: Number(r.tax_cents) }));
+  const data = await pageAll<Report>((a, b) => sb.from('sales_months').select('location_id, month, sales_cents, tax_cents')
+    .eq('organization_id', org).gte('month', from).lte('month', to).order('month').order('location_id').range(a, b));
+  return data.map((r) => ({ ...r, sales_cents: Number(r.sales_cents), tax_cents: Number(r.tax_cents) }));
 }
 
 /** Bills (not void) by due month: { 'YYYY-MM': { total, paid } }. */
@@ -40,8 +40,13 @@ export async function payrollPaid(sb: Sb, org: string, from: string, to: string)
 
 /** Payroll the schedule says the dates will cost (hourly from shifts or regular weeks, salary per day, with burden). */
 export async function scheduledPayroll(ctx: OrgContext, from: string, to: string): Promise<number> {
+  return (await scheduledPayrollDetail(ctx, from, to)).cents;
+}
+
+/** Same, plus whether every shift was read (false past 100,000 shifts, #169). */
+export async function scheduledPayrollDetail(ctx: OrgContext, from: string, to: string): Promise<{ cents: number; complete: boolean }> {
   const s = await loadStaff(ctx, () => ({ from, to }));
   let cents = 0;
   for (let d = from; d <= to; d = addDays(d, 1)) cents += laborDay(d, s.employees, s.pays, s.idx, s.rules).costCents;
-  return cents;
+  return { cents, complete: s.shiftsComplete };
 }

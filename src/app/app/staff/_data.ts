@@ -1,20 +1,8 @@
 import 'server-only';
 import { can, getSupabase, type OrgContext } from '@/lib/auth/context';
 import { todayIn } from '@/lib/time';
+import { pageAll } from '@/lib/page-all';
 import { DEFAULT_RULES, indexShifts, type Employee, type Pay, type Rules, type Shift } from '@/lib/staff/payroll';
-
-/** Shifts in a range, paged in 1,000s (the API returns at most 1,000 rows per read, #168). Up to 50,000. */
-async function allShifts(supabase: Awaited<ReturnType<typeof getSupabase>>, org: string, from: string, to: string) {
-  const data: Shift[] = [];
-  for (let page = 0; page < 50; page++) {
-    const { data: part, error } = await supabase.from('shifts').select('employee_id, work_date, off, start_time, end_time, lunch_min, actual_in, actual_out')
-      .eq('organization_id', org).gte('work_date', from).lte('work_date', to).order('work_date').order('employee_id').range(page * 1000, page * 1000 + 999);
-    if (error) throw error;
-    data.push(...((part ?? []) as Shift[]));
-    if (!part || part.length < 1000) break;
-  }
-  return { data };
-}
 
 /** Everything the staff pages share: employees, pay (payroll.view only), rules, shifts in a range. */
 export async function loadStaff(ctx: OrgContext, rangeFor?: (today: string) => { from: string; to: string }) {
@@ -24,12 +12,16 @@ export async function loadStaff(ctx: OrgContext, rangeFor?: (today: string) => {
   const range = rangeFor?.(today);
   const seePay = can(ctx, 'payroll.view');
   const [{ data: emps }, { data: pays }, { data: rules }, { data: shifts }, { data: locs }] = await Promise.all([
-    supabase.from('employees').select('id, name, role_title, location_id, start_date, end_date, is_active, regular, notes').eq('organization_id', ctx.org.id).order('name'),
-    seePay ? supabase.from('employee_pay').select('employee_id, pay_type, rate_cents, weekly_hours, burden_pct, tax_type, pay_method').eq('organization_id', ctx.org.id)
-      : Promise.resolve({ data: [] as Pay[] }),
+    pageAll<Employee>((a, b) => supabase.from('employees').select('id, name, role_title, location_id, start_date, end_date, is_active, regular, notes')
+      .eq('organization_id', ctx.org.id).order('name').order('id').range(a, b)).then((data) => ({ data })),
+    seePay ? pageAll<Pay>((a, b) => supabase.from('employee_pay').select('employee_id, pay_type, rate_cents, weekly_hours, burden_pct, tax_type, pay_method')
+      .eq('organization_id', ctx.org.id).order('employee_id').range(a, b)).then((data) => ({ data })) : Promise.resolve({ data: [] as Pay[] }),
     supabase.from('staff_settings').select('paid_lunch, overtime, overtime_after_hours, overtime_multiplier, pay_week_start, pay_every_weeks, labor_target_pct')
       .eq('organization_id', ctx.org.id).maybeSingle(),
-    range ? allShifts(supabase, ctx.org.id, range.from, range.to) : Promise.resolve({ data: [] as Shift[] }),
+    // Shifts paged in 1,000s up to 100,000; past that the schedule estimate says it's incomplete (#169).
+    range ? pageAll<Shift>((a, b) => supabase.from('shifts').select('employee_id, work_date, off, start_time, end_time, lunch_min, actual_in, actual_out')
+      .eq('organization_id', ctx.org.id).gte('work_date', range.from).lte('work_date', range.to).order('work_date').order('employee_id').range(a, b), 100).then((data) => ({ data }))
+      : Promise.resolve({ data: Object.assign([] as Shift[], { truncated: false }) }),
     supabase.rpc('my_locations', { p_org: ctx.org.id }),
   ]);
   const r = rules as Partial<Rules> | null;
@@ -46,6 +38,7 @@ export async function loadStaff(ctx: OrgContext, rangeFor?: (today: string) => {
       labor_target_pct: num(r?.labor_target_pct, 12), pay_week_start: num(r?.pay_week_start, 0), pay_every_weeks: num(r?.pay_every_weeks, 1),
     } as Rules,
     shifts: (shifts ?? []) as Shift[],
+    shiftsComplete: !(shifts as { truncated?: boolean } | null)?.truncated,
     idx: indexShifts((shifts ?? []) as Shift[]),
     stores: (locs ?? []) as { id: string; name: string }[],
     seePay,

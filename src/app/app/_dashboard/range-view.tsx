@@ -2,7 +2,7 @@ import { getSupabase, type OrgContext } from '@/lib/auth/context';
 import { Card, Notice } from '@/components/ui';
 import { formatMoney } from '@/lib/billing/plans';
 import { addDays, dailyAverage, daysBetween, lastYearOf, pct, salesByMonth, ymAdd, type Range, type Report, type Rollup } from '@/lib/dashboard/overview';
-import { billTotals, monthReports, payrollPaid, salesRollups, scheduledPayroll } from './data';
+import { billTotals, monthReports, payrollPaid, salesRollups, scheduledPayrollDetail } from './data';
 import { DailySalesChart } from './daily-sales-chart';
 import { TrendChart } from './trend-chart';
 import { Pct, Stat } from './tiles';
@@ -38,8 +38,8 @@ export async function RangeView({ ctx, range, perm }: { ctx: OrgContext; range: 
     perm.payroll ? payrollPaid(sb, org, range.from, range.to) : null,
     perm.profit ? payrollPaid(sb, org, ly.from, ly.to) : null,
   ]);
-  const payEst = pay && pay.runs === 0 ? await scheduledPayroll(ctx, range.from, range.to) : null;
-  const payUse = pay ? (pay.runs ? pay.cents : payEst ?? 0) : null;
+  const payEst = pay && pay.runs === 0 ? await scheduledPayrollDetail(ctx, range.from, range.to) : null;
+  const payUse = pay ? (pay.runs ? pay.cents : payEst?.cents ?? 0) : null;
   const sum = (m: Map<string, { total: number; paid: number }> | null) => {
     let total = 0, paid = 0;
     for (const v of m?.values() ?? []) { total += v.total; paid += v.paid; }
@@ -76,7 +76,7 @@ export async function RangeView({ ctx, range, perm }: { ctx: OrgContext; range: 
           sub={prev?.any ? <>{money0(prev.net)} last year <Pct v={pct(cur.net, prev.net)} /></> : 'No sales last year for these dates'} />}
         {cur && <Stat label="Daily average" value={cur.avg.cents === null ? '—' : money0(cur.avg.cents)}
           sub={<>{cur.avg.days} day{cur.avg.days === 1 ? '' : 's'} with sales{cur.reportMonths ? ' (plus monthly reports)' : ''}{prev?.avg.cents ? <> · LY {money0(prev.avg.cents)} <Pct v={pct(cur.avg.cents, prev.avg.cents)} /></> : null}</>} />}
-        {payUse !== null && <Stat block="indigo" label="Payroll" value={money0(payUse)} sub={pay!.runs ? `${pay!.runs} pay run${pay!.runs === 1 ? '' : 's'} paid` : 'Estimated from schedules'} />}
+        {payUse !== null && <Stat block="indigo" label="Payroll" value={money0(payUse)} sub={pay!.runs ? `${pay!.runs} pay run${pay!.runs === 1 ? '' : 's'} paid` : payEst?.complete === false ? 'Estimated from schedules (too many shifts to read them all; shorten the dates)' : 'Estimated from schedules'} />}
         {b && <Stat label="Bills due" value={money0(b.total)} sub={`${money0(b.paid)} paid · ${money0(b.left)} left`} />}
       </div>
       {perm.profit && (
