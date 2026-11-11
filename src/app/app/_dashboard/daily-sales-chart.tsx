@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { formatMoney } from '@/lib/billing/plans';
+import { useT } from '@/lib/i18n/client';
 
 type Point = { date: string; netCents: number | null };
 const dayLabel = (d: string, opts: Intl.DateTimeFormatOptions) =>
@@ -8,6 +9,7 @@ const dayLabel = (d: string, opts: Intl.DateTimeFormatOptions) =>
 
 /** Single-series bar chart: net sales per day, last 14 days. Missing days show a dashed "no report" stub. */
 export function DailySalesChart({ points, title = 'Net sales, last 14 days' }: { points: Point[]; title?: string }) {
+  const t = useT();
   const [active, setActive] = useState<number | null>(null);
   const max = Math.max(1, ...points.map((p) => p.netCents ?? 0));
   const shown = active ?? null;
@@ -19,7 +21,7 @@ export function DailySalesChart({ points, title = 'Net sales, last 14 days' }: {
         <span className="text-sm text-muted" aria-live="polite">
           {shown !== null
             ? `${dayLabel(points[shown].date, { weekday: 'short', month: 'short', day: 'numeric' })}: ${points[shown].netCents === null ? 'no report' : formatMoney(points[shown].netCents!)}`
-            : 'Hover a bar for the day’s total'}
+            : t('Hover a bar for the day’s total')}
         </span>
       </figcaption>
       <div className="relative mt-3 h-40" onMouseLeave={() => setActive(null)}>
@@ -52,9 +54,9 @@ export function DailySalesChart({ points, title = 'Net sales, last 14 days' }: {
         <span>{dayLabel(points[points.length - 1].date, { month: 'short', day: 'numeric' })}</span>
       </div>
       <details className="text-sm">
-        <summary className="cursor-pointer font-semibold text-accent-strong">Show as table</summary>
+        <summary className="cursor-pointer font-semibold text-accent-strong">{t('Show as table')}</summary>
         <table className="mt-2 w-full">
-          <thead className="text-left text-muted"><tr><th className="py-1 font-semibold">Day</th><th className="text-right font-semibold">Net sales</th></tr></thead>
+          <thead className="text-left text-muted"><tr><th className="py-1 font-semibold">{t('Day')}</th><th className="text-right font-semibold">{t('Net sales')}</th></tr></thead>
           <tbody>
             {points.map((p) => (
               <tr key={p.date} className="border-t border-line">

@@ -64,14 +64,14 @@ export default async function ReportPage({ searchParams }: PageProps<'/app/profi
         </div>
         {!one && (
           <table className="w-full text-[14px]">
-            <thead className="text-left text-xs uppercase tracking-[.06em] text-muted"><tr><th className="py-1.5">Month</th><th className="text-right">Sales + tax</th><th className="text-right">Bills</th><th className="text-right">Payroll</th><th className="text-right">Profit</th></tr></thead>
+            <thead className="text-start text-xs uppercase tracking-[.06em] text-muted"><tr><th className="py-1.5">Month</th><th className="text-end">Sales + tax</th><th className="text-end">Bills</th><th className="text-end">Payroll</th><th className="text-end">Profit</th></tr></thead>
             <tbody>
               {months.map((m) => (
                 <tr key={m.ym} className="border-t border-line">
                   <td className="py-1.5">{mon(m.ym)}{m.projected ? ' (on pace)' : m.manual !== null ? ' (by hand)' : ''}</td>
-                  <td className="num text-right">{m.sales === null ? '—' : formatMoney(m.sales + m.tax)}</td>
-                  <td className="num text-right">{formatMoney(m.bills)}</td><td className="num text-right">{formatMoney(m.payroll)}</td>
-                  <td className="num text-right font-semibold">{m.profit === null ? '—' : formatMoney(m.profit)}</td>
+                  <td className="num text-end">{m.sales === null ? '—' : formatMoney(m.sales + m.tax)}</td>
+                  <td className="num text-end">{formatMoney(m.bills)}</td><td className="num text-end">{formatMoney(m.payroll)}</td>
+                  <td className="num text-end font-semibold">{m.profit === null ? '—' : formatMoney(m.profit)}</td>
                 </tr>
               ))}
             </tbody>
@@ -79,13 +79,13 @@ export default async function ReportPage({ searchParams }: PageProps<'/app/profi
         )}
         {perPartner.length > 0 && (
           <table className="w-full text-[14px]">
-            <thead className="text-left text-xs uppercase tracking-[.06em] text-muted"><tr><th className="py-1.5">Partner</th><th className="text-right">Share</th><th className="text-right">Share of profit</th><th className="text-right">Distributed</th><th className="text-right">Paid</th></tr></thead>
+            <thead className="text-start text-xs uppercase tracking-[.06em] text-muted"><tr><th className="py-1.5">Partner</th><th className="text-end">Share</th><th className="text-end">Share of profit</th><th className="text-end">Distributed</th><th className="text-end">Paid</th></tr></thead>
             <tbody>
               {perPartner.map((p) => (
                 <tr key={p.id} className="border-t border-line">
-                  <td className="py-1.5">{p.name}</td><td className="num text-right">{p.pct.toFixed(2)}%</td>
-                  <td className="num text-right">{p.ofProfit === null ? '—' : formatMoney(p.ofProfit)}</td>
-                  <td className="num text-right">{formatMoney(p.distributed)}</td><td className="num text-right">{formatMoney(p.paid)}</td>
+                  <td className="py-1.5">{p.name}</td><td className="num text-end">{p.pct.toFixed(2)}%</td>
+                  <td className="num text-end">{p.ofProfit === null ? '—' : formatMoney(p.ofProfit)}</td>
+                  <td className="num text-end">{formatMoney(p.distributed)}</td><td className="num text-end">{formatMoney(p.paid)}</td>
                 </tr>
               ))}
             </tbody>
@@ -93,8 +93,8 @@ export default async function ReportPage({ searchParams }: PageProps<'/app/profi
         )}
         {one && myPayments.length > 0 && (
           <table className="w-full text-[14px]">
-            <thead className="text-left text-xs uppercase tracking-[.06em] text-muted"><tr><th className="py-1.5">Paid on</th><th>How</th><th>Reference</th><th className="text-right">Amount</th></tr></thead>
-            <tbody>{myPayments.map((p, i) => <tr key={i} className="border-t border-line"><td className="py-1.5">{fmtDate(String(p.paid_on))}</td><td className="capitalize">{String(p.method)}</td><td>{p.reference ?? ''}</td><td className="num text-right">{formatMoney(Number(p.amount_cents))}</td></tr>)}</tbody>
+            <thead className="text-start text-xs uppercase tracking-[.06em] text-muted"><tr><th className="py-1.5">Paid on</th><th>How</th><th>Reference</th><th className="text-end">Amount</th></tr></thead>
+            <tbody>{myPayments.map((p, i) => <tr key={i} className="border-t border-line"><td className="py-1.5">{fmtDate(String(p.paid_on))}</td><td className="capitalize">{String(p.method)}</td><td>{p.reference ?? ''}</td><td className="num text-end">{formatMoney(Number(p.amount_cents))}</td></tr>)}</tbody>
           </table>
         )}
         <p className="text-xs text-muted">Profit here is cash-basis: sales + tax, plus or minus balances with other stores, less bills due in the month (including stock purchases) and payroll. It is not an audited net income. Share of profit splits the year’s profit by each active partner’s %.</p>

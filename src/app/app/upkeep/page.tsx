@@ -70,7 +70,7 @@ export default async function UpkeepPage() {
             <p className="font-bold">{t.name} <span className="font-normal text-muted">· {everyText(t)}</span></p>
             <p className="text-sm text-muted">{[t.area, stores.length > 1 ? (t.location_id ? storeName.get(t.location_id) : 'Every store') : null, t.lastDone ? `Last done ${fmtDate(t.lastDone)}` : 'Not done yet', t.vendor].filter(Boolean).join(' · ')}</p>
           </div>
-          <span className="text-right"><Badge tone={PILL[t.status][0]}>{PILL[t.status][1]}</Badge><span className="block text-xs text-muted">{t.is_active ? dueText(t) : 'Paused'}</span></span>
+          <span className="text-end"><Badge tone={PILL[t.status][0]}>{PILL[t.status][1]}</Badge><span className="block text-xs text-muted">{t.is_active ? dueText(t) : 'Paused'}</span></span>
         </div>
         {t.notes && <p className="text-sm text-muted">{t.notes}</p>}
         <div className="flex flex-col gap-1.5">

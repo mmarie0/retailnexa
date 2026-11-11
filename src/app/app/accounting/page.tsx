@@ -24,7 +24,7 @@ export default async function ChartOfAccountsPage() {
             <ul className="mt-2 divide-y divide-line">
               {rows.map((a) => (
                 <li key={a.id} className="flex items-center justify-between gap-3 px-5 py-2.5">
-                  <span><span className="num mr-3 text-muted">{a.code}</span>{a.name}</span>
+                  <span><span className="num me-3 text-muted">{a.code}</span>{a.name}</span>
                   <span className="flex gap-2">{a.is_system && <Badge>Standard</Badge>}{!a.is_active && <Badge tone="warning">Inactive</Badge>}</span>
                 </li>
               ))}

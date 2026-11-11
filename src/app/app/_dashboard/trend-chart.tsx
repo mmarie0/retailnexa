@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { formatMoney } from '@/lib/billing/plans';
+import { useT } from '@/lib/i18n/client';
 
 type Point = { ym: string; cents: number | null; lastYearCents: number | null; projected: boolean };
 const CUR = '#3f63de', LY = '#e07b39';
@@ -8,6 +9,7 @@ const mon = (ym: string, o: Intl.DateTimeFormatOptions) => new Date(`${ym}-01T00
 
 /** Net sales by month, this year beside last year (#108). This month's bar is the projection when there is one. */
 export function TrendChart({ points, title = '12-month sales trend' }: { points: Point[]; title?: string }) {
+  const t = useT();
   const [active, setActive] = useState<number | null>(null);
   const max = Math.max(1, ...points.flatMap((p) => [p.cents ?? 0, p.lastYearCents ?? 0]));
   const anyLy = points.some((p) => p.lastYearCents);
@@ -18,7 +20,7 @@ export function TrendChart({ points, title = '12-month sales trend' }: { points:
     <figure className="flex flex-col gap-2">
       <figcaption className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="font-bold">{title}</span>
-        <span className="text-sm text-muted" aria-live="polite">{active !== null ? tip(points[active]) : 'Hover a month for its totals'}</span>
+        <span className="text-sm text-muted" aria-live="polite">{active !== null ? tip(points[active]) : t('Hover a month for its totals')}</span>
       </figcaption>
       <div className="relative mt-3 h-40" onMouseLeave={() => setActive(null)}>
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 border-t border-dashed border-line" />
@@ -41,17 +43,17 @@ export function TrendChart({ points, title = '12-month sales trend' }: { points:
         {points.map((p) => <span key={p.ym} className="flex-1 text-center">{mon(p.ym, { month: 'narrow' })}</span>)}
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-        <span className="flex items-center gap-1.5"><i aria-hidden className="size-2.5 rounded-sm" style={{ background: CUR }} />Net sales{points.some((p) => p.projected) ? ' (striped = this month on pace)' : ''}</span>
-        {anyLy && <span className="flex items-center gap-1.5"><i aria-hidden className="size-2.5 rounded-sm" style={{ background: LY }} />Last year</span>}
+        <span className="flex items-center gap-1.5"><i aria-hidden className="size-2.5 rounded-sm" style={{ background: CUR }} />{t('Net sales')}{points.some((p) => p.projected) ? t(' (striped = this month on pace)') : ''}</span>
+        {anyLy && <span className="flex items-center gap-1.5"><i aria-hidden className="size-2.5 rounded-sm" style={{ background: LY }} />{t('Last year')}</span>}
       </div>
       <details className="text-sm">
-        <summary className="cursor-pointer font-semibold text-accent-strong">Show as table</summary>
+        <summary className="cursor-pointer font-semibold text-accent-strong">{t('Show as table')}</summary>
         <table className="mt-2 w-full">
-          <thead className="text-left text-muted"><tr><th className="py-1 font-semibold">Month</th><th className="text-right font-semibold">Net sales</th><th className="text-right font-semibold">Last year</th></tr></thead>
+          <thead className="text-left text-muted"><tr><th className="py-1 font-semibold">{t('Month')}</th><th className="text-right font-semibold">{t('Net sales')}</th><th className="text-right font-semibold">{t('Last year')}</th></tr></thead>
           <tbody>
             {points.map((p) => (
               <tr key={p.ym} className="border-t border-line">
-                <td className="py-1">{mon(p.ym, { month: 'short', year: 'numeric' })}{p.projected ? ' (on pace)' : ''}</td>
+                <td className="py-1">{mon(p.ym, { month: 'short', year: 'numeric' })}{p.projected ? t(' (on pace)') : ''}</td>
                 <td className="num text-right">{p.cents === null ? '—' : formatMoney(p.cents)}</td>
                 <td className="num text-right">{p.lastYearCents === null ? '—' : formatMoney(p.lastYearCents)}</td>
               </tr>

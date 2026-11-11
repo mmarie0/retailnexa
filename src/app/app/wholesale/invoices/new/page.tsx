@@ -7,13 +7,15 @@ import { loadCustomers, loadItems, loadOpenLines, loadReceivables, loadSettings,
 import { createInvoice } from '../../actions';
 import { OrderBuilder } from '../../order/builder';
 import { builderData } from '../../order/data';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'New invoice' };
 
 /** A direct invoice without an order (counter sale, walk-in). Stock goes out when it’s saved. */
 export default async function NewInvoicePage({ searchParams }: PageProps<'/app/wholesale/invoices/new'>) {
+  const t = await getT();
   const ctx = await wsContext();
-  if (!can(ctx, 'wholesale.receivables.manage')) return <Notice tone="warning">You don’t have permission to create invoices.</Notice>;
+  if (!can(ctx, 'wholesale.receivables.manage')) return <Notice tone="warning">{t('You don’t have permission to create invoices.')}</Notice>;
   const sp = await searchParams;
   const [customers, tiers, items, lines, settings, rec] = await Promise.all([
     loadCustomers(ctx.org.id), loadTiers(ctx.org.id), loadItems(ctx.org.id), loadOpenLines(ctx.org.id), loadSettings(ctx.org.id), loadReceivables(ctx.org.id),
@@ -23,10 +25,10 @@ export default async function NewInvoicePage({ searchParams }: PageProps<'/app/w
   const { bc, bi } = builderData(customers, tiers, items, (id) => (items.find((i) => i.id === id)?.qty ?? 0) - (held.get(id) ?? 0), (c) => standing(c, inv, ctx.today).warnings);
   return (
     <>
-      <PageHeader title="New invoice" description="For a sale without an order. To bill an order, open it and tap Invoice." />
+      <PageHeader title={t('New invoice')} description={t('For a sale without an order. To bill an order, open it and tap Invoice.')} />
       <ReadOnlyNotice show={!ctx.access.canWrite} />
       {ctx.access.canWrite && (bc.length ? <OrderBuilder mode="invoice" action={createInvoice} customers={bc} items={bi} taxRate={settings.tax_rate} today={ctx.today}
-        initial={typeof sp.customer === 'string' ? { customer_id: sp.customer } : undefined} /> : <Notice>Add a customer first, on the Customers page.</Notice>)}
+        initial={typeof sp.customer === 'string' ? { customer_id: sp.customer } : undefined} /> : <Notice>{t('Add a customer first, on the Customers page.')}</Notice>)}
     </>
   );
 }

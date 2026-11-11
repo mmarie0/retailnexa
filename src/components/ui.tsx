@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import type { ComponentProps, ReactNode } from 'react';
 import { cloneElement, isValidElement } from 'react';
+import { getT } from '@/lib/i18n/server';
+import { Tx } from './tx';
 
 export function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ');
@@ -45,7 +47,7 @@ export function Field({ label, htmlFor, hint, error, children }: { label: string
       <label htmlFor={htmlFor} className="text-[13px] font-medium text-muted">{label}</label>
       {control}
       {hint && !error && <p id={`${htmlFor}-hint`} className="text-sm text-muted">{hint}</p>}
-      {error && <p id={`${htmlFor}-error`} className="text-sm text-late" role="alert">{error}</p>}
+      {error && <p id={`${htmlFor}-error`} className="text-sm text-late" role="alert"><Tx text={error} /></p>}
     </div>
   );
 }
@@ -111,12 +113,13 @@ export function FormMessage({ state }: { state: { ok: boolean; message: string |
   if (!state.message) return null;
   return (
     <p role={state.ok ? 'status' : 'alert'} className={cx('rounded-xl px-3 py-2 text-sm font-medium', state.ok ? 'bg-paid-soft text-paid' : 'bg-late-soft text-late')}>
-      {state.message}
+      <Tx text={state.message} />
     </p>
   );
 }
 
-export function Logo({ className }: { className?: string }) {
+export async function Logo({ className }: { className?: string }) {
+  const t = await getT();
   return (
     <span className={cx('inline-flex items-center gap-2 text-[21px] font-extrabold tracking-tight', className)}>
       <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
@@ -125,7 +128,7 @@ export function Logo({ className }: { className?: string }) {
         <rect x="11.25" y="9" width="3.5" height="11" rx="1.5" fill="#7E99FA" />
         <rect x="16.5" y="5.5" width="3.5" height="14.5" rx="1.5" fill="#FF9B91" />
       </svg>
-      RetailNexa
+      {t('RetailNexa')}
     </span>
   );
 }

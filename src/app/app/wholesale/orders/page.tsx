@@ -5,14 +5,16 @@ import { fmtDate } from '../../bills/format';
 import { Stat } from '../../_dashboard/tiles';
 import { loadCustomers, loadOrders, wsContext } from '../_data';
 import { OrderBadge, Pills, Row, SearchBox, money, money0 } from '../_ui';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Orders' };
 const FILTERS: [string, string][] = [['', 'Open orders'], ['quotes', 'Quotes'], ['closed', 'Invoiced & cancelled'], ['all', 'All']];
 
 /** Sales orders and quotes, like the Ledger's Orders tab. */
 export default async function OrdersPage({ searchParams }: PageProps<'/app/wholesale/orders'>) {
+  const t = await getT();
   const ctx = await wsContext();
-  if (!can(ctx, 'wholesale.orders.view')) return <Notice tone="warning">You don’t have access to orders.</Notice>;
+  if (!can(ctx, 'wholesale.orders.view')) return <Notice tone="warning">{t('You don’t have access to orders.')}</Notice>;
   const sp = await searchParams;
   const f = String(sp.f ?? ''), q = String(sp.q ?? '').trim().toLowerCase();
   const [orders, customers] = await Promise.all([loadOrders(ctx.org.id), loadCustomers(ctx.org.id)]);
@@ -24,18 +26,18 @@ export default async function OrdersPage({ searchParams }: PageProps<'/app/whole
   const live = orders.filter((o) => o.kind === 'order' && open(o));
   return (
     <>
-      <PageHeader title="Orders" description="Quotes and sales orders. Pick and ship them, then invoice — invoicing takes the stock out."
-        actions={can(ctx, 'wholesale.orders.create') && ctx.access.canWrite ? <LinkButton href="/app/wholesale/order" size="sm">Create order</LinkButton> : undefined} />
+      <PageHeader title={t('Orders')} description={t('Quotes and sales orders. Pick and ship them, then invoice — invoicing takes the stock out.')}
+        actions={can(ctx, 'wholesale.orders.create') && ctx.access.canWrite ? <LinkButton href="/app/wholesale/order" size="sm">{t('Create order')}</LinkButton> : undefined} />
       {orders.length > 0 && (
         <div className="grid grid-cols-3 gap-3 max-[520px]:grid-cols-1">
-          <Stat block="blue" label="Open orders" value={String(live.length)} sub={money0(live.reduce((s, o) => s + o.total_cents, 0))} />
-          <Stat label="Ready to ship" value={String(live.filter((o) => o.status === 'ready').length)} />
-          <Stat label="Open quotes" value={String(orders.filter((o) => o.kind === 'quote' && open(o)).length)} />
+          <Stat block="blue" label={t('Open orders')} value={String(live.length)} sub={money0(live.reduce((s, o) => s + o.total_cents, 0))} />
+          <Stat label={t('Ready to ship')} value={String(live.filter((o) => o.status === 'ready').length)} />
+          <Stat label={t('Open quotes')} value={String(orders.filter((o) => o.kind === 'quote' && open(o)).length)} />
         </div>
       )}
-      {orders.length > 0 && <SearchBox action="/app/wholesale/orders" q={String(sp.q ?? '')} placeholder="Search order #, PO or customer" hidden={f ? { f } : undefined} />}
+      {orders.length > 0 && <SearchBox action="/app/wholesale/orders" q={String(sp.q ?? '')} placeholder={t('Search order #, PO or customer')} hidden={f ? { f } : undefined} />}
       <Pills base="/app/wholesale/orders" current={f} items={FILTERS} />
-      {orders.truncated && <p className="text-sm text-muted">Showing the first 20,000 orders.</p>}
+      {orders.truncated && <p className="text-sm text-muted">{t('Showing the first 20,000 orders.')}</p>}
       {shown.length ? (
         <ul className="flex flex-col gap-2">
           {shown.map((o) => (
@@ -44,7 +46,7 @@ export default async function OrdersPage({ searchParams }: PageProps<'/app/whole
               amount={money(o.total_cents)} badge={<OrderBadge status={o.status} kind={o.kind} />} />
           ))}
         </ul>
-      ) : orders.length ? <p className="text-muted">Nothing here.</p> : <EmptyState title="No orders yet">Create an order or a quote from the order screen.</EmptyState>}
+      ) : orders.length ? <p className="text-muted">{t('Nothing here.')}</p> : <EmptyState title={t('No orders yet')}>{t('Create an order or a quote from the order screen.')}</EmptyState>}
     </>
   );
 }

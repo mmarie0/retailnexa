@@ -63,7 +63,7 @@ export default async function SchedulePage({ searchParams }: PageProps<'/app/sta
       ) : (
         <Card className="overflow-x-auto p-0">
           <table className="w-full min-w-[720px] text-[14px]">
-            <thead className="text-left"><tr><th className="px-4 py-3">Employee</th>{days.map((d, i) => <th key={d} className={cx('px-2 py-3', d === s.today && 'text-accent-strong')}>{WEEKDAYS[i].slice(0, 3)} {+d.slice(8)}</th>)}<th className="px-4 text-right">Hours</th></tr></thead>
+            <thead className="text-start"><tr><th className="px-4 py-3">Employee</th>{days.map((d, i) => <th key={d} className={cx('px-2 py-3', d === s.today && 'text-accent-strong')}>{WEEKDAYS[i].slice(0, 3)} {+d.slice(8)}</th>)}<th className="px-4 text-end">Hours</th></tr></thead>
             <tbody>
               {emps.map((e) => (
                 <tr key={e.id} className="border-t border-line align-top">
@@ -77,7 +77,7 @@ export default async function SchedulePage({ searchParams }: PageProps<'/app/sta
                       </td>
                     );
                   })}
-                  <td className="num px-4 py-2.5 text-right">{hoursOf(e.id).toFixed(1)}{s.seePay && <span className="block text-xs text-muted">{formatMoney(costOf(e.id))}</span>}</td>
+                  <td className="num px-4 py-2.5 text-end">{hoursOf(e.id).toFixed(1)}{s.seePay && <span className="block text-xs text-muted">{formatMoney(costOf(e.id))}</span>}</td>
                 </tr>
               ))}
             </tbody>

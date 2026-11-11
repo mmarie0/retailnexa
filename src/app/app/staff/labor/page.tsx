@@ -55,10 +55,10 @@ export default async function LaborPage({ searchParams }: PageProps<'/app/staff/
             <li key={w.dow} className="contents">
               <span className="text-sm font-semibold">{WEEKDAYS[w.dow].slice(0, 3)}</span>
               <span className="relative h-3 rounded bg-soft" role="img" aria-label={`${WEEKDAYS[w.dow]} ${pct(w.pct)}`}>
-                <span className={cx('absolute inset-y-0 left-0 rounded', w.pct !== null && w.pct > T ? 'bg-late' : 'bg-paid')} style={{ width: `${((w.pct ?? 0) / maxPct) * 100}%` }} />
+                <span className={cx('absolute inset-y-0 start-0 rounded', w.pct !== null && w.pct > T ? 'bg-late' : 'bg-paid')} style={{ width: `${((w.pct ?? 0) / maxPct) * 100}%` }} />
                 <b className="absolute inset-y-[-3px] w-0.5 bg-ink" style={{ left: `calc(${(T / maxPct) * 100}% - 1px)` }} />
               </span>
-              <span className={cx('num text-right text-sm font-semibold', w.pct !== null && w.pct > T ? 'text-late' : 'text-paid')}>{pct(w.pct)}</span>
+              <span className={cx('num text-end text-sm font-semibold', w.pct !== null && w.pct > T ? 'text-late' : 'text-paid')}>{pct(w.pct)}</span>
             </li>
           ))}
         </ul>
@@ -70,11 +70,11 @@ export default async function LaborPage({ searchParams }: PageProps<'/app/staff/
       <Card className="overflow-x-auto p-0">
         <h2 className="px-4 pt-4 text-lg font-bold">Weekday breakdown</h2>
         <table className="w-full min-w-[520px] text-[14px]">
-          <thead className="text-left"><tr><th className="px-4 py-2">Day</th><th className="px-2 text-right">Avg sales</th><th className="px-2 text-right">Avg hours</th><th className="px-2 text-right">Avg labor</th><th className="px-4 text-right">Labor %</th></tr></thead>
+          <thead className="text-start"><tr><th className="px-4 py-2">Day</th><th className="px-2 text-end">Avg sales</th><th className="px-2 text-end">Avg hours</th><th className="px-2 text-end">Avg labor</th><th className="px-4 text-end">Labor %</th></tr></thead>
           <tbody>{L.weekdays.filter((w) => w.n).map((w) => (
             <tr key={w.dow} className="border-t border-line"><td className="px-4 py-2">{WEEKDAYS[w.dow]} <span className="text-xs text-muted">{w.n}×</span></td>
-              <td className="num px-2 text-right">{formatMoney(Math.round(w.salesCents ?? 0))}</td><td className="num px-2 text-right">{(w.hours ?? 0).toFixed(1)}</td>
-              <td className="num px-2 text-right">{formatMoney(Math.round(w.costCents ?? 0))}</td><td className={cx('num px-4 text-right font-bold', w.pct !== null && w.pct > T ? 'text-late' : 'text-paid')}>{pct(w.pct)}</td></tr>
+              <td className="num px-2 text-end">{formatMoney(Math.round(w.salesCents ?? 0))}</td><td className="num px-2 text-end">{(w.hours ?? 0).toFixed(1)}</td>
+              <td className="num px-2 text-end">{formatMoney(Math.round(w.costCents ?? 0))}</td><td className={cx('num px-4 text-end font-bold', w.pct !== null && w.pct > T ? 'text-late' : 'text-paid')}>{pct(w.pct)}</td></tr>
           ))}</tbody>
         </table>
         <p className="px-4 py-3 text-sm text-muted">Sales per labor hour: <b className="text-ink">{L.salesPerHourCents ? formatMoney(Math.round(L.salesPerHourCents)) : '—'}</b></p>
@@ -82,12 +82,12 @@ export default async function LaborPage({ searchParams }: PageProps<'/app/staff/
       <Card className="overflow-x-auto p-0">
         <h2 className="px-4 pt-4 text-lg font-bold">Every day</h2>
         <table className="w-full min-w-[520px] text-[14px]">
-          <thead className="text-left"><tr><th className="px-4 py-2">Date</th><th className="px-2 text-right">Sales</th><th className="px-2 text-right">Hours</th><th className="px-2 text-right">Labor</th><th className="px-4 text-right">%</th></tr></thead>
+          <thead className="text-start"><tr><th className="px-4 py-2">Date</th><th className="px-2 text-end">Sales</th><th className="px-2 text-end">Hours</th><th className="px-2 text-end">Labor</th><th className="px-4 text-end">%</th></tr></thead>
           <tbody>{[...L.days].reverse().filter((d) => d.salesCents !== null || d.date === s.today).map((d) => (
             <tr key={d.date} className="border-t border-line"><td className="px-4 py-2">{dl(d.date, { weekday: 'short', day: 'numeric' })}</td>
-              <td className="num px-2 text-right">{d.salesCents !== null ? formatMoney(d.salesCents) : <span className="text-muted">no report</span>}</td>
-              <td className="num px-2 text-right">{d.hours.toFixed(1)}</td><td className="num px-2 text-right">{formatMoney(d.costCents)}</td>
-              <td className={cx('num px-4 text-right font-semibold', d.pct !== null && d.pct > T ? 'text-late' : 'text-paid')}>{pct(d.pct)}</td></tr>
+              <td className="num px-2 text-end">{d.salesCents !== null ? formatMoney(d.salesCents) : <span className="text-muted">no report</span>}</td>
+              <td className="num px-2 text-end">{d.hours.toFixed(1)}</td><td className="num px-2 text-end">{formatMoney(d.costCents)}</td>
+              <td className={cx('num px-4 text-end font-semibold', d.pct !== null && d.pct > T ? 'text-late' : 'text-paid')}>{pct(d.pct)}</td></tr>
           ))}</tbody>
         </table>
         <p className="px-4 py-3 text-xs text-muted">Labor cost = hours on the schedule (clock times when entered) × pay rate × employer taxes. Salaried staff count 1/365 of salary per day. Sales are gross from daily reports.</p>

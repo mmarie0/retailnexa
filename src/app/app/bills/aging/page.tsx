@@ -53,25 +53,25 @@ export default async function AgingPage({ searchParams }: PageProps<'/app/bills/
             {late > 0 && <>, of which <strong className="num text-late">{formatMoney(late)}</strong> is past due</>}.</p>
           <Card className="overflow-x-auto p-0">
             <table className="w-full min-w-[720px] text-[15px]">
-              <thead className="text-left text-sm text-muted">
+              <thead className="text-start text-sm text-muted">
                 <tr><th className="px-5 py-3 font-semibold">Vendor</th>
-                  {AGING_BUCKETS.map((k) => <th key={k} className="px-3 text-right font-semibold">{LABEL[k]}</th>)}
-                  <th className="px-5 text-right font-semibold">Total</th></tr>
+                  {AGING_BUCKETS.map((k) => <th key={k} className="px-3 text-end font-semibold">{LABEL[k]}</th>)}
+                  <th className="px-5 text-end font-semibold">Total</th></tr>
               </thead>
               <tbody>
                 {report.rows.map((r) => (
                   <tr key={r.vendorId} className="border-t border-line">
                     <td className="px-5 py-2.5 font-semibold">{r.vendorName}</td>
                     {AGING_BUCKETS.map((k) => (
-                      <td key={k} className={cx('num px-3 text-right', k !== 'current' && r.buckets[k] > 0 && 'text-late')}>{r.buckets[k] ? formatMoney(r.buckets[k]) : '—'}</td>
+                      <td key={k} className={cx('num px-3 text-end', k !== 'current' && r.buckets[k] > 0 && 'text-late')}>{r.buckets[k] ? formatMoney(r.buckets[k]) : '—'}</td>
                     ))}
-                    <td className="num px-5 text-right font-semibold">{formatMoney(r.total)}</td>
+                    <td className="num px-5 text-end font-semibold">{formatMoney(r.total)}</td>
                   </tr>
                 ))}
                 <tr className="border-t-2 border-ink/20 font-bold">
                   <td className="px-5 py-3">Total</td>
-                  {AGING_BUCKETS.map((k) => <td key={k} className="num px-3 text-right">{formatMoney(report.totals[k])}</td>)}
-                  <td className="num px-5 text-right">{formatMoney(report.total)}</td>
+                  {AGING_BUCKETS.map((k) => <td key={k} className="num px-3 text-end">{formatMoney(report.totals[k])}</td>)}
+                  <td className="num px-5 text-end">{formatMoney(report.total)}</td>
                 </tr>
               </tbody>
             </table>

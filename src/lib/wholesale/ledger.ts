@@ -103,7 +103,7 @@ export function standing(c: CustomerLite, invoices: InvoiceWithBalance[], today:
   const certExpired = c.tax_exempt && !!c.cert_expiry && c.cert_expiry < today;
   const warnings = [
     c.on_hold && 'On hold',
-    late.length > 0 && `${late.length} overdue invoice${late.length === 1 ? '' : 's'}`,
+    late.length > 0 && 'Overdue invoices',
     overLimit && 'Over credit limit',
     certExpired && 'Resale certificate expired',
   ].filter(Boolean) as string[];

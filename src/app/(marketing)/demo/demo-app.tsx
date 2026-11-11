@@ -162,7 +162,7 @@ function Dashboard({ anchor, account }: { anchor: string; account: Account }) {
             ['Operating profit', profit.operatingProfitCents],
           ].map(([k, v, note]) => (
             <div key={k as string} className="flex justify-between gap-4 border-b border-line py-1.5">
-              <dt className={cx((k as string).includes('profit') && 'font-semibold')}>{k}{note && <span className="ml-2 text-sm text-muted">{note}</span>}</dt>
+              <dt className={cx((k as string).includes('profit') && 'font-semibold')}>{k}{note && <span className="ms-2 text-sm text-muted">{note}</span>}</dt>
               <dd className="num">{money(v as number)}</dd>
             </div>
           ))}
@@ -264,16 +264,16 @@ function Invoices({ anchor }: { anchor: string }) {
           <h3 className="font-bold">{inv.number} — {vendorName(inv.vendorId)}</h3>
           <div className="mt-3 overflow-x-auto">
             <table className="w-full min-w-[560px] text-[15px]">
-              <thead className="text-left text-sm text-muted"><tr><th className="py-1.5">SKU</th><th>UPC</th><th>Item</th><th className="text-right">Qty</th><th className="text-right">Unit</th><th className="text-right">Total</th></tr></thead>
+              <thead className="text-start text-sm text-muted"><tr><th className="py-1.5">SKU</th><th>UPC</th><th>Item</th><th className="text-end">Qty</th><th className="text-end">Unit</th><th className="text-end">Total</th></tr></thead>
               <tbody>
                 {inv.lines.map((l) => (
                   <tr key={l.sku} className="border-t border-line">
                     <td className="py-1.5">{l.sku}</td><td className="num">{l.upc}</td><td>{l.description}</td>
-                    <td className="num text-right">{l.qty}</td><td className="num text-right">{money(l.unitCents)}</td><td className="num text-right">{money(l.qty * l.unitCents)}</td>
+                    <td className="num text-end">{l.qty}</td><td className="num text-end">{money(l.unitCents)}</td><td className="num text-end">{money(l.qty * l.unitCents)}</td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot><tr className="border-t border-line font-semibold"><td colSpan={5} className="py-1.5">Total · paid {money(inv.paidCents)}</td><td className="num text-right">{money(inv.totalCents)}</td></tr></tfoot>
+              <tfoot><tr className="border-t border-line font-semibold"><td colSpan={5} className="py-1.5">Total · paid {money(inv.paidCents)}</td><td className="num text-end">{money(inv.totalCents)}</td></tr></tfoot>
             </table>
           </div>
         </Card>

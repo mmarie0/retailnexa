@@ -70,15 +70,15 @@ export default async function CardDepositsPage({ searchParams }: PageProps<'/app
       {matches.length === 0 ? <EmptyState title="No card deposits matched yet">Import your bank statement on the Statement tab and record daily sales with card totals.</EmptyState> : (
         <Card className="overflow-x-auto p-0">
           <table className="w-full min-w-[560px] text-[14.5px]">
-            <thead className="text-left text-xs uppercase tracking-[.06em] text-muted"><tr><th className="px-4 py-2.5">Deposit</th><th className="px-2">For card sales</th><th className="px-2 text-right">Card sales</th><th className="px-2 text-right">Deposited</th><th className="px-4 text-right">Fee</th></tr></thead>
+            <thead className="text-start text-xs uppercase tracking-[.06em] text-muted"><tr><th className="px-4 py-2.5">Deposit</th><th className="px-2">For card sales</th><th className="px-2 text-end">Card sales</th><th className="px-2 text-end">Deposited</th><th className="px-4 text-end">Fee</th></tr></thead>
             <tbody>
               {matches.map((m) => (
                 <tr key={m.deposit.id} className="border-t border-line">
                   <td className="px-4 py-2">{fmtDate(m.deposit.date)}<span className="block max-w-[14rem] truncate text-xs text-muted">{m.deposit.description}</span></td>
                   <td className="px-2">{m.from === m.to ? fmtDate(m.from) : `${fmtDate(m.from)} – ${fmtDate(m.to)}`}</td>
-                  <td className="num px-2 text-right">{formatMoney(m.expectedCents)}</td>
-                  <td className="num px-2 text-right">{formatMoney(m.deposit.amountCents)}</td>
-                  <td className="px-4 text-right"><Badge tone={m.feePct > 4 ? 'warning' : 'neutral'}>{m.feePct.toFixed(2)}%</Badge></td>
+                  <td className="num px-2 text-end">{formatMoney(m.expectedCents)}</td>
+                  <td className="num px-2 text-end">{formatMoney(m.deposit.amountCents)}</td>
+                  <td className="px-4 text-end"><Badge tone={m.feePct > 4 ? 'warning' : 'neutral'}>{m.feePct.toFixed(2)}%</Badge></td>
                 </tr>
               ))}
             </tbody>
