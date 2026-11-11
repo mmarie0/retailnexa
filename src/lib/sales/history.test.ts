@@ -13,8 +13,18 @@ describe('monthTotals', () => {
     const [oct, sep] = monthTotals(days, reports);
     expect(oct).toMatchObject({ ym: '2026-10', sales: 9500 * 2 + 50000, gross: 20000 + 51000, transactions: 20 + 90, source: 'mixed', points: 1000 + 1000 });
     expect(sep).toMatchObject({ ym: '2026-09', sales: 9500, transactions: 20, source: 'daily', days: 1 });
-    expect(avgSale(oct)).toBe(Math.round(69000 / 110));
+    // Store A's 10/02 has no count, so its 9,500 isn't in the average (#162).
+    expect(avgSale(oct)).toBe(Math.round((9500 + 50000) / 110));
     expect(share(4000, 10000)).toBe(40);
+  });
+  it('average sale ignores stores without a transaction count (#162 repro)', () => {
+    const reports = [{ location_id: 'A', month: '2026-10-01', sales_cents: 7_000_000, gross_cents: null, tax_cents: 0, cash_cents: 0, card_cents: 0, store_card_cents: 0, points_cents: 0, transactions: 2000 }];
+    const days = [day('2026-10-05', 'B', { gross_sales_cents: 3_000_000, discounts_cents: 0, transaction_count: null })];
+    const [oct] = monthTotals(days, reports);
+    expect(oct.sales).toBe(10_000_000);
+    expect(avgSale(oct)).toBe(3500);
+    const [none] = monthTotals(days, []);
+    expect(avgSale(none)).toBeNull();
   });
 });
 
@@ -36,6 +46,7 @@ describe('sheets', () => {
   it('category sheet skips totals; compare with last month and last year', () => {
     const { rows } = parseCategorySheet([['Department', 'Net Sales', 'Qty'], ['Wigs', '1,000.00', '10'], ['Braiding hair', '500', ''], ['Total', '1500', '']]);
     expect(rows).toEqual([{ category: 'Wigs', sales_cents: 100000, quantity: 10 }, { category: 'Braiding hair', sales_cents: 50000, quantity: null }]);
+    expect(parseCategorySheet([['Category', 'Sales', 'Qty'], ['Wigs', '10', 'ten']]).errors).toEqual([{ line: 2, message: 'Wigs: quantity must be a number like 12' }]);
     const cmp = compareCategories(rows, [{ category: 'wigs', sales_cents: 80000, quantity: null }], [{ category: 'Lace fronts', sales_cents: 9000, quantity: null }]);
     expect(cmp.map((c) => [c.category, c.cents, c.vsPrevPct, c.lastYearCents])).toEqual([
       ['Wigs', 100000, 25, null], ['Braiding hair', 50000, null, null], ['Lace fronts', 0, null, 9000],

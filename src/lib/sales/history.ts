@@ -17,6 +17,8 @@ export interface MonthReport {
 export interface MonthTotals {
   ym: string; sales: number; gross: number; tax: number; cash: number; card: number; storeCard: number; points: number;
   transactions: number | null; days: number; source: 'report' | 'daily' | 'mixed';
+  /** Sales from the days or reports that carry a transaction count; the average sale uses only these (#162). */
+  salesWithTxns: number;
 }
 
 const n = (v: unknown) => Number(v ?? 0);
@@ -27,10 +29,13 @@ export function monthTotals(days: DayRow[], reports: MonthReport[]): MonthTotals
   const daily = new Map<string, MonthTotals>();
   for (const d of days) {
     const ym = d.business_date.slice(0, 7), k = key(d.location_id, ym);
-    const t = daily.get(k) ?? { ym, sales: 0, gross: 0, tax: 0, cash: 0, card: 0, storeCard: 0, points: 0, transactions: null, days: 0, source: 'daily' as const };
+    const t = daily.get(k) ?? { ym, sales: 0, gross: 0, tax: 0, cash: 0, card: 0, storeCard: 0, points: 0, transactions: null, days: 0, source: 'daily' as const, salesWithTxns: 0 };
     t.gross += n(d.gross_sales_cents); t.points += n(d.discounts_cents); t.sales += n(d.gross_sales_cents) - n(d.discounts_cents);
     t.tax += n(d.sales_tax_cents); t.cash += n(d.cash_cents); t.card += n(d.card_cents); t.storeCard += n(d.customer_credit_cents);
-    if (d.transaction_count !== null && d.transaction_count !== undefined) t.transactions = (t.transactions ?? 0) + n(d.transaction_count);
+    if (d.transaction_count !== null && d.transaction_count !== undefined) {
+      t.transactions = (t.transactions ?? 0) + n(d.transaction_count);
+      t.salesWithTxns += n(d.gross_sales_cents) - n(d.discounts_cents);
+    }
     t.days++;
     daily.set(k, t);
   }
@@ -41,6 +46,7 @@ export function monthTotals(days: DayRow[], reports: MonthReport[]): MonthTotals
       ym, sales: n(r.sales_cents), gross: r.gross_cents === null ? n(r.sales_cents) + n(r.points_cents) : n(r.gross_cents), tax: n(r.tax_cents),
       cash: n(r.cash_cents), card: n(r.card_cents), storeCard: n(r.store_card_cents), points: n(r.points_cents),
       transactions: r.transactions === null ? null : n(r.transactions), days: daily.get(k)?.days ?? 0, source: 'report',
+      salesWithTxns: r.transactions === null ? 0 : n(r.sales_cents),
     });
   }
   const byMonth = new Map<string, MonthTotals>();
@@ -49,14 +55,15 @@ export function monthTotals(days: DayRow[], reports: MonthReport[]): MonthTotals
     if (!m) { byMonth.set(t.ym, { ...t }); continue; }
     m.sales += t.sales; m.gross += t.gross; m.tax += t.tax; m.cash += t.cash; m.card += t.card; m.storeCard += t.storeCard; m.points += t.points;
     m.transactions = m.transactions === null && t.transactions === null ? null : (m.transactions ?? 0) + (t.transactions ?? 0);
-    m.days += t.days;
+    m.days += t.days; m.salesWithTxns += t.salesWithTxns;
     if (m.source !== t.source) m.source = 'mixed';
   }
   return [...byMonth.values()].sort((a, b) => b.ym.localeCompare(a.ym));
 }
 
 export const share = (part: number, whole: number) => (whole > 0 ? (part / whole) * 100 : null);
-export const avgSale = (t: Pick<MonthTotals, 'sales' | 'transactions'>) => (t.transactions ? Math.round(t.sales / t.transactions) : null);
+/** Average sale over only the sales that have a transaction count, so stores or days without a count don't inflate it (#162). */
+export const avgSale = (t: Pick<MonthTotals, 'salesWithTxns' | 'transactions'>) => (t.transactions ? Math.round(t.salesWithTxns / t.transactions) : null);
 export const pctChange = (cur: number, prev: number | null | undefined) => (prev ? ((cur - prev) / Math.abs(prev)) * 100 : null);
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9#%]+/g, ' ').trim();
@@ -126,7 +133,8 @@ export function parseCategorySheet(rows: string[][]): { rows: { category: string
     if (cents === null) return errors.push({ line, message: `${name}: sales must be a number like 1234.56` }) && undefined;
     const qRaw = c.qty === undefined ? '' : (r[c.qty] ?? '').replace(/[,\s]/g, '');
     const q = qRaw === '' ? null : Number(qRaw);
-    out.push({ category: name.slice(0, 120), sales_cents: cents, quantity: q === null || Number.isNaN(q) ? null : q });
+    if (q !== null && (!Number.isFinite(q) || q < 0)) return errors.push({ line, message: `${name}: quantity must be a number like 12` }) && undefined;
+    out.push({ category: name.slice(0, 120), sales_cents: cents, quantity: q });
   });
   return { rows: out, errors };
 }

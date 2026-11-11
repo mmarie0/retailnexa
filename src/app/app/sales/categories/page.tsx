@@ -27,9 +27,17 @@ export default async function CategoriesPage({ searchParams }: PageProps<'/app/s
   const { data: latest } = await supabase.from('category_sales').select('month').eq('organization_id', ctx.org.id).order('month', { ascending: false }).limit(1);
   const ym = typeof sp.m === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(sp.m) ? sp.m : (latest?.[0]?.month?.slice(0, 7) ?? ymAdd(today.slice(0, 7), -1));
   const prev = ymAdd(ym, -1), ly = ymAdd(ym, -12);
-  const { data } = await supabase.from('category_sales').select('month, category, sales_cents, quantity').eq('organization_id', ctx.org.id)
-    .in('month', [`${ym}-01`, `${prev}-01`, `${ly}-01`]).limit(10000);
-  const rows = (data ?? []).map((r) => ({ ...r, month: String(r.month).slice(0, 7), sales_cents: Number(r.sales_cents), quantity: r.quantity === null ? null : Number(r.quantity) }));
+  // Page in 1,000s (the API caps a single read at 1,000 rows); several stores × 3 months can pass that (#163).
+  const data: { month: string; category: string; sales_cents: number; quantity: number | null }[] = [];
+  let truncated = false;
+  for (let page = 0; page < 30; page++) {
+    const { data: part } = await supabase.from('category_sales').select('id, month, category, sales_cents, quantity').eq('organization_id', ctx.org.id)
+      .in('month', [`${ym}-01`, `${prev}-01`, `${ly}-01`]).order('id').range(page * 1000, page * 1000 + 999);
+    data.push(...(part ?? []));
+    if (!part || part.length < 1000) break;
+    if (page === 29) truncated = true;
+  }
+  const rows = data.map((r) => ({ ...r, month: String(r.month).slice(0, 7), sales_cents: Number(r.sales_cents), quantity: r.quantity === null ? null : Number(r.quantity) }));
   const of = (m: string) => rows.filter((r) => r.month === m) as CategoryRow[];
   const cmp = compareCategories(of(ym), of(prev), of(ly));
   const total = (m: string) => of(m).reduce((a, r) => a + r.sales_cents, 0);
@@ -44,6 +52,7 @@ export default async function CategoriesPage({ searchParams }: PageProps<'/app/s
         <h1 className="text-[22px] font-bold tracking-tight">{label(ym)}</h1>
         <Link href={`/app/sales/categories?m=${ymAdd(ym, 1)}`} aria-label="Next month" className="grid size-10 place-items-center rounded-full bg-card text-lg shadow-[var(--shadow-card)]">›</Link>
       </nav>
+      {truncated && <Notice tone="warning">This month has more category rows than one page can show, so totals may be short. Contact support.</Notice>}
       {editable && <Card><CategoryUpload stores={(locs ?? []) as { id: string; name: string }[]} month={ym} /></Card>}
       {cmp.length === 0 ? <EmptyState title={`No category report for ${label(ym)}`}>Upload your POS’s category (or department) report for the month to see what sells and how it compares.</EmptyState> : (
         <>
