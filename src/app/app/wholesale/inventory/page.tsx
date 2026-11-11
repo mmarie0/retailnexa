@@ -11,7 +11,7 @@ import { loadItems, loadOpenLines, loadSettings, wsContext, type Item } from '..
 import { Pills, SearchBox, money, money0 } from '../_ui';
 import { adjustStock, deleteItem, saveItem } from '../actions';
 
-export const metadata: Metadata = { title: 'Inventory' };
+export const metadata: Metadata = { title: 'Products & inventory' };
 
 function ItemFields({ it, markup }: { it?: Item; markup: number }) {
   const p = it?.id ?? 'new';
@@ -67,7 +67,7 @@ export default async function InventoryPage({ searchParams }: PageProps<'/app/wh
 
   return (
     <>
-      <PageHeader title="Inventory" description="What’s on hand, what open orders are holding, what’s free to sell, and what to reorder." />
+      <PageHeader title="Products & inventory" description="Your products: what’s on hand, what open orders are holding, what’s free to sell, and what to reorder." />
       <ReadOnlyNotice show={(can(ctx, 'wholesale.catalog.manage') || can(ctx, 'inventory.manage')) && !ctx.access.canWrite} />
       {items.length > 0 && (
         <div className="grid grid-cols-3 gap-3 max-[520px]:grid-cols-1">

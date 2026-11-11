@@ -8,7 +8,7 @@
  * Pure data + functions so the shell and its tests share one source.
  */
 
-export type AreaKey = 'home' | 'orders' | 'customers' | 'inventory' | 'bills' | 'sales' | 'staff' | 'upkeep' | 'books' | 'business';
+export type AreaKey = 'home' | 'selling' | 'bills' | 'sales' | 'staff' | 'upkeep' | 'books' | 'business';
 export type BusinessType = 'retail' | 'wholesale' | 'both';
 export type IconKey =
   | 'home' | 'bills' | 'sales' | 'staff' | 'upkeep' | 'invoice' | 'calendar' | 'repeat' | 'doc' | 'bank'
@@ -34,6 +34,8 @@ export interface NavArea {
   bottom: boolean;
   /** Which side of the business the section belongs to; missing = every business. */
   side?: 'retail' | 'wholesale';
+  /** A different name for some account types (Bills is "Purchasing" for Wholesale). */
+  labelFor?: Partial<Record<BusinessType, string>>;
   pages: NavPage[];
 }
 
@@ -44,8 +46,8 @@ export interface NavArea {
  */
 export const BOTTOM: Record<BusinessType, AreaKey[]> = {
   retail: ['home', 'bills', 'sales', 'staff', 'upkeep'],
-  wholesale: ['home', 'orders', 'customers', 'inventory', 'bills'],
-  both: ['home', 'orders', 'bills', 'sales', 'staff'],
+  wholesale: ['home', 'selling', 'bills', 'staff', 'upkeep'],
+  both: ['home', 'selling', 'bills', 'sales', 'staff'],
 };
 /** Retail-only sections a Wholesale account doesn't see (daily register sales). */
 const RETAIL_ONLY: AreaKey[] = ['sales'];
@@ -64,30 +66,21 @@ export const BILLS_MORE: NavPage[] = [
 export const AREAS: NavArea[] = [
   { key: 'home', label: 'Overview', icon: 'home', bottom: true, pages: [{ key: 'home', label: 'Overview', href: '/app', icon: 'home' }] },
   {
-    key: 'orders', label: 'Orders', icon: 'cart', bottom: false, side: 'wholesale',
+    // Wholesale selling, all in one place: ordering, customers, products and stock.
+    key: 'selling', label: 'Selling', icon: 'cart', bottom: false, side: 'wholesale',
     pages: [
       { key: 'ws-new', label: 'Create order', href: '/app/wholesale/order', icon: 'cart', perm: 'wholesale.orders.create' },
       { key: 'ws-orders', label: 'Orders', href: '/app/wholesale/orders', icon: 'doc', perm: 'wholesale.orders.view' },
       { key: 'ws-invoices', label: 'Invoices', href: '/app/wholesale/invoices', icon: 'invoice', perm: 'wholesale.receivables.view' },
       { key: 'ws-payments', label: 'Payments', href: '/app/wholesale/payments', icon: 'card', perm: 'wholesale.receivables.view' },
-    ],
-  },
-  {
-    key: 'customers', label: 'Customers', icon: 'team', bottom: false, side: 'wholesale',
-    pages: [
       { key: 'ws-customers', label: 'Customers', href: '/app/wholesale/customers', icon: 'team', perm: ['wholesale.customers.manage', 'wholesale.orders.view', 'wholesale.receivables.view'] },
       { key: 'ws-tiers', label: 'Price tiers', href: '/app/wholesale/tiers', icon: 'tag', perm: 'wholesale.catalog.manage' },
-    ],
-  },
-  {
-    key: 'inventory', label: 'Inventory', icon: 'box', bottom: false, side: 'wholesale',
-    pages: [
-      { key: 'ws-items', label: 'Inventory', href: '/app/wholesale/inventory', icon: 'box', perm: ['inventory.view', 'wholesale.catalog.manage'] },
+      { key: 'ws-items', label: 'Products & inventory', href: '/app/wholesale/inventory', icon: 'box', perm: ['inventory.view', 'wholesale.catalog.manage'] },
       { key: 'ws-catalog', label: 'Order screen', href: '/app/wholesale/catalog', icon: 'tag', perm: 'wholesale.catalog.manage' },
     ],
   },
   {
-    key: 'bills', label: 'Bills', icon: 'bills', bottom: true,
+    key: 'bills', label: 'Bills', labelFor: { wholesale: 'Purchasing' }, icon: 'bills', bottom: true,
     pages: [
       { key: 'due', label: 'Due', href: '/app/bills', icon: 'bills', perm: 'bills.view', match: ['/app/bills/new', '/app/bills/list'] },
       { key: 'vendors', label: 'Vendors', href: '/app/vendors', icon: 'invoice', perm: 'vendors.view' },
@@ -168,7 +161,7 @@ export function visibleAreas(can: (perm: string) => boolean, type: BusinessType 
     if (a.side === 'wholesale') return type !== 'retail';
     if (type === 'wholesale' && RETAIL_ONLY.includes(a.key)) return false;
     return true;
-  }).map((a) => ({ ...a, bottom: bottom.includes(a.key), pages: a.pages.filter((p) => allowed(p, can) && (type !== 'retail' || !p.key.startsWith('ws-'))) }));
+  }).map((a) => ({ ...a, label: a.labelFor?.[type] ?? a.label, bottom: bottom.includes(a.key), pages: a.pages.filter((p) => allowed(p, can) && (type !== 'retail' || !p.key.startsWith('ws-'))) }));
   const order = (a: NavArea) => (a.bottom ? bottom.indexOf(a.key) : bottom.length + AREAS.indexOf(AREAS.find((x) => x.key === a.key)!));
   // The five bottom tabs always show (same layout as the app); a tab with no page this person may open is shown disabled.
   return shown.filter((a) => a.bottom || a.pages.length > 0).sort((x, y) => order(x) - order(y));
