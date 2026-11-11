@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { as, sys, createUser, createOrg, addMember, setSubscription, expectDenied, closeDb, type TestUser } from './helpers';
+import { Client } from 'pg';
+import { adminUrl, TEST_DB, as, sys, createUser, createOrg, addMember, setSubscription, expectDenied, closeDb, type TestUser } from './helpers';
 
 // Batch C: monthly sales reports (#103) and category reports (#112).
 let owner: TestUser, mgrA: TestUser, viewer: TestUser, emp: TestUser, outsider: TestUser;
@@ -50,6 +51,33 @@ describe('category_sales', () => {
     expect(await as(viewer, `select category, sales_cents from public.category_sales where organization_id = $1`, [org])).toEqual([{ category: 'Wigs', sales_cents: '1' }]);
     await expectDenied(as(mgrA, `select public.save_category_month($1, $2, '2026-10-01', $3::jsonb)`, [org, B, JSON.stringify(rows)]), /store you don.t have access to/);
     await expectDenied(as(owner, `select public.save_category_month($1, $2, '2026-10-01', '[{"category":""}]'::jsonb)`, [org, A]), /category and sales/);
+  });
+
+  it('two simultaneous first uploads of a month end with exactly one of them (#163)', async () => {
+    const open: Client[] = [];
+    const session = async () => {
+      const c = new Client({ connectionString: adminUrl(TEST_DB) });
+      await c.connect(); open.push(c);
+      await c.query('begin');
+      await c.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: owner.id, role: 'authenticated', aal: 'aal1' })]);
+      await c.query('set local role authenticated');
+      return c;
+    };
+    try {
+      const save = (c: Client, names: string[]) => c.query(`select public.save_category_month($1, $2, '2026-08-01', $3::jsonb)`,
+        [org, B, JSON.stringify(names.map((category) => ({ category, sales_cents: 100 })))]);
+      const a = await session(), b = await session();
+      await save(a, ['Alpha', 'Beta']);
+      const second = save(b, ['Gamma', 'Delta']);
+      await new Promise((r) => setTimeout(r, 150)); // b waits on a's lock instead of seeing an empty month
+      await a.query('commit');
+      await second;
+      await b.query('commit');
+      const left = await sys<{ category: string }>(`select category from public.category_sales where organization_id = $1 and location_id = $2 and month = '2026-08-01' order by category`, [org, B]);
+      expect(left.map((r) => r.category)).toEqual(['Delta', 'Gamma']);
+    } finally {
+      await Promise.all(open.map((c) => c.end().catch(() => {})));
+    }
   });
 
   it('a read-only business can’t save', async () => {
