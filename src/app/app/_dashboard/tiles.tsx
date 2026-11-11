@@ -7,7 +7,7 @@ import { cx } from '@/components/ui';
  * `block` turns it into a colour block (the hero number on a page).
  */
 export function Stat({ label, value, sub, href, tone, block, hero }: {
-  label: string; value: string; sub?: ReactNode; href?: string; tone?: 'late'; block?: 'blue' | 'indigo' | 'lav' | 'coral'; hero?: boolean;
+  label: string; value: string; sub?: ReactNode; href?: string; tone?: 'late'; block?: 'blue' | 'indigo' | 'lav' | 'coral' | 'sunset'; hero?: boolean;
 }) {
   const body = (
     <>
@@ -29,4 +29,10 @@ export function Change({ pct, vs }: { pct: number | null; vs: string }) {
       <span aria-hidden>{up ? '▲' : '▼'}</span> {up ? '+' : ''}{pct}% <span className="text-muted">vs {vs}</span>
     </span>
   );
+}
+
+/** "+4.2%" with an arrow so direction isn't color-only; nothing when there's nothing to compare. */
+export function Pct({ v }: { v: number | null }) {
+  if (v === null) return null;
+  return <span className={cx('delta whitespace-nowrap', v >= 0 ? 'text-paid' : 'text-late')}><span aria-hidden>{v >= 0 ? '▲' : '▼'}</span> {v >= 0 ? '+' : ''}{v}%</span>;
 }

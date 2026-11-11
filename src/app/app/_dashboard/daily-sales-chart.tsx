@@ -7,7 +7,7 @@ const dayLabel = (d: string, opts: Intl.DateTimeFormatOptions) =>
   new Date(`${d}T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', ...opts });
 
 /** Single-series bar chart: net sales per day, last 14 days. Missing days show a dashed "no report" stub. */
-export function DailySalesChart({ points }: { points: Point[] }) {
+export function DailySalesChart({ points, title = 'Net sales, last 14 days' }: { points: Point[]; title?: string }) {
   const [active, setActive] = useState<number | null>(null);
   const max = Math.max(1, ...points.map((p) => p.netCents ?? 0));
   const shown = active ?? null;
@@ -15,7 +15,7 @@ export function DailySalesChart({ points }: { points: Point[] }) {
   return (
     <figure className="flex flex-col gap-2">
       <figcaption className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="font-bold">Net sales, last 14 days</span>
+        <span className="font-bold">{title}</span>
         <span className="text-sm text-muted" aria-live="polite">
           {shown !== null
             ? `${dayLabel(points[shown].date, { weekday: 'short', month: 'short', day: 'numeric' })}: ${points[shown].netCents === null ? 'no report' : formatMoney(points[shown].netCents!)}`
