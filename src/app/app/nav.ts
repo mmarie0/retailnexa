@@ -59,9 +59,9 @@ export const AREAS: NavArea[] = [
     key: 'sales', label: 'Sales', icon: 'sales', bottom: true,
     pages: [
       { key: 'daily', label: 'Daily', href: '/app/sales', icon: 'sales', perm: 'sales.view', match: ['/app/sales/import'] },
-      { key: 'history', label: 'Months & history', icon: 'calendar' },
+      { key: 'history', label: 'Months & history', href: '/app/sales/history', icon: 'calendar', perm: 'sales.view' },
       { key: 'profit', label: 'Profit', href: '/app/accounting/profit-loss', icon: 'profit', perm: 'accounting.view' },
-      { key: 'categories', label: 'Categories', icon: 'doc' },
+      { key: 'categories', label: 'Categories', href: '/app/sales/categories', icon: 'doc', perm: 'sales.view' },
     ],
   },
   {
