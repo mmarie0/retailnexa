@@ -51,9 +51,10 @@ export default async function BillingPage({ searchParams }: PageProps<'/app/bill
   const live = sub && ['trialing', 'active', 'past_due', 'unpaid', 'paused', 'incomplete'].includes(sub.status);
   const supabase = await getSupabase();
   const ownedIds = [...new Set([ctx.org.id, ...ctx.orgs.filter((o) => o.role === 'owner').map((o) => o.id)])];
-  const [{ data: org }, { data: used }] = await Promise.all([
+  const [{ data: org }, { data: used }, { data: partner }] = await Promise.all([
     supabase.from('organizations').select('canceled_at').eq('id', ctx.org.id).single(),
     supabase.from('organizations').select('id').in('id', ownedIds).not('trial_consumed_at', 'is', null).limit(1),
+    supabase.rpc('org_agent_discount', { p_org: ctx.org.id }),
   ]);
   const trialEligible = (used ?? []).length === 0 && !sub;
   const inv = can(ctx, 'billing.view') ? await invoices(ctx.org.id) : null;
@@ -69,6 +70,7 @@ export default async function BillingPage({ searchParams }: PageProps<'/app/bill
     <>
       <PageHeader title="Billing" description="Your plan, payment method and invoices." />
       {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
+      {partner === true && !live && <Notice tone="good">Partner discount: 50% off the Wholesale plan is applied at checkout. Prices below are before the discount.</Notice>}
       {!isStripeConfigured() && <Notice tone="warning">Payments aren’t connected yet. An administrator needs to add the Stripe keys before plans can be started.</Notice>}
 
       {sub && (

@@ -5,7 +5,7 @@ import { getStripe } from '@/lib/billing/stripe';
 import { liveWebhookDeps } from '@/lib/billing/deps';
 import { syncFromStripe } from '@/lib/billing/webhook';
 import { checkoutLineItems, formatMoney, monthlyTotalCents, normalizeSelection, TRIAL_DAYS } from '@/lib/billing/plans';
-import { siteUrl, stripeEnv } from '@/lib/env';
+import { agentCouponId, siteUrl, stripeEnv } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { fail, failFrom, ok, type ActionState } from '@/lib/actions';
 import { CheckoutBlockedError, guardedCheckout, type CheckoutGuardDeps } from '@/lib/billing/checkout-guard';
@@ -97,6 +97,14 @@ export async function startCheckout(_p: ActionState, form: FormData): Promise<Ac
       const { error } = await createAdminClient().rpc('release_trial_claim', { p_user: ctx.user.id, p_org: ctx.org.id });
       if (error) console.error('[checkout] could not release trial claim', error.message);
     };
+    // A sales agent's one wholesale account gets 50% off through the owner's Stripe coupon.
+    const { data: partner, error: partnerErr } = await supabase.rpc('org_agent_discount', { p_org: ctx.org.id });
+    if (partnerErr) throw partnerErr;
+    const coupon = partner && sel.wholesale ? agentCouponId() : null;
+    if (partner && sel.wholesale && !coupon) {
+      await releaseClaim();
+      return fail('Your partner discount isn’t set up yet. Contact RetailNexa support before you subscribe so you aren’t charged full price.');
+    }
     let session: { url: string | null };
     try {
       const customer = await ensureCustomer(ctx.org.id, ctx.org.name, ctx.user.email);
@@ -114,8 +122,11 @@ export async function startCheckout(_p: ActionState, form: FormData): Promise<Ac
         metadata: { organization_id: ctx.org.id },
         customer_update: { address: 'auto', name: 'auto' },
         billing_address_collection: 'auto',
-        allow_promotion_codes: true,
-        ...(trial ? { custom_text: { submit: { message: `You won’t be charged today. Your first payment of ${formatMoney(monthlyTotalCents(sel))} plus any applicable tax is on ${firstCharge} unless you cancel before then.` } } } : {}),
+        // Stripe allows either a fixed discount or customer-entered promotion codes, not both.
+        ...(coupon ? { discounts: [{ coupon }] } : { allow_promotion_codes: true }),
+        ...(trial ? { custom_text: { submit: { message: coupon
+          ? `You won’t be charged today. Your first payment, with your partner discount, plus any applicable tax is on ${firstCharge} unless you cancel before then.`
+          : `You won’t be charged today. Your first payment of ${formatMoney(monthlyTotalCents(sel))} plus any applicable tax is on ${firstCharge} unless you cancel before then.` } } } : {}),
         success_url: `${siteUrl()}/app/billing/return?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${siteUrl()}/app/billing?checkout=canceled`,
       }));
@@ -126,7 +137,7 @@ export async function startCheckout(_p: ActionState, form: FormData): Promise<Ac
       if (!(e instanceof CheckoutBlockedError)) await releaseClaim();
       throw e;
     }
-    await auditUser(ctx.org.id, ctx.user.id, trial ? 'billing.checkout_started_trial' : 'billing.checkout_started', { products: [sel.retail && 'retail', sel.wholesale && 'wholesale'].filter(Boolean), extra_locations: sel.extraLocations });
+    await auditUser(ctx.org.id, ctx.user.id, trial ? 'billing.checkout_started_trial' : 'billing.checkout_started', { products: [sel.retail && 'retail', sel.wholesale && 'wholesale'].filter(Boolean), extra_locations: sel.extraLocations, partner_discount: !!coupon });
     url = session.url;
   } catch (e) {
     if (e instanceof CheckoutBlockedError) return fail(e.message);

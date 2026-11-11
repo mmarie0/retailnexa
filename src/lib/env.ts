@@ -56,6 +56,14 @@ export function stripeEnv() {
   };
 }
 
+/**
+ * Stripe coupon for a sales agent's one wholesale account (50% off). Created by
+ * the owner in Stripe and set here; until then the discount can't be applied.
+ */
+export function agentCouponId(): string | null {
+  return process.env.STRIPE_COUPON_AGENT_WHOLESALE?.trim() || null;
+}
+
 export function cronSecret(): string | null {
   return process.env.CRON_SECRET?.trim() || null;
 }

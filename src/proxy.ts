@@ -1,13 +1,21 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { supabasePublishableKey, supabaseUrl } from '@/lib/env-public';
+import { REF_COOKIE } from '@/lib/referral';
 
 /**
  * Refreshes the Supabase session cookie on every matched request and performs
  * an *optimistic* redirect for signed-out visitors. Real authorization happens
  * in the data access layer (src/lib/auth/context.ts) and in Postgres RLS.
  */
-const PROTECTED = ['/app', '/admin', '/onboarding', '/account'];
+const PROTECTED = ['/app', '/admin', '/onboarding', '/account', '/partner'];
+
+/** Remember a sales agent's referral code (?ref=CODE) for 60 days, so the new business is credited at signup. */
+function keepReferral(request: NextRequest, response: NextResponse) {
+  const ref = request.nextUrl.searchParams.get('ref')?.trim().toUpperCase();
+  if (ref && /^[A-Z0-9]{4,20}$/.test(ref)) response.cookies.set(REF_COOKIE, ref, { maxAge: 60 * 86_400, path: '/', sameSite: 'lax', httpOnly: true, secure: request.nextUrl.protocol === 'https:' });
+  return response;
+}
 
 export async function proxy(request: NextRequest) {
   const url = supabaseUrl();
@@ -16,7 +24,7 @@ export async function proxy(request: NextRequest) {
 
   if (!url || !key) {
     if (isProtected) return NextResponse.redirect(new URL('/login?error=not_configured', request.url));
-    return NextResponse.next();
+    return keepReferral(request, NextResponse.next());
   }
 
   let response = NextResponse.next({ request });
@@ -39,7 +47,7 @@ export async function proxy(request: NextRequest) {
     login.searchParams.set('next', request.nextUrl.pathname + request.nextUrl.search);
     return NextResponse.redirect(login);
   }
-  return response;
+  return keepReferral(request, response);
 }
 
 export const config = {
