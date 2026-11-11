@@ -22,7 +22,7 @@ export default async function HistoryPage({ searchParams }: PageProps<'/app/sale
   const ctx = await getOrgContext();
   if (!can(ctx, 'sales.view')) return <Notice tone="warning">You don’t have access to sales.</Notice>;
   const sp = await searchParams;
-  const { today, months, stores } = await loadMonths(ctx, 3);
+  const { today, months, stores, truncated } = await loadMonths(ctx, 3);
   const thisYear = +today.slice(0, 4);
   const year = typeof sp.y === 'string' && /^\d{4}$/.test(sp.y) && +sp.y >= thisYear - 2 && +sp.y <= thisYear ? +sp.y : thisYear;
   const byYm = new Map(months.map((m) => [m.ym, m]));
@@ -37,6 +37,7 @@ export default async function HistoryPage({ searchParams }: PageProps<'/app/sale
   return (
     <>
       <ReadOnlyNotice show={can(ctx, 'sales.import') && !ctx.access.canWrite} />
+      {truncated && <Notice tone="warning">You have more than 50,000 daily sales rows in these 3 years, so the oldest months may be short. Upload monthly reports for those months, or contact support.</Notice>}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-[22px] font-bold tracking-tight">Months & history</h1>
         <nav aria-label="Year" className="flex gap-1 rounded-full bg-soft p-1">

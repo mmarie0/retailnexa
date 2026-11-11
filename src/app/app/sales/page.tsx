@@ -16,7 +16,9 @@ export default async function SalesPage({ searchParams }: PageProps<'/app/sales'
   const ctx = await getOrgContext();
   if (!can(ctx, 'sales.view')) return <Notice tone="warning">You don’t have access to sales.</Notice>;
   const sp = await searchParams;
-  const ok = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : null);
+  // Real calendar dates only: Date.parse accepts 2026-02-30 and rolls it over, so round-trip it (#163).
+  const ok = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && v >= '2000-01-01' && v <= '2100-12-31' && !Number.isNaN(Date.parse(v)) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v ? v : null);
+  const badRange = (sp.from && !ok(sp.from)) || (sp.to && !ok(sp.to));
   // Date-range lookup (#103): any period, up to 1,000 rows; without a range, the latest 120.
   let from = ok(sp.from), to = ok(sp.to);
   if (from && to && from > to) [from, to] = [to, from];
@@ -52,6 +54,7 @@ export default async function SalesPage({ searchParams }: PageProps<'/app/sales'
         <SubmitButton variant="secondary">Look up</SubmitButton>
         {(from || to) && <LinkButton href="/app/sales" variant="ghost">Latest days</LinkButton>}
       </form>
+      {badRange && <Notice tone="warning">That isn’t a real date, so it was left out of the lookup. Pick dates from the calendar.</Notice>}
       {(from || to) && days.length > 0 && (
         <p className="rounded-[14px] bg-card px-4 py-3 text-[15px] shadow-[var(--shadow-card)]">
           {from ? fmtDate(from) : 'Start'} – {to ? fmtDate(to) : 'today'}: <b className="num">{formatMoney(rangeNet)}</b> net sales on {new Set(live.map((d) => d.business_date)).size} days{more && ' (first 1,000 rows; narrow the range for the rest)'}
