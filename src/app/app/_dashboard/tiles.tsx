@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { cx } from '@/components/ui';
+import { getT } from '@/lib/i18n/server';
 
 /**
  * Overview tile, styled like the RetailNexa app: uppercase label, large number.
@@ -21,12 +22,13 @@ export function Stat({ label, value, sub, href, tone, block, hero }: {
 }
 
 /** "+4.2% vs last year" with an arrow glyph so direction isn't color-only. */
-export function Change({ pct, vs }: { pct: number | null; vs: string }) {
-  if (pct === null) return <span>No {vs} to compare</span>;
+export async function Change({ pct, vs }: { pct: number | null; vs: string }) {
+  const t = await getT();
+  if (pct === null) return <span>{t('No')} {vs} {t('to compare')}</span>;
   const up = pct >= 0;
   return (
     <span className={cx('delta', up ? 'text-paid' : 'text-late')}>
-      <span aria-hidden>{up ? '▲' : '▼'}</span> {up ? '+' : ''}{pct}% <span className="text-muted">vs {vs}</span>
+      <span aria-hidden>{up ? '▲' : '▼'}</span> {up ? '+' : ''}{pct}% <span className="text-muted">{t('vs')} {vs}</span>
     </span>
   );
 }

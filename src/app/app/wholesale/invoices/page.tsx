@@ -6,14 +6,16 @@ import { fmtDate } from '../../bills/format';
 import { Stat } from '../../_dashboard/tiles';
 import { loadCustomers, loadReceivables, wsContext } from '../_data';
 import { InvoiceBadge, Pills, Row, SearchBox, money, money0 } from '../_ui';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Invoices' };
 const FILTERS: [string, string][] = [['', 'Open'], ['overdue', 'Overdue'], ['paid', 'Paid'], ['void', 'Void'], ['all', 'All']];
 
 /** Customer invoices with balances and aging (Not yet due, 1–30, 31–60, 61–90, 90+). */
 export default async function InvoicesPage({ searchParams }: PageProps<'/app/wholesale/invoices'>) {
+  const t = await getT();
   const ctx = await wsContext();
-  if (!can(ctx, 'wholesale.receivables.view')) return <Notice tone="warning">You don’t have access to invoices.</Notice>;
+  if (!can(ctx, 'wholesale.receivables.view')) return <Notice tone="warning">{t('You don’t have access to invoices.')}</Notice>;
   const sp = await searchParams;
   const f = String(sp.f ?? ''), q = String(sp.q ?? '').trim().toLowerCase();
   const [rec, customers] = await Promise.all([loadReceivables(ctx.org.id), loadCustomers(ctx.org.id)]);
@@ -27,36 +29,36 @@ export default async function InvoicesPage({ searchParams }: PageProps<'/app/who
   const owed = buckets.reduce((s, b) => s + b, 0);
   return (
     <>
-      <PageHeader title="Invoices" description="What customers owe you, by due date. Record payments on each invoice."
-        actions={can(ctx, 'wholesale.receivables.manage') && ctx.access.canWrite ? <LinkButton href="/app/wholesale/invoices/new" size="sm">New invoice</LinkButton> : undefined} />
+      <PageHeader title={t('Invoices')} description={t('What customers owe you, by due date. Record payments on each invoice.')}
+        actions={can(ctx, 'wholesale.receivables.manage') && ctx.access.canWrite ? <LinkButton href="/app/wholesale/invoices/new" size="sm">{t('New invoice')}</LinkButton> : undefined} />
       {inv.length > 0 && (
         <>
           <div className="grid grid-cols-2 gap-3">
-            <Stat block="blue" label="Owed to you" value={money0(owed)} sub={`${inv.filter((i) => i.balance > 0).length} open invoices`} />
-            <Stat block={owed - buckets[0] ? 'coral' : undefined} label="Overdue" value={money0(owed - buckets[0])} sub={`${inv.filter((i) => i.status === 'overdue').length} invoices`} />
+            <Stat block="blue" label={t('Owed to you')} value={money0(owed)} sub={t('{v0} open invoices', { v0: inv.filter((i) => i.balance > 0).length })} />
+            <Stat block={owed - buckets[0] ? 'coral' : undefined} label={t('Overdue')} value={money0(owed - buckets[0])} sub={t('{v0} invoices', { v0: inv.filter((i) => i.status === 'overdue').length })} />
           </div>
-          <div className="grid grid-cols-5 gap-1.5 text-center max-[421px]:grid-cols-3" aria-label="Aging">
+          <div className="grid grid-cols-5 gap-1.5 text-center max-[421px]:grid-cols-3" aria-label={t('Aging')}>
             {AGING.map((label, n) => (
               <div key={label} className="rounded-xl bg-card px-1.5 py-2 shadow-[var(--shadow-card)]">
-                <p className="text-[11px] font-semibold text-muted">{n ? `${label} days` : label}</p>
+                <p className="text-[11px] font-semibold text-muted">{n ? t('{n} days', { n: label }) : t(label)}</p>
                 <p className={n && buckets[n] ? 'num text-sm font-semibold text-late' : 'num text-sm font-semibold'}>{money0(buckets[n])}</p>
               </div>
             ))}
           </div>
-          <SearchBox action="/app/wholesale/invoices" q={String(sp.q ?? '')} placeholder="Search invoice # or customer" hidden={f ? { f } : undefined} />
+          <SearchBox action="/app/wholesale/invoices" q={String(sp.q ?? '')} placeholder={t('Search invoice # or customer')} hidden={f ? { f } : undefined} />
         </>
       )}
       <Pills base="/app/wholesale/invoices" current={f} items={FILTERS} />
-      {rec.truncated && <p className="text-sm text-muted">Showing the first 20,000 invoices or payments; totals may be low.</p>}
+      {rec.truncated && <p className="text-sm text-muted">{t('Showing the first 20,000 invoices or payments; totals may be low.')}</p>}
       {shown.length ? (
         <ul className="flex flex-col gap-2">
           {shown.map((i) => (
             <Row key={i.id} href={`/app/wholesale/invoices/${i.id}`} title={`${i.number} · ${name.get(i.customer_id) ?? 'Customer'}`}
-              detail={`${fmtDate(i.invoice_date)} · due ${fmtDate(i.due_date)}${i.status === 'overdue' ? ` · ${i.daysLate} days late` : ''}`}
-              amount={i.balance > 0 ? `${money(i.balance)} due` : money(i.total_cents)} badge={<InvoiceBadge s={i.status} />} />
+              detail={t('{v0} · due {v1}{v2}', { v0: fmtDate(i.invoice_date), v1: fmtDate(i.due_date), v2: i.status === 'overdue' ? ` · ${i.daysLate} days late` : '' })}
+              amount={i.balance > 0 ? t('{v0} due', { v0: money(i.balance) }) : money(i.total_cents)} badge={<InvoiceBadge s={i.status} />} />
           ))}
         </ul>
-      ) : inv.length ? <p className="text-muted">Nothing here.</p> : <EmptyState title="No invoices yet">Invoice an order from its page, or start a new invoice.</EmptyState>}
+      ) : inv.length ? <p className="text-muted">{t('Nothing here.')}</p> : <EmptyState title={t('No invoices yet')}>{t('Invoice an order from its page, or start a new invoice.')}</EmptyState>}
     </>
   );
 }

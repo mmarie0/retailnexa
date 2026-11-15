@@ -10,13 +10,15 @@ import { loadCustomers, loadReceivables, loadSettings, loadTiers, wsContext } fr
 import { Pills, Row, SearchBox, Warnings, money, money0 } from '../_ui';
 import { saveCustomer } from '../actions';
 import { CustomerFields } from './fields';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Customers' };
 
 /** Wholesale customers: tier, terms, balance and warnings (overdue, over limit, certificate expired, on hold). */
 export default async function CustomersPage({ searchParams }: PageProps<'/app/wholesale/customers'>) {
+  const t = await getT();
   const ctx = await wsContext();
-  if (!(['wholesale.customers.manage', 'wholesale.orders.view', 'wholesale.receivables.view'] as const).some((p) => can(ctx, p))) return <Notice tone="warning">You don’t have access to customers.</Notice>;
+  if (!(['wholesale.customers.manage', 'wholesale.orders.view', 'wholesale.receivables.view'] as const).some((p) => can(ctx, p))) return <Notice tone="warning">{t('You don’t have access to customers.')}</Notice>;
   const sp = await searchParams;
   const q = String(sp.q ?? '').trim().toLowerCase(), f = String(sp.f ?? '');
   const seeMoney = can(ctx, 'wholesale.receivables.view');
@@ -36,22 +38,22 @@ export default async function CustomersPage({ searchParams }: PageProps<'/app/wh
 
   return (
     <>
-      <PageHeader title="Customers" description="The businesses you sell to: their price tier, payment terms, credit limit and what they owe." />
+      <PageHeader title={t('Customers')} description={t('The businesses you sell to: their price tier, payment terms, credit limit and what they owe.')} />
       <ReadOnlyNotice show={can(ctx, 'wholesale.customers.manage') && !ctx.access.canWrite} />
       {customers.length > 0 && (
         <div className="grid grid-cols-3 gap-3 max-[520px]:grid-cols-1">
-          <Stat label="Active customers" value={String(rows.filter((r) => r.c.is_active).length)} />
-          {seeMoney && <Stat block="blue" label="They owe you" value={money0(owed)} />}
-          {seeMoney && <Stat block={late ? 'coral' : undefined} label="Overdue" value={money0(late)} sub={`${rows.filter((r) => r.s.overdue > 0).length} customers`} />}
+          <Stat label={t('Active customers')} value={String(rows.filter((r) => r.c.is_active).length)} />
+          {seeMoney && <Stat block="blue" label={t('They owe you')} value={money0(owed)} />}
+          {seeMoney && <Stat block={late ? 'coral' : undefined} label={t('Overdue')} value={money0(late)} sub={t('{v0} customers', { v0: rows.filter((r) => r.s.overdue > 0).length })} />}
         </div>
       )}
       {customers.length > 0 && (
         <>
-          <SearchBox action="/app/wholesale/customers" q={String(sp.q ?? '')} placeholder="Search name, contact, email or phone" hidden={f ? { f } : undefined} />
+          <SearchBox action="/app/wholesale/customers" q={String(sp.q ?? '')} placeholder={t('Search name, contact, email or phone')} hidden={f ? { f } : undefined} />
           <Pills base="/app/wholesale/customers" current={f} items={[['', 'All'], ...(seeMoney ? [['owing', 'Owe you'], ['overdue', 'Overdue']] as [string, string][] : []), ['warn', 'Need attention'], ['inactive', 'Inactive']]} />
         </>
       )}
-      {customers.truncated && <p className="text-sm text-muted">Showing the first 20,000 customers.</p>}
+      {customers.truncated && <p className="text-sm text-muted">{t('Showing the first 20,000 customers.')}</p>}
       {shown.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {shown.map(({ c, s }) => (
@@ -60,17 +62,17 @@ export default async function CustomersPage({ searchParams }: PageProps<'/app/wh
               amount={seeMoney && s.balance ? money(s.balance) : undefined} />
           ))}
         </ul>
-      ) : customers.length > 0 ? <p className="text-muted">No customers match.</p> : (
-        <EmptyState title="No customers yet">{manage ? 'Add the stores and businesses you sell to below.' : 'An owner or admin can add customers.'}</EmptyState>
+      ) : customers.length > 0 ? <p className="text-muted">{t('No customers match.')}</p> : (
+        <EmptyState title={t('No customers yet')}>{manage ? t('Add the stores and businesses you sell to below.') : t('An owner or admin can add customers.')}</EmptyState>
       )}
       {manage && (
         <Card id="add">
-          <h2 className="text-lg font-bold">Add a customer</h2>
-          {!tiers.length && <p className="mt-1 text-sm text-muted">Tip: set up price tiers (Standard, Volume, Distributor) under Customers → Price tiers first.</p>}
+          <h2 className="text-lg font-bold">{t('Add a customer')}</h2>
+          {!tiers.length && <p className="mt-1 text-sm text-muted">{t('Tip: set up price tiers (Standard, Volume, Distributor) under Customers → Price tiers first.')}</p>}
           <ActionForm action={saveCustomer} className="mt-3 flex flex-col gap-3">
             <input type="hidden" name="then" value="open" />
             <CustomerFields tiers={tiers} defaultTerms={settings.default_terms} />
-            <div><SubmitButton>Add customer</SubmitButton></div>
+            <div><SubmitButton>{t('Add customer')}</SubmitButton></div>
           </ActionForm>
         </Card>
       )}

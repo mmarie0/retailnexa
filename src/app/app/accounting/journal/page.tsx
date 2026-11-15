@@ -68,9 +68,9 @@ export default async function JournalPage({ searchParams }: PageProps<'/app/acco
                         const a = acct.get(l.account_id);
                         return (
                           <tr key={i} className="border-t border-line">
-                            <td className="px-5 py-1.5"><span className="num mr-2 text-muted">{a?.code}</span>{a?.name}{l.memo && <span className="text-muted"> · {l.memo}</span>}</td>
-                            <td className="num w-32 px-3 text-right">{Number(l.debit_cents) ? formatMoney(Number(l.debit_cents)) : ''}</td>
-                            <td className="num w-32 px-5 text-right">{Number(l.credit_cents) ? formatMoney(Number(l.credit_cents)) : ''}</td>
+                            <td className="px-5 py-1.5"><span className="num me-2 text-muted">{a?.code}</span>{a?.name}{l.memo && <span className="text-muted"> · {l.memo}</span>}</td>
+                            <td className="num w-32 px-3 text-end">{Number(l.debit_cents) ? formatMoney(Number(l.debit_cents)) : ''}</td>
+                            <td className="num w-32 px-5 text-end">{Number(l.credit_cents) ? formatMoney(Number(l.credit_cents)) : ''}</td>
                           </tr>
                         );
                       })}

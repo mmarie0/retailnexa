@@ -5,6 +5,7 @@ import { initialActionState, type ActionState } from '@/lib/actions';
 import { formatMoney } from '@/lib/billing/plans';
 import { centsToInput, parseDollarsToCents } from '@/lib/money';
 import { PAY_METHODS, addDays, splitPlan } from '@/lib/wholesale/ledger';
+import { useT } from '@/lib/i18n/client';
 
 type Row = { due_date: string; amount: string; check_no: string };
 
@@ -14,6 +15,7 @@ export function PlanForm({ action, customers, today, initialCustomer }: {
   customers: { id: string; name: string; balance: number; unscheduled: number }[];
   today: string; initialCustomer?: string;
 }) {
+  const t = useT();
   const [state, run] = useActionState(action, initialActionState);
   const [cust, setCust] = useState(initialCustomer ?? '');
   const c = customers.find((x) => x.id === cust);
@@ -32,37 +34,37 @@ export function PlanForm({ action, customers, today, initialCustomer }: {
   return (
     <form action={run} className="flex flex-col gap-3">
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Customer" htmlFor="pc">
+        <Field label={t('Customer')} htmlFor="pc">
           <Select id="pc" name="customer_id" value={cust} onChange={(e) => { setCust(e.target.value); const x = customers.find((y) => y.id === e.target.value); if (x) setTotal(centsToInput(x.unscheduled)); }} required>
-            <option value="">Choose…</option>
-            {customers.map((x) => <option key={x.id} value={x.id}>{x.name} · owes {formatMoney(x.balance)}</option>)}
+            <option value="">{t('Choose…')}</option>
+            {customers.map((x) => <option key={x.id} value={x.id}>{x.name} {t('· owes')} {formatMoney(x.balance)}</option>)}
           </Select>
         </Field>
-        <Field label="Amount to schedule" htmlFor="pt" hint={c ? `${formatMoney(c.unscheduled)} isn’t scheduled yet.` : undefined}><Input id="pt" inputMode="decimal" className="num" value={total} onChange={(e) => setTotal(e.target.value)} /></Field>
-        <Field label="Number of payments" htmlFor="pn"><Input id="pn" type="number" min={1} max={60} className="num" value={n} onChange={(e) => setN(e.target.value)} /></Field>
-        <Field label="First payment" htmlFor="pf"><Input id="pf" type="date" value={first} onChange={(e) => setFirst(e.target.value)} /></Field>
-        <Field label="Every (days)" htmlFor="pe"><Input id="pe" type="number" min={1} max={365} className="num" value={every} onChange={(e) => setEvery(e.target.value)} /></Field>
-        <div className="flex items-end"><Button type="button" variant="secondary" size="sm" onClick={split}>Split into payments</Button></div>
+        <Field label={t('Amount to schedule')} htmlFor="pt" hint={c ? t('{v0} isn’t scheduled yet.', { v0: formatMoney(c.unscheduled) }) : undefined}><Input id="pt" inputMode="decimal" className="num" value={total} onChange={(e) => setTotal(e.target.value)} /></Field>
+        <Field label={t('Number of payments')} htmlFor="pn"><Input id="pn" type="number" min={1} max={60} className="num" value={n} onChange={(e) => setN(e.target.value)} /></Field>
+        <Field label={t('First payment')} htmlFor="pf"><Input id="pf" type="date" value={first} onChange={(e) => setFirst(e.target.value)} /></Field>
+        <Field label={t('Every (days)')} htmlFor="pe"><Input id="pe" type="number" min={1} max={365} className="num" value={every} onChange={(e) => setEvery(e.target.value)} /></Field>
+        <div className="flex items-end"><Button type="button" variant="secondary" size="sm" onClick={split}>{t('Split into payments')}</Button></div>
       </div>
       {rows.length > 0 && (
         <>
           <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="How they’ll pay" htmlFor="pm"><Select id="pm" name="method" defaultValue="check">{PAY_METHODS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}</Select></Field>
-            <Field label="Their bank (optional)" htmlFor="pb"><Input id="pb" name="bank" maxLength={60} /></Field>
-            <Field label="Note (optional)" htmlFor="pnote"><Input id="pnote" name="note" maxLength={200} /></Field>
+            <Field label={t('How they’ll pay')} htmlFor="pm"><Select id="pm" name="method" defaultValue="check">{PAY_METHODS.map((m) => <option key={m.key} value={m.key}>{t(m.label)}</option>)}</Select></Field>
+            <Field label={t('Their bank (optional)')} htmlFor="pb"><Input id="pb" name="bank" maxLength={60} /></Field>
+            <Field label={t('Note (optional)')} htmlFor="pnote"><Input id="pnote" name="note" maxLength={200} /></Field>
           </div>
           <ul className="flex flex-col gap-2">
             {rows.map((r, i) => (
               <li key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2">
-                <Input name="due_date" type="date" value={r.due_date} aria-label={`Payment ${i + 1} date`} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, due_date: e.target.value } : x)))} />
-                <Input name="amount" inputMode="decimal" className="num" value={r.amount} aria-label={`Payment ${i + 1} amount`} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
-                <Input name="check_no" placeholder="Check # (optional)" maxLength={30} value={r.check_no} aria-label={`Payment ${i + 1} check number`} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, check_no: e.target.value } : x)))} />
-                <button type="button" onClick={() => setRows(rows.filter((_, j) => j !== i))} aria-label={`Remove payment ${i + 1}`} className="px-2 text-lg text-muted hover:text-late">×</button>
+                <Input name="due_date" type="date" value={r.due_date} aria-label={t('Payment {v0} date', { v0: i + 1 })} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, due_date: e.target.value } : x)))} />
+                <Input name="amount" inputMode="decimal" className="num" value={r.amount} aria-label={t('Payment {v0} amount', { v0: i + 1 })} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
+                <Input name="check_no" placeholder={t('Check # (optional)')} maxLength={30} value={r.check_no} aria-label={t('Payment {v0} check number', { v0: i + 1 })} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, check_no: e.target.value } : x)))} />
+                <button type="button" onClick={() => setRows(rows.filter((_, j) => j !== i))} aria-label={t('Remove payment {v0}', { v0: i + 1 })} className="px-2 text-lg text-muted hover:text-late">×</button>
               </li>
             ))}
           </ul>
-          <p className="text-sm text-muted">Total <span className="num font-semibold text-ink">{formatMoney(sum)}</span> in {rows.length} payment{rows.length === 1 ? '' : 's'}.</p>
-          <div><Button type="submit" disabled={!cust}>Save payment plan</Button></div>
+          <p className="text-sm text-muted">{t('Total')} <span className="num font-semibold text-ink">{formatMoney(sum)}</span> {t('in')} {rows.length} {t('payment')}{rows.length === 1 ? '' : 's'}.</p>
+          <div><Button type="submit" disabled={!cust}>{t('Save payment plan')}</Button></div>
         </>
       )}
       <FormMessage state={state} />

@@ -6,6 +6,7 @@ import { billTotals, monthReports, payrollPaid, salesRollups, scheduledPayrollDe
 import { DailySalesChart } from './daily-sales-chart';
 import { TrendChart } from './trend-chart';
 import { Pct, Stat } from './tiles';
+import { getT } from '@/lib/i18n/server';
 
 const money0 = (c: number) => formatMoney(Math.round(c / 100) * 100).replace(/\.00$/, '');
 const fmt = (d: string, year = true) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', ...(year ? { year: 'numeric' } : {}) });
@@ -27,6 +28,7 @@ async function salesFor(sb: Awaited<ReturnType<typeof getSupabase>>, org: string
 
 /** Overview for a date range, with last year's matching dates (#108). */
 export async function RangeView({ ctx, range, perm }: { ctx: OrgContext; range: Range; perm: { sales: boolean; bills: boolean; payroll: boolean; profit: boolean } }) {
+  const t = await getT();
   const sb = await getSupabase();
   const org = ctx.org.id, ly = lastYearOf(range), days = daysBetween(range.from, range.to) + 1;
   const [cur, prev, daily, bills, lyBills, pay, lyPay] = await Promise.all([
@@ -55,33 +57,33 @@ export async function RangeView({ ctx, range, perm }: { ctx: OrgContext; range: 
       const by = new Map<string, number>();
       for (const r of daily) by.set(r.period, (by.get(r.period) ?? 0) + Number(r.net_cents));
       const points = Array.from({ length: days }, (_, i) => { const d = addDays(range.from, i); return { date: d, netCents: by.get(d) ?? null }; });
-      return <DailySalesChart points={points} title="Net sales by day" />;
+      return <DailySalesChart points={points} title={t('Net sales by day')} />;
     }
     const pts: { ym: string; cents: number | null; lastYearCents: number | null; projected: boolean }[] = [];
     for (let m = range.from.slice(0, 7), k = 0; m <= range.to.slice(0, 7) && k < 25; m = ymAdd(m, 1), k++) {
       pts.push({ ym: m, cents: cur.months.get(m)?.net ?? null, lastYearCents: prev?.months.get(ymAdd(m, -12))?.net ?? null, projected: false });
     }
-    return <TrendChart points={pts} title="Net sales by month" />;
+    return <TrendChart points={pts} title={t('Net sales by month')} />;
   })();
 
   return (
     <>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-[20px] font-bold tracking-tight">{fmt(range.from)} – {fmt(range.to)}</h2>
-        <span className="text-sm text-muted">vs {ly.sameWeekdays ? 'same weekdays' : 'same dates'} last year ({fmt(ly.from, false)} – {fmt(ly.to)})</span>
+        <span className="text-sm text-muted">{t('vs')} {ly.sameWeekdays ? t('same weekdays') : t('same dates')} {t('last year (')}{fmt(ly.from, false)} – {fmt(ly.to)})</span>
       </div>
-      {!perm.sales && !perm.bills && <Notice tone="warning">You don’t have access to sales or bills.</Notice>}
+      {!perm.sales && !perm.bills && <Notice tone="warning">{t('You don’t have access to sales or bills.')}</Notice>}
       <div className="grid grid-cols-2 gap-3">
-        {cur && <Stat block="blue" label="Net sales" value={money0(cur.net)}
-          sub={prev?.any ? <>{money0(prev.net)} last year <Pct v={pct(cur.net, prev.net)} /></> : 'No sales last year for these dates'} />}
-        {cur && <Stat label="Daily average" value={cur.avg.cents === null ? '—' : money0(cur.avg.cents)}
-          sub={<>{cur.avg.days} day{cur.avg.days === 1 ? '' : 's'} with sales{cur.reportMonths ? ' (plus monthly reports)' : ''}{prev?.avg.cents ? <> · LY {money0(prev.avg.cents)} <Pct v={pct(cur.avg.cents, prev.avg.cents)} /></> : null}</>} />}
-        {payUse !== null && <Stat block="indigo" label="Payroll" value={money0(payUse)} sub={pay!.runs ? `${pay!.runs} pay run${pay!.runs === 1 ? '' : 's'} paid` : payEst?.complete === false ? 'Estimated from schedules (too many shifts to read them all; shorten the dates)' : 'Estimated from schedules'} />}
-        {b && <Stat label="Bills due" value={money0(b.total)} sub={`${money0(b.paid)} paid · ${money0(b.left)} left`} />}
+        {cur && <Stat block="blue" label={t('Net sales')} value={money0(cur.net)}
+          sub={prev?.any ? <>{money0(prev.net)} {t('last year')} <Pct v={pct(cur.net, prev.net)} /></> : t('No sales last year for these dates')} />}
+        {cur && <Stat label={t('Daily average')} value={cur.avg.cents === null ? '—' : money0(cur.avg.cents)}
+          sub={<>{cur.avg.days} {t('day')}{cur.avg.days === 1 ? '' : 's'} {t('with sales')}{cur.reportMonths ? t(' (plus monthly reports)') : ''}{prev?.avg.cents ? <> {t('· LY')} {money0(prev.avg.cents)} <Pct v={pct(cur.avg.cents, prev.avg.cents)} /></> : null}</>} />}
+        {payUse !== null && <Stat block="indigo" label={t('Payroll')} value={money0(payUse)} sub={pay!.runs ? t('{v0} pay run{v1} paid', { v0: pay!.runs, v1: pay!.runs === 1 ? '' : 's' }) : payEst?.complete === false ? t('Estimated from schedules (too many shifts to read them all; shorten the dates)') : t('Estimated from schedules')} />}
+        {b && <Stat label={t('Bills due')} value={money0(b.total)} sub={t('{v0} paid · {v1} left', { v0: money0(b.paid), v1: money0(b.left) })} />}
       </div>
       {perm.profit && (
-        <Stat block={profit !== null && profit < 0 ? 'coral' : 'sunset'} label="Profit for these dates" value={profit === null ? '—' : money0(profit)}
-          sub={profit === null ? 'No sales recorded for these dates' : <>Sales {money0(cur!.net)} + tax {money0(cur!.tax)} − bills {money0(b!.total)} − payroll {money0(payUse!)}{lyProfit !== null ? <> · last year {money0(lyProfit)} <Pct v={pct(profit, lyProfit)} /></> : null}</>} />
+        <Stat block={profit !== null && profit < 0 ? 'coral' : 'sunset'} label={t('Profit for these dates')} value={profit === null ? '—' : money0(profit)}
+          sub={profit === null ? t('No sales recorded for these dates') : <>{t('Sales')} {money0(cur!.net)} {t('+ tax')} {money0(cur!.tax)} {t('− bills')} {money0(b!.total)} {t('− payroll')} {money0(payUse!)}{lyProfit !== null ? <> {t('· last year')} {money0(lyProfit)} <Pct v={pct(profit, lyProfit)} /></> : null}</>} />
       )}
       {chart && <Card>{chart}</Card>}
     </>

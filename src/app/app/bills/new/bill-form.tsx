@@ -65,7 +65,7 @@ export function BillForm({ vendors, accounts, locations, today, initialDue }: { 
             </Select>
             <Input name="line_description" aria-label={`Line ${i + 1} description`} placeholder="Description" maxLength={300}
               value={l.description} onChange={(e) => update(l.key, { description: e.target.value })} />
-            <Input name="line_amount" aria-label={`Line ${i + 1} amount`} inputMode="decimal" placeholder="0.00" className="num w-full text-right"
+            <Input name="line_amount" aria-label={`Line ${i + 1} amount`} inputMode="decimal" placeholder="0.00" className="num w-full text-end"
               value={l.amount} onChange={(e) => update(l.key, { amount: e.target.value })} />
             <Button type="button" variant="ghost" size="sm" disabled={lines.length === 1} aria-label={`Remove line ${i + 1}`}
               onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}>Remove</Button>
@@ -74,7 +74,7 @@ export function BillForm({ vendors, accounts, locations, today, initialDue }: { 
         <div className="flex items-center justify-between gap-3">
           <Button type="button" variant="secondary" size="sm" disabled={lines.length >= 100}
             onClick={() => setLines((ls) => [...ls, { key: Math.max(...ls.map((x) => x.key)) + 1, account: '', amount: '', description: '' }])}>Add line</Button>
-          <p className="font-semibold">Total <span className="num ml-2">{formatMoney(total)}</span></p>
+          <p className="font-semibold">Total <span className="num ms-2">{formatMoney(total)}</span></p>
         </div>
       </fieldset>
 

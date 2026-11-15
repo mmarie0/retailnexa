@@ -140,3 +140,7 @@ body:has(main [data-fab-hide], main details[open] form, main form :focus, main #
   --color-accent: #c38bff; --color-accent-strong: #d6adff; --color-accent-soft: #3d2b58; --color-on-accent: #1c1328;
   --color-paid: #4fd1a0; --color-paid-soft: #173329; --color-soon: #f2b24f; --color-soon-soft: #3a2d18; --color-late: #ff7a8a; --color-late-soft: #43202a;
 }
+
+/* Arabic: a font with good Arabic letters first, and arrows that point the reading way. */
+:lang(ar) body { font-family: "Noto Sans Arabic", "Segoe UI", Tahoma, var(--font-sans, system-ui), sans-serif; }
+[dir='rtl'] .rtl-flip { transform: scaleX(-1); }

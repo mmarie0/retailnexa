@@ -50,7 +50,7 @@ export default async function YearEndPage({ searchParams }: PageProps<'/app/prof
       <Stat block="sunset" label={`${year} profit`} value={formatMoney(sum.total)} sub="Cash-basis: sales + tax ± other stores − bills − payroll" />
       <Card>
         <h2 className="text-lg font-bold">What’s in the Excel file</h2>
-        <ul className="mt-2 list-disc pl-5 text-[15px]">{sheets.map((s) => <li key={s}>{s}</li>)}</ul>
+        <ul className="mt-2 list-disc ps-5 text-[15px]">{sheets.map((s) => <li key={s}>{s}</li>)}</ul>
         {can(ctx, 'reports.export')
           ? <a href={`/app/profit/year-end/xlsx?y=${year}`} className="mt-3 inline-flex rounded-full bg-accent px-4 py-2 font-semibold text-on-accent">Download {year} Excel report</a>
           : <p className="mt-3 text-sm text-muted">Downloading needs the Export reports permission.</p>}

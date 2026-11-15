@@ -16,7 +16,7 @@ export default async function AppHelpPage() {
       <PageHeader title="Help" description="What each part of RetailNexa does, and how to use it." />
       <Card>
         <h2 className="text-lg font-bold">Start here</h2>
-        <ol className="mt-2 list-decimal pl-5 text-[15px]">
+        <ol className="mt-2 list-decimal ps-5 text-[15px]">
           <li>Import today’s sales report or enter your bills.</li>
           <li>Set each vendor’s credit terms so due dates fill in.</li>
           <li>Add your team and your monthly fixed costs.</li>
@@ -31,7 +31,7 @@ export default async function AppHelpPage() {
                 <span aria-hidden className="text-muted">›</span>
               </summary>
               <div className="flex flex-col gap-2 px-4 pb-4">
-                <ol className="list-decimal pl-5 text-[15px]">{h.steps.map((s) => <li key={s} className="py-0.5">{s}</li>)}</ol>
+                <ol className="list-decimal ps-5 text-[15px]">{h.steps.map((s) => <li key={s} className="py-0.5">{s}</li>)}</ol>
                 {h.tip && <p className="text-sm text-muted">{h.tip}</p>}
                 <Link href={h.href} className="self-start rounded-full bg-soft px-3.5 py-1.5 text-sm font-semibold text-accent-strong">Take me there ›</Link>
               </div>

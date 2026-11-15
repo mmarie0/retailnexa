@@ -25,7 +25,7 @@ export default async function SalesTaxPage({ searchParams }: PageProps<'/app/acc
   if (error) return <Notice tone="danger">The sales tax summary couldn’t be loaded. Try again.</Notice>;
   const s = ((data ?? [])[0] ?? { opening_cents: 0, collected_cents: 0, paid_cents: 0, closing_cents: 0 }) as Record<string, number>;
   const row = (label: string, cents: number, strong = false) => (
-    <tr className={cx('border-t border-line', strong && 'font-bold')}><td className="px-5 py-2.5">{label}</td><td className="num px-5 text-right">{formatMoney(Number(cents))}</td></tr>
+    <tr className={cx('border-t border-line', strong && 'font-bold')}><td className="px-5 py-2.5">{label}</td><td className="num px-5 text-end">{formatMoney(Number(cents))}</td></tr>
   );
 
   return (

@@ -7,11 +7,13 @@ import { Stat } from '../_dashboard/tiles';
 import { Icon } from '../app-shell';
 import { loadCustomers, loadExpected, loadItems, loadOpenLines, loadOrders, loadReceivables } from './_data';
 import { OrderBadge, money, money0 } from './_ui';
+import { getT } from '@/lib/i18n/server';
 
 const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 1000) / 10 : null);
 
 /** Wholesale Overview, like the Ledger's dashboard: what's owed, this month's sales, what to collect, pick and reorder. */
 export async function WholesaleOverview({ ctx, today, compact = false }: { ctx: OrgContext; today: string; compact?: boolean }) {
+  const t = await getT();
   const org = ctx.org.id;
   const see = {
     orders: can(ctx, 'wholesale.orders.view'), money: can(ctx, 'wholesale.receivables.view'),
@@ -42,8 +44,8 @@ export async function WholesaleOverview({ ctx, today, compact = false }: { ctx: 
   const nothing = !see.orders && !see.money && !see.stock;
 
   return (
-    <section className="flex flex-col gap-[18px]" aria-label="Wholesale">
-      {compact && <Eyebrow>Wholesale</Eyebrow>}
+    <section className="flex flex-col gap-[18px]" aria-label={t('Wholesale')}>
+      {compact && <Eyebrow>{t('Wholesale')}</Eyebrow>}
       {!compact && (
         <div className="grid grid-cols-4 gap-2 max-[520px]:grid-cols-2">
           {[
@@ -53,62 +55,62 @@ export async function WholesaleOverview({ ctx, today, compact = false }: { ctx: 
             see.cust && { href: '/app/wholesale/customers', icon: 'team', label: 'Customers' },
           ].filter(Boolean).map((b) => {
             const x = b as { href: string; icon: 'cart' | 'invoice' | 'card' | 'team'; label: string };
-            return <Link key={x.href} href={x.href} className="flex flex-col items-center gap-1 rounded-[16px] bg-card px-2 py-3 text-sm font-semibold shadow-[var(--shadow-card)] hover:bg-soft"><Icon k={x.icon} className="size-6 text-accent" />{x.label}</Link>;
+            return <Link key={x.href} href={x.href} className="flex flex-col items-center gap-1 rounded-[16px] bg-card px-2 py-3 text-sm font-semibold shadow-[var(--shadow-card)] hover:bg-soft"><Icon k={x.icon} className="size-6 text-accent" />{t(x.label)}</Link>;
           })}
         </div>
       )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {see.money && <Stat block="blue" label="Owed to you" value={money0(owed)} sub={overdue ? `${money0(overdue)} overdue` : 'Nothing overdue'} href="/app/wholesale/invoices" />}
-        {see.money && <Stat label="Sales this month" value={money0(sales)} sub={sales ? `GP ${money0(gp)} · ${pct(gp, sales)}% margin` : 'No invoices yet'} />}
-        {see.orders && <Stat label="Open orders" value={String(toShip.length)} sub={`${openOrders.length - toShip.length} quote${openOrders.length - toShip.length === 1 ? '' : 's'}`} href="/app/wholesale/orders" />}
-        {see.stock && <Stat label="Stock on hand" value={money0(value.cost)} sub={`At cost · ${money0(value.price)} at price`} href="/app/wholesale/inventory" />}
+        {see.money && <Stat block="blue" label={t('Owed to you')} value={money0(owed)} sub={overdue ? t('{v0} overdue', { v0: money0(overdue) }) : t('Nothing overdue')} href="/app/wholesale/invoices" />}
+        {see.money && <Stat label={t('Sales this month')} value={money0(sales)} sub={sales ? t('GP {v0} · {v1}% margin', { v0: money0(gp), v1: pct(gp, sales) ?? 0 }) : t('No invoices yet')} />}
+        {see.orders && <Stat label={t('Open orders')} value={String(toShip.length)} sub={t('{v0} quote{v1}', { v0: openOrders.length - toShip.length, v1: openOrders.length - toShip.length === 1 ? '' : 's' })} href="/app/wholesale/orders" />}
+        {see.stock && <Stat label={t('Stock on hand')} value={money0(value.cost)} sub={t('At cost · {v0} at price', { v0: money0(value.price) })} href="/app/wholesale/inventory" />}
       </div>
-      {rec.truncated && <p className="text-sm text-muted">Showing the first 20,000 invoices or payments; totals may be low.</p>}
+      {rec.truncated && <p className="text-sm text-muted">{t('Showing the first 20,000 invoices or payments; totals may be low.')}</p>}
 
       <div className="grid gap-3 sm:grid-cols-2">
         {see.money && (
           <Card>
-            <h2 className="font-bold">Collect next</h2>
+            <h2 className="font-bold">{t('Collect next')}</h2>
             {collect.length ? (
               <ul className="mt-2 flex flex-col gap-1.5 text-[15px]">
                 {collect.map(({ c, s }) => <li key={c.id} className="flex justify-between gap-2"><Link href={`/app/wholesale/customers/${c.id}`} className="truncate hover:underline">{c.name}</Link><span className="num text-late">{money(s.overdue)}</span></li>)}
               </ul>
-            ) : <p className="mt-1 text-sm text-muted">No overdue balances.</p>}
+            ) : <p className="mt-1 text-sm text-muted">{t('No overdue balances.')}</p>}
           </Card>
         )}
         {see.money && (
           <Card>
-            <h2 className="font-bold">Payments coming in</h2>
+            <h2 className="font-bold">{t('Payments coming in')}</h2>
             {coming.length ? (
               <ul className="mt-2 flex flex-col gap-1.5 text-[15px]">
-                {coming.map((e) => <li key={e.id} className="flex justify-between gap-2"><span className="truncate">{fmtDate(e.due_date)} · {name.get(e.customer_id) ?? 'Customer'}</span><span className={e.due_date < today ? 'num text-late' : 'num'}>{money(e.amount_cents)}</span></li>)}
+                {coming.map((e) => <li key={e.id} className="flex justify-between gap-2"><span className="truncate">{fmtDate(e.due_date)} · {name.get(e.customer_id) ?? t('Customer')}</span><span className={e.due_date < today ? 'num text-late' : 'num'}>{money(e.amount_cents)}</span></li>)}
               </ul>
-            ) : <p className="mt-1 text-sm text-muted">No promised payments in the next 7 days.</p>}
-            <Link href="/app/wholesale/payments" className="mt-2 inline-block text-sm font-semibold text-accent-strong">Payment schedule</Link>
+            ) : <p className="mt-1 text-sm text-muted">{t('No promised payments in the next 7 days.')}</p>}
+            <Link href="/app/wholesale/payments" className="mt-2 inline-block text-sm font-semibold text-accent-strong">{t('Payment schedule')}</Link>
           </Card>
         )}
         {see.orders && (
           <Card>
-            <h2 className="font-bold">To pick &amp; ship</h2>
+            <h2 className="font-bold">{t('To pick & ship')}</h2>
             {toShip.length ? (
               <ul className="mt-2 flex flex-col gap-1.5 text-[15px]">
-                {toShip.slice(0, 6).map((o) => <li key={o.id} className="flex items-center justify-between gap-2"><Link href={`/app/wholesale/orders/${o.id}`} className="truncate hover:underline">{o.number} · {name.get(o.customer_id) ?? 'Customer'}</Link><OrderBadge status={o.status} /></li>)}
+                {toShip.slice(0, 6).map((o) => <li key={o.id} className="flex items-center justify-between gap-2"><Link href={`/app/wholesale/orders/${o.id}`} className="truncate hover:underline">{o.number} · {name.get(o.customer_id) ?? t('Customer')}</Link><OrderBadge status={o.status} /></li>)}
               </ul>
-            ) : <p className="mt-1 text-sm text-muted">No open orders.</p>}
+            ) : <p className="mt-1 text-sm text-muted">{t('No open orders.')}</p>}
           </Card>
         )}
         {see.stock && (
           <Card>
-            <h2 className="font-bold">Reorder</h2>
+            <h2 className="font-bold">{t('Reorder')}</h2>
             {reorder.length ? (
               <ul className="mt-2 flex flex-col gap-1.5 text-[15px]">
-                {reorder.slice(0, 6).map(({ it, n }) => <li key={it.id} className="flex justify-between gap-2"><span className="truncate">{it.name}</span><span className="num">order {fmtQty(n!)}</span></li>)}
+                {reorder.slice(0, 6).map(({ it, n }) => <li key={it.id} className="flex justify-between gap-2"><span className="truncate">{it.name}</span><span className="num">{t('order')} {fmtQty(n!)}</span></li>)}
               </ul>
-            ) : <p className="mt-1 text-sm text-muted">Nothing at its reorder point.</p>}
+            ) : <p className="mt-1 text-sm text-muted">{t('Nothing at its reorder point.')}</p>}
           </Card>
         )}
       </div>
-      {nothing && <p className="text-muted">Your role doesn’t include wholesale pages yet.</p>}
+      {nothing && <p className="text-muted">{t('Your role doesn’t include wholesale pages yet.')}</p>}
     </section>
   );
 }

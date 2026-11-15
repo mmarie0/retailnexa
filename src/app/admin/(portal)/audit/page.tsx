@@ -25,7 +25,7 @@ export default async function AdminAuditPage({ searchParams }: PageProps<'/admin
       </nav>
       <Card className="overflow-x-auto p-0">
         <table className="w-full min-w-[720px] text-sm">
-          <thead className="bg-soft text-left"><tr><th className="px-4 py-2">When</th><th>Actor</th><th>Action</th><th>Account</th><th>Target</th></tr></thead>
+          <thead className="bg-soft text-start"><tr><th className="px-4 py-2">When</th><th>Actor</th><th>Action</th><th>Account</th><th>Target</th></tr></thead>
           <tbody>
             {rows.slice(0, PAGE).map((r) => (
               <tr key={r.id} className="border-t border-line align-top">

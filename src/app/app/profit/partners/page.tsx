@@ -66,15 +66,15 @@ export default async function PartnersPage() {
       {totals.length > 0 && (
         <Card className="overflow-x-auto p-0">
           <table className="w-full min-w-[560px] text-[14.5px]">
-            <thead className="text-left text-xs uppercase tracking-[.06em] text-muted"><tr><th className="px-4 py-2.5">Partner</th><th className="px-2 text-right">Share</th><th className="px-2 text-right">{year} share</th><th className="px-2 text-right">{year} paid</th><th className="px-4 text-right">All time paid</th></tr></thead>
+            <thead className="text-start text-xs uppercase tracking-[.06em] text-muted"><tr><th className="px-4 py-2.5">Partner</th><th className="px-2 text-end">Share</th><th className="px-2 text-end">{year} share</th><th className="px-2 text-end">{year} paid</th><th className="px-4 text-end">All time paid</th></tr></thead>
             <tbody>
               {totals.map((p) => (
                 <tr key={p.id} className="border-t border-line">
                   <td className="px-4 py-2 font-semibold">{p.name} {!p.is_active && <Badge>Inactive</Badge>}</td>
-                  <td className="num px-2 text-right">{p.pct.toFixed(2)}%</td>
-                  <td className="num px-2 text-right">{formatMoney(p.ytd.share)}</td>
-                  <td className="num px-2 text-right">{formatMoney(p.ytd.paid)}{p.ytd.share > p.ytd.paid ? <span className="block text-xs text-late">{formatMoney(p.ytd.share - p.ytd.paid)} left</span> : null}</td>
-                  <td className="num px-4 text-right">{formatMoney(p.all.paid)}</td>
+                  <td className="num px-2 text-end">{p.pct.toFixed(2)}%</td>
+                  <td className="num px-2 text-end">{formatMoney(p.ytd.share)}</td>
+                  <td className="num px-2 text-end">{formatMoney(p.ytd.paid)}{p.ytd.share > p.ytd.paid ? <span className="block text-xs text-late">{formatMoney(p.ytd.share - p.ytd.paid)} left</span> : null}</td>
+                  <td className="num px-4 text-end">{formatMoney(p.all.paid)}</td>
                 </tr>
               ))}
             </tbody>
@@ -137,7 +137,7 @@ export default async function PartnersPage() {
                             <span className="num">{formatMoney(s.share_cents)} {left === 0 ? <Badge tone="good">Paid</Badge> : <span className="text-sm text-muted">{formatMoney(left)} left</span>}</span>
                           </div>
                           {payments.filter((p) => p.share_id === s.id).map((p) => (
-                            <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 pl-3 text-sm text-muted">
+                            <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 ps-3 text-sm text-muted">
                               <span>{fmtDate(p.paid_on)} · {METHOD[p.method] ?? p.method}{p.reference ? ` #${p.reference}` : ''}</span>
                               <span className="flex items-center gap-2"><span className="num">{formatMoney(p.amount_cents)}</span>
                                 {manage && <ActionForm action={removeDistributionItem} className="contents"><input type="hidden" name="kind" value="payment" /><input type="hidden" name="id" value={p.id} /><SubmitButton variant="ghost" size="sm" aria-label={`Remove the ${formatMoney(p.amount_cents)} payment`}>Remove</SubmitButton></ActionForm>}
