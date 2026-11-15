@@ -106,6 +106,9 @@ export const AREAS: NavArea[] = [
       { key: 'payroll', label: 'Payroll', href: '/app/staff/payroll', icon: 'card', perm: 'payroll.view' },
       { key: 'stubs', label: 'Paystubs', href: '/app/staff/stubs', icon: 'doc', perm: 'payroll.view' },
       { key: 'labor', label: 'Labor %', href: '/app/staff/labor', icon: 'profit', perm: 'payroll.view' },
+      // Wholesale only (ws- pages are hidden for Retail accounts).
+      { key: 'ws-reps', label: 'Sales reps', href: '/app/wholesale/reps', icon: 'team', perm: ['commissions.manage', 'commissions.view'] },
+      { key: 'ws-commissions', label: 'Commissions', href: '/app/wholesale/commissions', icon: 'profit', perm: ['commissions.manage', 'commissions.view'] },
     ],
   },
   { key: 'upkeep', label: 'Upkeep', icon: 'upkeep', bottom: true, pages: [{ key: 'tasks', label: 'Maintenance', href: '/app/upkeep', icon: 'upkeep', perm: ['maintenance.view', 'tasks.view'] }] },

@@ -401,3 +401,79 @@ export async function setItemImage(itemId: string, path: string | null): Promise
     return ok(path ? 'Photo saved.' : 'Photo removed.');
   } catch (e) { return failFrom(e); }
 }
+
+// ---------------------------------------------------------------- sales reps and commission
+export async function saveRep(_p: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const ctx = await guard('commissions.manage'); if (isState(ctx)) return ctx;
+    const f = z.object({
+      id: optUuid, name: z.string().trim().min(1, 'Enter the rep’s name').max(120), email: z.string().trim().max(200).email('Check the email').or(z.literal('')).default(''),
+      phone: text(40), user_id: optUuid, rate_pct: z.coerce.number().min(0, '0 to 100').max(100, '0 to 100'), basis: z.enum(['sales', 'profit']), earn_on: z.enum(['invoiced', 'paid']),
+      notes: text(1000),
+    }).safeParse(fields(form));
+    if (!f.success) return fail('Check the highlighted fields.', Object.fromEntries(f.error.issues.map((i) => [String(i.path[0]), i.message])));
+    const target = money(form.get('monthly_target'));
+    if (target === undefined) return fail('Target looks like 10000.00.', { monthly_target: 'Enter an amount' });
+    const { id, ...v } = f.data;
+    const { error } = await (await getSupabase()).rpc('save_sales_rep', {
+      p_org: ctx.org.id, p_id: id, p: { ...v, monthly_target_cents: target, active: form.get('active') === null ? true : form.getAll('active').includes('true') },
+    });
+    if (error) throw error;
+    done();
+    return ok(id ? 'Saved.' : `Added ${v.name}.`);
+  } catch (e) { return failFrom(e); }
+}
+
+export async function setCustomerRep(_p: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const ctx = await guard('wholesale.customers.manage'); if (isState(ctx)) return ctx;
+    const f = z.object({ customer_id: uuid, rep_id: optUuid }).safeParse(fields(form));
+    if (!f.success) return fail('Pick a rep.');
+    const { error } = await (await getSupabase()).rpc('set_customer_rep', { p_org: ctx.org.id, p_customer: f.data.customer_id, p_rep: f.data.rep_id });
+    if (error) throw error;
+    done();
+    return ok(f.data.rep_id ? 'Rep saved. Their new orders are credited to this rep.' : 'No rep for this customer now.');
+  } catch (e) { return failFrom(e); }
+}
+
+export async function setOrderRep(_p: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const ctx = await guard('wholesale.orders.view'); if (isState(ctx)) return ctx;
+    if (!can(ctx, 'commissions.manage') && !can(ctx, 'wholesale.customers.manage')) return fail('Only managers can change who gets credit.');
+    const f = z.object({ order_id: uuid, rep_id: optUuid }).safeParse(fields(form));
+    if (!f.success) return fail('Pick a rep.');
+    const { error } = await (await getSupabase()).rpc('set_order_rep', { p_org: ctx.org.id, p_order: f.data.order_id, p_rep: f.data.rep_id });
+    if (error) throw error;
+    done();
+    return ok('Credit saved.');
+  } catch (e) { return failFrom(e); }
+}
+
+export async function recordPayout(_p: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const ctx = await guard('commissions.manage'); if (isState(ctx)) return ctx;
+    const f = z.object({ rep_id: uuid, paid_on: date, method: z.enum(['check', 'cash', 'ach', 'zelle', 'payroll', 'other']), reference: text(60), note: text(300) }).safeParse(fields(form));
+    if (!f.success) return fail('Pick the rep, the date and how you paid.');
+    const amount = money(form.get('amount'));
+    if (!amount) return fail('Amount looks like 250.00.', { amount: 'Enter an amount' });
+    const v = f.data;
+    const { error } = await (await getSupabase()).rpc('record_commission_payout', {
+      p_org: ctx.org.id, p_rep: v.rep_id, p_paid_on: v.paid_on, p_amount_cents: amount, p_method: v.method, p_reference: v.reference || null, p_note: v.note || null,
+    });
+    if (error) throw error;
+    done();
+    return ok('Payout recorded.');
+  } catch (e) { return failFrom(e); }
+}
+
+export async function voidPayout(_p: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const ctx = await guard('commissions.manage'); if (isState(ctx)) return ctx;
+    const f = z.object({ id: uuid, reason: z.string().trim().min(1, 'Say why').max(200) }).safeParse(fields(form));
+    if (!f.success) return fail('Say why this payout is being voided.');
+    const { error } = await (await getSupabase()).rpc('void_commission_payout', { p_org: ctx.org.id, p_id: f.data.id, p_reason: f.data.reason });
+    if (error) throw error;
+    done();
+    return ok('Payout voided. It stays on the list, crossed out.');
+  } catch (e) { return failFrom(e); }
+}

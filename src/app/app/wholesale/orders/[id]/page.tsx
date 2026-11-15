@@ -3,13 +3,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { can, getSupabase } from '@/lib/auth/context';
 import { ActionForm } from '@/components/action-form';
-import { Card, Field, Input, LinkButton, PageHeader } from '@/components/ui';
+import { Card, Field, Input, LinkButton, PageHeader, Select } from '@/components/ui';
 import { SubmitButton } from '@/components/submit-button';
 import { fmtQty } from '@/lib/wholesale/ledger';
 import { fmtDate } from '../../../bills/format';
-import { loadCustomers, loadOrders, wsContext } from '../../_data';
+import { loadCustomers, loadOrders, loadReps, wsContext } from '../../_data';
 import { OrderBadge, money } from '../../_ui';
-import { invoiceOrder, setOrderStatus, setPicked } from '../../actions';
+import { invoiceOrder, setOrderRep, setOrderStatus, setPicked } from '../../actions';
 
 export const metadata: Metadata = { title: 'Order' };
 
@@ -25,6 +25,9 @@ export default async function OrderPage({ params }: PageProps<'/app/wholesale/or
   const o = orders.find((x) => x.id === id);
   if (!o) notFound();
   const c = customers.find((x) => x.id === o.customer_id);
+  const credit = (can(ctx, 'commissions.manage') || can(ctx, 'wholesale.customers.manage')) && ctx.access.canWrite;
+  const reps = credit || can(ctx, 'commissions.view') ? await loadReps(ctx.org.id) : [];
+  const repName = reps.find((r) => r.id === o.rep_id)?.name;
   const open = ['open', 'picking', 'ready'].includes(o.status);
   const edit = can(ctx, 'wholesale.orders.create') && ctx.access.canWrite && open;
   const bill = can(ctx, 'wholesale.receivables.manage') && ctx.access.canWrite && open;
@@ -43,6 +46,7 @@ export default async function OrderPage({ params }: PageProps<'/app/wholesale/or
         {o.need_by && <span className="text-sm text-muted">Needed by {fmtDate(o.need_by)}</span>}
         {o.valid_until && <span className="text-sm text-muted">Good until {fmtDate(o.valid_until)}</span>}
         {o.customer_po && <span className="text-sm text-muted">PO {o.customer_po}</span>}
+        {repName && <span className="text-sm text-muted">Rep: {repName}</span>}
         {o.invoice_id && can(ctx, 'wholesale.receivables.view') && <Link href={`/app/wholesale/invoices/${o.invoice_id}`} className="text-sm font-semibold text-accent-strong">See the invoice</Link>}
       </div>
       <Card>
@@ -73,6 +77,13 @@ export default async function OrderPage({ params }: PageProps<'/app/wholesale/or
         </dl>
         {o.notes && <p className="mt-2 whitespace-pre-line text-sm text-muted">{o.notes}</p>}
       </Card>
+      {credit && reps.length > 0 && (
+        <ActionForm action={setOrderRep} className="flex flex-wrap items-end gap-2">
+          <input type="hidden" name="order_id" value={o.id} />
+          <Field label="Commission goes to" htmlFor="orep"><Select id="orep" name="rep_id" defaultValue={o.rep_id ?? ''}><option value="">No rep</option>{reps.filter((r) => r.is_active || r.id === o.rep_id).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</Select></Field>
+          <SubmitButton size="sm" variant="secondary">Save</SubmitButton>
+        </ActionForm>
+      )}
       {(edit || bill) && (
         <Card className="flex flex-col gap-3">
           <h2 className="font-bold">Next step</h2>

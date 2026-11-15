@@ -3,14 +3,14 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { can } from '@/lib/auth/context';
 import { ActionForm } from '@/components/action-form';
-import { Card, Eyebrow, LinkButton, Notice, PageHeader } from '@/components/ui';
+import { Card, Eyebrow, Field, LinkButton, Notice, PageHeader, Select } from '@/components/ui';
 import { SubmitButton } from '@/components/submit-button';
 import { methodLabel, standing, termsLabel, withBalances } from '@/lib/wholesale/ledger';
 import { fmtDate } from '../../../bills/format';
 import { Stat } from '../../../_dashboard/tiles';
-import { loadCustomers, loadExpected, loadOrders, loadReceivables, loadSettings, loadTiers, wsContext } from '../../_data';
+import { loadCustomers, loadExpected, loadOrders, loadReceivables, loadReps, loadSettings, loadTiers, wsContext } from '../../_data';
 import { InvoiceBadge, OrderBadge, Row, Warnings, money } from '../../_ui';
-import { deleteCustomer, saveCustomer } from '../../actions';
+import { deleteCustomer, saveCustomer, setCustomerRep } from '../../actions';
 import { CustomerFields } from '../fields';
 
 export const metadata: Metadata = { title: 'Customer' };
@@ -27,6 +27,8 @@ export default async function CustomerPage({ params }: PageProps<'/app/wholesale
   ]);
   const c = customers.find((x) => x.id === id);
   if (!c) notFound();
+  const reps = can(ctx, 'wholesale.customers.manage') || can(ctx, 'commissions.view') ? await loadReps(ctx.org.id) : [];
+  const rep = reps.find((r) => r.id === c.rep_id);
   const inv = withBalances(rec.invoices.filter((i) => i.customer_id === id), rec.payments, ctx.today);
   const s = standing(c, inv, ctx.today);
   const mine = orders.filter((o) => o.customer_id === id);
@@ -48,6 +50,18 @@ export default async function CustomerPage({ params }: PageProps<'/app/wholesale
           <Stat label="Promised" value={money(plan.reduce((t, e) => t + e.amount_cents, 0))} sub={plan[0] ? `Next ${fmtDate(plan[0].due_date)}` : 'No payment plan'} />
           <Stat label="Sales, last 12 months" value={money(sales12)} sub={lastPay ? `Last paid ${fmtDate(lastPay.paid_on)} · ${methodLabel(lastPay.method)}` : 'No payments yet'} />
         </div>
+      )}
+      {(rep || (manage && reps.length > 0)) && (
+        <Card className="flex flex-wrap items-end justify-between gap-3">
+          <p className="text-[15px]"><span className="text-muted">Sales rep: </span><strong>{rep?.name ?? 'None'}</strong></p>
+          {manage && reps.length > 0 && (
+            <ActionForm action={setCustomerRep} className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="customer_id" value={c.id} />
+              <Field label="Change rep" htmlFor="rep"><Select id="rep" name="rep_id" defaultValue={c.rep_id ?? ''}><option value="">No rep</option>{reps.filter((r) => r.is_active || r.id === c.rep_id).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</Select></Field>
+              <SubmitButton size="sm" variant="secondary">Save</SubmitButton>
+            </ActionForm>
+          )}
+        </Card>
       )}
       <Card>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[15px]">
