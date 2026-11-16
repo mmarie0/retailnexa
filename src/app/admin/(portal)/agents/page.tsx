@@ -32,9 +32,9 @@ export default async function AgentsPage() {
       {rows.length ? (
         <Card className="overflow-x-auto p-0">
           <table className="w-full min-w-[640px] text-[15px]">
-            <thead><tr className="border-b border-line text-left text-sm text-muted">
-              <th className="px-4 py-2 font-semibold">Agent</th><th className="px-4 py-2 font-semibold">Code</th><th className="px-4 py-2 text-right font-semibold">Accounts</th>
-              <th className="px-4 py-2 text-right font-semibold">Paying</th><th className="px-4 py-2 text-right font-semibold">Trials</th><th className="px-4 py-2 text-right font-semibold">MRR</th>
+            <thead><tr className="border-b border-line text-start text-sm text-muted">
+              <th className="px-4 py-2 font-semibold">Agent</th><th className="px-4 py-2 font-semibold">Code</th><th className="px-4 py-2 text-end font-semibold">Accounts</th>
+              <th className="px-4 py-2 text-end font-semibold">Paying</th><th className="px-4 py-2 text-end font-semibold">Trials</th><th className="px-4 py-2 text-end font-semibold">MRR</th>
             </tr></thead>
             <tbody>
               {rows.map(({ a, s }) => (
@@ -42,8 +42,8 @@ export default async function AgentsPage() {
                   <td className="px-4 py-2"><Link href={`/admin/agents/${a.user_id}`} className="font-semibold text-accent-strong">{a.name}</Link>
                     <span className="block text-sm text-muted">{a.email}</span>{!a.is_active && <Badge>Inactive</Badge>}</td>
                   <td className="px-4 py-2 font-mono text-sm">{a.ref_code}</td>
-                  <td className="num px-4 py-2 text-right">{s.accounts}</td><td className="num px-4 py-2 text-right">{s.paying}</td>
-                  <td className="num px-4 py-2 text-right">{s.trialing}</td><td className="num px-4 py-2 text-right font-semibold">{formatMoney(s.mrrCents)}</td>
+                  <td className="num px-4 py-2 text-end">{s.accounts}</td><td className="num px-4 py-2 text-end">{s.paying}</td>
+                  <td className="num px-4 py-2 text-end">{s.trialing}</td><td className="num px-4 py-2 text-end font-semibold">{formatMoney(s.mrrCents)}</td>
                 </tr>
               ))}
             </tbody>

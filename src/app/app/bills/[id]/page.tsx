@@ -62,20 +62,20 @@ export default async function BillPage({ params }: PageProps<'/app/bills/[id]'>)
 
       <Card className="p-0">
         <table className="w-full text-[15px]">
-          <thead className="text-left text-sm text-muted"><tr><th className="px-5 py-3 font-semibold">Account</th><th className="px-3 font-semibold">Description</th><th className="px-5 text-right font-semibold">Amount</th></tr></thead>
+          <thead className="text-start text-sm text-muted"><tr><th className="px-5 py-3 font-semibold">Account</th><th className="px-3 font-semibold">Description</th><th className="px-5 text-end font-semibold">Amount</th></tr></thead>
           <tbody>
             {(lines ?? []).map((l) => {
               const a = acct.get(l.account_id);
               return (
                 <tr key={l.id} className="border-t border-line">
-                  <td className="px-5 py-2"><span className="num mr-2 text-muted">{a?.code}</span>{a?.name ?? 'Account'}</td>
+                  <td className="px-5 py-2"><span className="num me-2 text-muted">{a?.code}</span>{a?.name ?? 'Account'}</td>
                   <td className="px-3 text-muted">{l.description}</td>
-                  <td className="num px-5 text-right">{formatMoney(Number(l.amount_cents))}</td>
+                  <td className="num px-5 text-end">{formatMoney(Number(l.amount_cents))}</td>
                 </tr>
               );
             })}
-            <tr className="border-t border-line font-bold"><td className="px-5 py-2.5" colSpan={2}>Total</td><td className="num px-5 text-right">{formatMoney(total)}</td></tr>
-            {Number(bill.paid_cents) > 0 && <tr className="border-t border-line"><td className="px-5 py-2" colSpan={2}>Still owed</td><td className="num px-5 text-right font-semibold">{formatMoney(open)}</td></tr>}
+            <tr className="border-t border-line font-bold"><td className="px-5 py-2.5" colSpan={2}>Total</td><td className="num px-5 text-end">{formatMoney(total)}</td></tr>
+            {Number(bill.paid_cents) > 0 && <tr className="border-t border-line"><td className="px-5 py-2" colSpan={2}>Still owed</td><td className="num px-5 text-end font-semibold">{formatMoney(open)}</td></tr>}
           </tbody>
         </table>
       </Card>

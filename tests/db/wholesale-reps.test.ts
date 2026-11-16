@@ -84,4 +84,22 @@ describe('sales reps and commission', () => {
     await expectDenied(as(owner, `select public.void_commission_payout($1, $2, 'again')`, [org, id]), /already void/);
     expect((await summary(owner)).find((r) => r.name === 'Ana')!.balance_cents).toBe('300');
   });
+
+  it('new terms take effect immediately: older invoices keep the old rate', async () => {
+    const today = (await sys<{ d: string }>(`select private.org_today($1)::text as d`, [org]))[0].d;
+    await as(owner, `select public.save_sales_rep($1, $2, $3::jsonb)`, [org, rA, j({ name: 'Ana', user_id: repUser.id, rate_pct: 50, basis: 'sales', earn_on: 'invoiced' })]);
+    expect((await sys(`select effective_from::text as d, rate_pct::text as r from public.sales_rep_terms where rep_id = $1 order by effective_from`, [rA])).map((x) => [x.d, x.r]))
+      .toEqual([['2000-01-01', '10.00'], [today, '50.00']]);
+    const o = await one(repUser, `select public.save_sales_order($1, null, $2::jsonb) as r`, [org, j({ customer_id: cust, lines: [{ item_id: item, qty: 10, price_cents: 300 }] })]);
+    await as(acct, `select public.invoice_order($1, $2, $3::date)`, [org, o, today]);
+    // March invoice: 10% of $30 = 300c (unchanged). Today's invoice: 50% of $30 = 1500c.
+    const ana = (await summary(owner, '2026-01-01', today)).find((r) => r.name === 'Ana')!;
+    expect(Number(ana.earned_cents)).toBe(1800);
+    // Saving again with the same terms doesn't add a row; the rep can see their own terms only.
+    await as(owner, `select public.save_sales_rep($1, $2, $3::jsonb)`, [org, rA, j({ name: 'Ana B.', user_id: repUser.id, rate_pct: 50, basis: 'sales', earn_on: 'invoiced' })]);
+    expect((await sys(`select count(*)::int as n from public.sales_rep_terms where rep_id = $1`, [rA]))[0].n).toBe(2);
+    expect((await as(repUser, `select rep_id from public.sales_rep_terms where organization_id = $1`, [org])).every((x) => x.rep_id === rA)).toBe(true);
+    expect(await as(viewer, `select rep_id from public.sales_rep_terms where organization_id = $1`, [org])).toEqual([]);
+    await expectDenied(as(owner, `insert into public.sales_rep_terms (organization_id, rep_id, effective_from, rate_pct, basis, earn_on) values ($1, $2, '2026-01-01', 99, 'sales', 'paid')`, [org, rA]));
+  });
 });

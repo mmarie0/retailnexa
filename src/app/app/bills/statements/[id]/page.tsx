@@ -67,13 +67,13 @@ export default async function StatementPage({ params }: PageProps<'/app/bills/st
 
       <Card className="overflow-x-auto p-0">
         <table className="w-full min-w-[640px] text-[14.5px]">
-          <thead className="text-left text-xs uppercase tracking-[.06em] text-muted"><tr><th className="px-4 py-2.5">Date</th><th className="px-2">Invoice #</th><th className="px-2 text-right">Statement</th><th className="px-2">Your bill</th><th className="px-4">Status</th></tr></thead>
+          <thead className="text-start text-xs uppercase tracking-[.06em] text-muted"><tr><th className="px-4 py-2.5">Date</th><th className="px-2">Invoice #</th><th className="px-2 text-end">Statement</th><th className="px-2">Your bill</th><th className="px-4">Status</th></tr></thead>
           <tbody>
             {r.lines.map((m) => (
               <tr key={m.id} className={cx('border-t border-line align-top', m.status === 'missing' && 'bg-late/5')}>
                 <td className="px-4 py-2">{m.line_date ? fmtDate(m.line_date) : '—'}</td>
                 <td className="px-2">{m.reference ?? '—'}{m.description ? <span className="block text-xs text-muted">{m.description}</span> : null}</td>
-                <td className="num px-2 text-right">{formatMoney(m.amount_cents)}</td>
+                <td className="num px-2 text-end">{formatMoney(m.amount_cents)}</td>
                 <td className="px-2">{m.bill ? <Link href={`/app/bills/${m.bill.id}`} className="font-semibold text-accent-strong">#{m.bill.bill_number}</Link> : '—'}{m.bill ? <span className="num block text-xs text-muted">{formatMoney(Number(m.bill.total_cents))}{m.how === 'amount' ? ' · matched by amount' : m.how === 'linked' ? ' · picked by hand' : ''}</span> : null}</td>
                 <td className="px-4">
                   <Badge tone={STATUS[m.status][0]}>{STATUS[m.status][1]}</Badge>

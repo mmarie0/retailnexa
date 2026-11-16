@@ -103,7 +103,7 @@ export default async function BalancesPage({ searchParams }: PageProps<'/app/bil
                     <p className="font-bold">{b.other_party} <span className="font-normal text-muted">· {DIRECTION_LABEL[b.direction]}</span></p>
                     <p className="text-sm text-muted">{fmtDate(b.entry_date)}{b.due_date ? ` · paid by ${fmtDate(b.due_date)}` : ''} · counts in {monthLabel(b.count_month.slice(0, 7))}{stores.length > 1 ? ` · ${storeName.get(b.location_id) ?? 'Store'}` : ''}{b.reference ? ` · #${b.reference}` : ''}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-end">
                     <p className={cx('num text-[20px] font-medium', b.direction === 'i_owe' && b.left > 0 && 'text-late')}>{formatMoney(b.left)}</p>
                     <p className="text-xs text-muted">left of {formatMoney(b.amount_cents)}</p>
                     <Badge tone={STATUS[b.status][0]}>{STATUS[b.status][1]}</Badge>

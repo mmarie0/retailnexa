@@ -46,17 +46,17 @@ export default async function TrialBalancePage({ searchParams }: PageProps<'/app
       ) : (
         <Card className="overflow-x-auto p-0">
           <table className="w-full min-w-[520px] text-[15px]">
-            <thead className="bg-soft text-left text-sm text-muted"><tr><th className="px-5 py-2">Account</th><th className="px-3 text-right">Debit</th><th className="px-5 text-right">Credit</th></tr></thead>
+            <thead className="bg-soft text-start text-sm text-muted"><tr><th className="px-5 py-2">Account</th><th className="px-3 text-end">Debit</th><th className="px-5 text-end">Credit</th></tr></thead>
             <tbody>
               {TYPE_ORDER.flatMap((t) => active.filter((r) => r.type === t).map((r, i) => (
                 <tr key={r.account_id} className="border-t border-line">
-                  <td className="px-5 py-1.5">{i === 0 && <span className="mr-2 text-xs font-semibold text-muted">{TYPE_LABEL[t]}</span>}<span className="num mr-2 text-muted">{r.code}</span>{r.name}</td>
-                  <td className="num px-3 text-right">{r.balance_cents > 0 ? formatMoney(r.balance_cents) : ''}</td>
-                  <td className="num px-5 text-right">{r.balance_cents < 0 ? formatMoney(-r.balance_cents) : ''}</td>
+                  <td className="px-5 py-1.5">{i === 0 && <span className="me-2 text-xs font-semibold text-muted">{TYPE_LABEL[t]}</span>}<span className="num me-2 text-muted">{r.code}</span>{r.name}</td>
+                  <td className="num px-3 text-end">{r.balance_cents > 0 ? formatMoney(r.balance_cents) : ''}</td>
+                  <td className="num px-5 text-end">{r.balance_cents < 0 ? formatMoney(-r.balance_cents) : ''}</td>
                 </tr>
               )))}
             </tbody>
-            <tfoot><tr className="border-t-2 border-ink font-bold"><td className="px-5 py-2">Total</td><td className="num px-3 text-right">{formatMoney(totalD)}</td><td className="num px-5 text-right">{formatMoney(totalC)}</td></tr></tfoot>
+            <tfoot><tr className="border-t-2 border-ink font-bold"><td className="px-5 py-2">Total</td><td className="num px-3 text-end">{formatMoney(totalD)}</td><td className="num px-5 text-end">{formatMoney(totalC)}</td></tr></tfoot>
           </table>
         </Card>
       )}

@@ -77,7 +77,7 @@ export function SalesImporter({ locations, timeZone }: { locations: Loc[]; timeZ
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="CSV file" htmlFor="file" hint="One row per register per day.">
           <input id="file" type="file" multiple accept=".csv,.txt,.xls,.htm,.html,text/csv" onChange={(e) => onFiles(e.target.files)}
-            className="text-[15px] file:mr-3 file:rounded-full file:border-0 file:bg-accent-soft file:px-3 file:py-1.5 file:font-semibold file:text-indigo" />
+            className="text-[15px] file:me-3 file:rounded-full file:border-0 file:bg-accent-soft file:px-3 file:py-1.5 file:font-semibold file:text-indigo" />
         </Field>
         <Field label="Store" htmlFor="loc">
           <Select id="loc" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
@@ -103,16 +103,16 @@ export function SalesImporter({ locations, timeZone }: { locations: Loc[]; timeZ
           {vela.days.length > 0 && (
             <div className="overflow-x-auto rounded-xl border border-line">
               <table className="w-full min-w-[640px] text-sm">
-                <thead className="bg-soft text-left text-muted"><tr>
-                  <th className="px-3 py-2">Date</th><th className="px-3 text-right">Gross</th><th className="px-3 text-right">Discounts + returns</th>
-                  <th className="px-3 text-right">Tax</th><th className="px-3 text-right">Cash</th><th className="px-3 text-right">Card</th><th className="px-3 text-right">Credit</th><th className="px-3 text-right">Txns</th>
+                <thead className="bg-soft text-start text-muted"><tr>
+                  <th className="px-3 py-2">Date</th><th className="px-3 text-end">Gross</th><th className="px-3 text-end">Discounts + returns</th>
+                  <th className="px-3 text-end">Tax</th><th className="px-3 text-end">Cash</th><th className="px-3 text-end">Card</th><th className="px-3 text-end">Credit</th><th className="px-3 text-end">Txns</th>
                 </tr></thead>
                 <tbody>
                   {vela.days.map((d) => (
                     <tr key={d.businessDate} className="border-t border-line">
                       <td className="px-3 py-1.5">{d.businessDate}</td>
-                      {[d.grossCents, d.discountsCents, d.taxCents, d.cashCents, d.cardCents, d.creditCents].map((c, i) => <td key={i} className="num px-3 text-right">{formatMoney(c)}</td>)}
-                      <td className="num px-3 text-right">{d.transactions ?? '—'}</td>
+                      {[d.grossCents, d.discountsCents, d.taxCents, d.cashCents, d.cardCents, d.creditCents].map((c, i) => <td key={i} className="num px-3 text-end">{formatMoney(c)}</td>)}
+                      <td className="num px-3 text-end">{d.transactions ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -156,16 +156,16 @@ export function SalesImporter({ locations, timeZone }: { locations: Loc[]; timeZ
               {preview.days.length > 0 && (
                 <div className="overflow-x-auto rounded-xl border border-line">
                   <table className="w-full min-w-[640px] text-sm">
-                    <thead className="bg-soft text-left text-muted"><tr>
-                      <th className="px-3 py-2">Date</th><th className="px-3">Register</th><th className="px-3 text-right">Gross</th><th className="px-3 text-right">Discounts</th>
-                      <th className="px-3 text-right">Tax</th><th className="px-3 text-right">Cash</th><th className="px-3 text-right">Card</th><th className="px-3 text-right">Credit</th>
+                    <thead className="bg-soft text-start text-muted"><tr>
+                      <th className="px-3 py-2">Date</th><th className="px-3">Register</th><th className="px-3 text-end">Gross</th><th className="px-3 text-end">Discounts</th>
+                      <th className="px-3 text-end">Tax</th><th className="px-3 text-end">Cash</th><th className="px-3 text-end">Card</th><th className="px-3 text-end">Credit</th>
                     </tr></thead>
                     <tbody>
                       {preview.days.slice(0, 20).map((d) => (
                         <tr key={d.line} className="border-t border-line">
                           <td className="px-3 py-1.5">{d.businessDate}</td><td className="px-3">{d.register}</td>
                           {[d.grossCents, d.discountsCents, d.taxCents, d.cashCents, d.cardCents, d.creditCents].map((c, i) =>
-                            <td key={i} className="num px-3 text-right">{formatMoney(c)}</td>)}
+                            <td key={i} className="num px-3 text-end">{formatMoney(c)}</td>)}
                         </tr>
                       ))}
                     </tbody>

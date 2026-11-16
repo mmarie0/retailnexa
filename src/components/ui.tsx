@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ComponentProps, ReactNode } from 'react';
 import { cloneElement, isValidElement } from 'react';
+import { Tx } from './tx';
 
 export function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ');
@@ -45,7 +46,7 @@ export function Field({ label, htmlFor, hint, error, children }: { label: string
       <label htmlFor={htmlFor} className="text-[13px] font-medium text-muted">{label}</label>
       {control}
       {hint && !error && <p id={`${htmlFor}-hint`} className="text-sm text-muted">{hint}</p>}
-      {error && <p id={`${htmlFor}-error`} className="text-sm text-late" role="alert">{error}</p>}
+      {error && <p id={`${htmlFor}-error`} className="text-sm text-late" role="alert"><Tx text={error} /></p>}
     </div>
   );
 }
@@ -58,7 +59,7 @@ export function Input({ className, ...rest }: ComponentProps<'input'>) {
   return <input className={cx(inputBase, widthDefault(className), className)} {...rest} />;
 }
 export function Select({ className, ...rest }: ComponentProps<'select'>) {
-  return <select className={cx(inputBase, 'pr-8', widthDefault(className), className)} {...rest} />;
+  return <select className={cx(inputBase, 'pe-8', widthDefault(className), className)} {...rest} />;
 }
 export function Textarea({ className, ...rest }: ComponentProps<'textarea'>) {
   return <textarea className={cx(inputBase, 'min-h-28', widthDefault(className), className)} {...rest} />;
@@ -111,7 +112,7 @@ export function FormMessage({ state }: { state: { ok: boolean; message: string |
   if (!state.message) return null;
   return (
     <p role={state.ok ? 'status' : 'alert'} className={cx('rounded-xl px-3 py-2 text-sm font-medium', state.ok ? 'bg-paid-soft text-paid' : 'bg-late-soft text-late')}>
-      {state.message}
+      <Tx text={state.message} />
     </p>
   );
 }

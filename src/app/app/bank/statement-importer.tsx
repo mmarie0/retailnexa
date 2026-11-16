@@ -29,7 +29,7 @@ export function StatementImporter() {
     <div className="flex flex-col gap-4">
       <Field label="Bank statement (CSV)" htmlFor="bank-file" hint="From your bank’s website: download transactions as CSV.">
         <input id="bank-file" type="file" accept=".csv,.txt,text/csv" onChange={(e) => onFile(e.target.files?.[0])}
-          className="text-[15px] file:mr-3 file:rounded-full file:border-0 file:bg-accent-soft file:px-3 file:py-1.5 file:font-semibold file:text-indigo" />
+          className="text-[15px] file:me-3 file:rounded-full file:border-0 file:bg-accent-soft file:px-3 file:py-1.5 file:font-semibold file:text-indigo" />
       </Field>
       {file && (
         <>

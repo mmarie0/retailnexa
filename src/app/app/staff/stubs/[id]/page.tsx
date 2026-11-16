@@ -70,7 +70,7 @@ export default async function RunStubsPage({ params, searchParams }: PageProps<'
           <Card key={l.id} className={cx('flex flex-col gap-3 print:shadow-none', i < shown.length - 1 && 'print-break')}>
             <div className="flex flex-wrap items-start justify-between gap-2 border-b border-line pb-3">
               <div><p className="text-lg font-bold">{business}</p><p className="text-sm text-muted">Paystub</p></div>
-              <div className="text-right text-sm"><p className="font-semibold">Pay date {dl(run.pay_date)}</p><p className="text-muted">Period {dl(run.period_start)} – {dl(run.period_end)}</p></div>
+              <div className="text-end text-sm"><p className="font-semibold">Pay date {dl(run.pay_date)}</p><p className="text-muted">Period {dl(run.period_start)} – {dl(run.period_end)}</p></div>
             </div>
             <div className="flex flex-wrap justify-between gap-2 text-[15px]">
               <p><span className="font-semibold">{e?.name ?? 'Employee'}</span>{e?.role_title && <span className="text-muted"> · {e.role_title}</span>}</p>
@@ -78,11 +78,11 @@ export default async function RunStubsPage({ params, searchParams }: PageProps<'
             </div>
             <table className="w-full text-[15px]">
               <tbody>
-                {rows.map(([label, c]) => <tr key={label}><td className="py-1">{label}</td><td className="num py-1 text-right">{formatMoney(c)}</td></tr>)}
-                <tr className="border-t border-line font-semibold"><td className="py-1">Gross pay</td><td className="num py-1 text-right">{formatMoney(n(l.gross_cents))}</td></tr>
-                {n(l.advance_cents) > 0 && <tr><td className="py-1">Advance taken back</td><td className="num py-1 text-right">−{formatMoney(n(l.advance_cents))}</td></tr>}
-                <tr className="border-t border-line text-lg font-bold"><td className="py-1.5">Net pay</td><td className="num py-1.5 text-right">{formatMoney(n(l.net_cents))}</td></tr>
-                {withTax && <tr className="text-sm text-muted"><td className="py-1">Employer taxes & benefits (paid by the business)</td><td className="num py-1 text-right">{formatMoney(n(l.employer_tax_cents))}</td></tr>}
+                {rows.map(([label, c]) => <tr key={label}><td className="py-1">{label}</td><td className="num py-1 text-end">{formatMoney(c)}</td></tr>)}
+                <tr className="border-t border-line font-semibold"><td className="py-1">Gross pay</td><td className="num py-1 text-end">{formatMoney(n(l.gross_cents))}</td></tr>
+                {n(l.advance_cents) > 0 && <tr><td className="py-1">Advance taken back</td><td className="num py-1 text-end">−{formatMoney(n(l.advance_cents))}</td></tr>}
+                <tr className="border-t border-line text-lg font-bold"><td className="py-1.5">Net pay</td><td className="num py-1.5 text-end">{formatMoney(n(l.net_cents))}</td></tr>
+                {withTax && <tr className="text-sm text-muted"><td className="py-1">Employer taxes & benefits (paid by the business)</td><td className="num py-1 text-end">{formatMoney(n(l.employer_tax_cents))}</td></tr>}
               </tbody>
             </table>
             <p className="text-xs text-muted">No taxes were withheld from this pay. Keep this for your records.</p>

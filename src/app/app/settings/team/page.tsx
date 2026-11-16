@@ -89,7 +89,7 @@ export default async function TeamPage() {
                       <input type="hidden" name="membership_id" value={m.id} />
                       <label className="flex items-center gap-2 text-[15px]"><input type="radio" name="scope" value="all" defaultChecked={myStores.length === 0} className="size-4 accent-[#3f63de]" /> All stores</label>
                       <label className="flex items-center gap-2 text-[15px]"><input type="radio" name="scope" value="some" defaultChecked={myStores.length > 0} className="size-4 accent-[#3f63de]" /> Only these:</label>
-                      <div className="ml-6 flex flex-col gap-1">
+                      <div className="ms-6 flex flex-col gap-1">
                         {locations.map((l) => (
                           <label key={l.id} className="flex items-center gap-2 text-[15px]">
                             <input type="checkbox" name="location_id" value={l.id} defaultChecked={myStores.includes(l.id)} className="size-4 accent-[#3f63de]" />
@@ -112,7 +112,7 @@ export default async function TeamPage() {
                         const current = o ? (o.granted ? 'grant' : 'revoke') : 'default';
                         return (
                           <li key={perm} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
-                            <span className="text-sm">{PERMISSIONS[perm].label}{PERMISSIONS[perm].sensitive && <span className="ml-1.5 text-soon">· sensitive</span>}</span>
+                            <span className="text-sm">{PERMISSIONS[perm].label}{PERMISSIONS[perm].sensitive && <span className="ms-1.5 text-soon">· sensitive</span>}</span>
                             <ActionForm action={setMemberPermission} className="flex items-center gap-2">
                               <input type="hidden" name="membership_id" value={m.id} />
                               <input type="hidden" name="permission" value={perm} />

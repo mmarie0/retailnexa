@@ -69,7 +69,7 @@ export default async function SalesPage({ searchParams }: PageProps<'/app/sales'
           <Card key={date} className="p-0">
             <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-4">
               <h2 className="font-bold">{fmtDate(date)}</h2>
-              <p className="text-sm text-muted">Net sales <span className="num ml-1 font-semibold text-ink">{formatMoney(net)}</span></p>
+              <p className="text-sm text-muted">Net sales <span className="num ms-1 font-semibold text-ink">{formatMoney(net)}</span></p>
             </div>
             <ul className="mt-2 divide-y divide-line">
               {rows.map((r) => (

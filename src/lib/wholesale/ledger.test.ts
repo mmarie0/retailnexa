@@ -31,7 +31,7 @@ describe('wholesale ledger rules', () => {
     const rows = withBalances([inv('a', '2026-10-01', 6000)], [], today);
     const s = standing({ id: 'c1', credit_limit_cents: 5000, cert_expiry: '2026-01-01', tax_exempt: true, on_hold: true }, rows, today);
     expect(s).toMatchObject({ balance: 6000, overdue: 6000, overLimit: true, certExpired: true });
-    expect(s.warnings).toEqual(['On hold', '1 overdue invoice', 'Over credit limit', 'Resale certificate expired']);
+    expect(s.warnings).toEqual(['On hold', 'Overdue invoices', 'Over credit limit', 'Resale certificate expired']);
     expect(standing({ id: 'c2', credit_limit_cents: null, cert_expiry: null, tax_exempt: false, on_hold: false }, rows, today).warnings).toEqual([]);
   });
 

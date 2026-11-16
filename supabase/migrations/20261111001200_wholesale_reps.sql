@@ -12,6 +12,10 @@
 --   is voided (kept, with a reason), never deleted.
 -- * Earned commission is worked out on the server (rep_commission_summary /
 --   rep_commission_lines) so everyone sees the same number.
+-- * Commission terms take effect immediately: changing a rep's rate, basis or
+--   timing applies to sales invoiced from today on. Each change is kept in
+--   sales_rep_terms, and every invoice is paid at the terms in effect on its
+--   invoice date (also when it's earned later, as the customer pays).
 -- Money in integer cents. Payouts are records only: nothing posts to the books.
 -- =============================================================================
 
@@ -46,6 +50,24 @@ create index customers_org_rep_idx on public.customers (organization_id, rep_id)
 create index sales_orders_org_rep_idx on public.sales_orders (organization_id, rep_id);
 create index customer_invoices_org_rep_idx on public.customer_invoices (organization_id, rep_id, invoice_date);
 
+-- Commission terms over time (the rep's current terms are also on sales_reps).
+create table public.sales_rep_terms (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null,
+  rep_id uuid not null,
+  effective_from date not null,
+  rate_pct numeric(5,2) not null check (rate_pct >= 0 and rate_pct <= 100),
+  basis text not null check (basis in ('sales', 'profit')),
+  earn_on text not null check (earn_on in ('invoiced', 'paid')),
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  unique (rep_id, effective_from),
+  foreign key (organization_id, rep_id) references public.sales_reps (organization_id, id) on delete cascade
+);
+create index sales_rep_terms_org_rep_idx on public.sales_rep_terms (organization_id, rep_id, effective_from);
+create index sales_rep_terms_created_by_idx on public.sales_rep_terms (created_by);
+create trigger audit_sales_rep_terms after insert or update or delete on public.sales_rep_terms for each row execute function private.audit_row_change();
+
 create table public.commission_payouts (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null,
@@ -79,10 +101,13 @@ revoke all on function private.rep_admin(uuid), private.own_rep(uuid) from publi
 grant execute on function private.rep_admin(uuid), private.own_rep(uuid) to authenticated;
 
 alter table public.sales_reps enable row level security;
+alter table public.sales_rep_terms enable row level security;
 alter table public.commission_payouts enable row level security;
-revoke all on public.sales_reps, public.commission_payouts from anon, authenticated;
-grant select on public.sales_reps, public.commission_payouts to authenticated;
-grant all on public.sales_reps, public.commission_payouts to service_role;
+revoke all on public.sales_reps, public.sales_rep_terms, public.commission_payouts from anon, authenticated;
+grant select on public.sales_reps, public.sales_rep_terms, public.commission_payouts to authenticated;
+grant all on public.sales_reps, public.sales_rep_terms, public.commission_payouts to service_role;
+create policy sales_rep_terms_select on public.sales_rep_terms for select to authenticated
+  using (private.rep_admin(organization_id) or rep_id = private.own_rep(organization_id));
 create policy sales_reps_select on public.sales_reps for select to authenticated
   using (private.rep_admin(organization_id) or id = private.own_rep(organization_id));
 create policy commission_payouts_select on public.commission_payouts for select to authenticated
@@ -117,7 +142,7 @@ create trigger customer_invoices_default_rep before insert on public.customer_in
 -- p: name, email, phone, user_id (a team member of this business), rate_pct, basis, earn_on, monthly_target_cents, active, notes
 create or replace function public.save_sales_rep(p_org uuid, p_id uuid, p jsonb)
 returns uuid language plpgsql security definer set search_path = '' as $$
-declare v_id uuid; v_user uuid := nullif(p ->> 'user_id', '')::uuid; v_rate numeric := coalesce(nullif(p ->> 'rate_pct', '')::numeric, 0);
+declare v_id uuid; v_user uuid := nullif(p ->> 'user_id', '')::uuid; v_rate numeric := coalesce(nullif(p ->> 'rate_pct', '')::numeric, 0); v_old public.sales_reps;
 begin
   perform private.ws_guard(p_org, 'commissions.manage');
   if nullif(btrim(p ->> 'name'), '') is null or char_length(btrim(p ->> 'name')) > 120 then raise exception 'enter the rep''s name' using errcode = '22023'; end if;
@@ -137,13 +162,23 @@ begin
             coalesce(p ->> 'basis', 'sales'), coalesce(p ->> 'earn_on', 'paid'), nullif(p ->> 'monthly_target_cents', '')::bigint, coalesce((p ->> 'active')::boolean, true),
             nullif(btrim(left(p ->> 'notes', 1000)), ''), auth.uid())
     returning id into v_id;
+    -- A new rep's first terms cover everything credited to them, including older orders.
+    insert into public.sales_rep_terms (organization_id, rep_id, effective_from, rate_pct, basis, earn_on, created_by)
+    values (p_org, v_id, '2000-01-01', round(v_rate, 2), coalesce(p ->> 'basis', 'sales'), coalesce(p ->> 'earn_on', 'paid'), auth.uid());
     return v_id;
   end if;
+  select * into v_old from public.sales_reps where id = p_id and organization_id = p_org for update;
+  if not found then raise exception 'that rep was not found' using errcode = '22023'; end if;
   update public.sales_reps set name = btrim(left(p ->> 'name', 120)), email = nullif(btrim(left(p ->> 'email', 200)), ''), phone = nullif(btrim(left(p ->> 'phone', 40)), ''),
          user_id = v_user, rate_pct = round(v_rate, 2), basis = coalesce(p ->> 'basis', 'sales'), earn_on = coalesce(p ->> 'earn_on', 'paid'),
          monthly_target_cents = nullif(p ->> 'monthly_target_cents', '')::bigint, is_active = coalesce((p ->> 'active')::boolean, true), notes = nullif(btrim(left(p ->> 'notes', 1000)), '')
    where id = p_id and organization_id = p_org;
-  if not found then raise exception 'that rep was not found' using errcode = '22023'; end if;
+  -- New terms take effect today: invoices dated today or later use them; earlier ones keep the old terms.
+  if (v_old.rate_pct, v_old.basis, v_old.earn_on) is distinct from (round(v_rate, 2), coalesce(p ->> 'basis', 'sales'), coalesce(p ->> 'earn_on', 'paid')) then
+    insert into public.sales_rep_terms (organization_id, rep_id, effective_from, rate_pct, basis, earn_on, created_by)
+    values (p_org, p_id, private.org_today(p_org), round(v_rate, 2), coalesce(p ->> 'basis', 'sales'), coalesce(p ->> 'earn_on', 'paid'), auth.uid())
+    on conflict (rep_id, effective_from) do update set rate_pct = excluded.rate_pct, basis = excluded.basis, earn_on = excluded.earn_on, created_by = excluded.created_by, created_at = now();
+  end if;
   return p_id;
 end $$;
 
@@ -184,26 +219,30 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- Commission: earned, paid out, balance
 -- ---------------------------------------------------------------------------
--- What each invoice (or payment, for reps paid "as the customer pays") earns, dated.
+-- What each invoice (or payment, for reps paid "as the customer pays") earns, dated. Every invoice uses
+-- the rep's terms in effect on its invoice date.
 create or replace function private.commission_events(p_org uuid, p_to date)
 returns table (rep_id uuid, invoice_id uuid, on_date date, sales_cents bigint, profit_cents bigint, earned_cents bigint)
 language sql stable security definer set search_path = '' as $$
+  with inv as (
+    select i.id, i.rep_id, i.invoice_date, i.total_cents, i.subtotal_cents - i.discount_cents as sales, i.subtotal_cents - i.discount_cents - i.cost_cents as profit,
+           t.rate_pct, t.basis, t.earn_on
+      from public.customer_invoices i
+      cross join lateral (select st.rate_pct, st.basis, st.earn_on from public.sales_rep_terms st
+                           where st.rep_id = i.rep_id and st.effective_from <= i.invoice_date order by st.effective_from desc limit 1) t
+     where i.organization_id = p_org and i.voided_at is null and i.rep_id is not null and i.invoice_date <= p_to)
   -- When invoiced: the whole invoice on its date.
-  select i.rep_id, i.id, i.invoice_date, i.subtotal_cents - i.discount_cents, i.subtotal_cents - i.discount_cents - i.cost_cents,
-         round((case r.basis when 'sales' then i.subtotal_cents - i.discount_cents else i.subtotal_cents - i.discount_cents - i.cost_cents end) * r.rate_pct / 100)::bigint
-    from public.customer_invoices i join public.sales_reps r on r.id = i.rep_id
-   where i.organization_id = p_org and i.voided_at is null and r.earn_on = 'invoiced' and i.invoice_date <= p_to
+  select inv.rep_id, inv.id, inv.invoice_date, inv.sales, inv.profit,
+         round((case inv.basis when 'sales' then inv.sales else inv.profit end) * inv.rate_pct / 100)::bigint
+    from inv where inv.earn_on = 'invoiced'
   union all
   -- As paid: each payment's share of the invoice on the day it came in.
-  select i.rep_id, i.id, p.paid_on,
-         round((i.subtotal_cents - i.discount_cents)::numeric * p.amount_cents / i.total_cents)::bigint,
-         round((i.subtotal_cents - i.discount_cents - i.cost_cents)::numeric * p.amount_cents / i.total_cents)::bigint,
-         round((case r.basis when 'sales' then i.subtotal_cents - i.discount_cents else i.subtotal_cents - i.discount_cents - i.cost_cents end)::numeric
-               * p.amount_cents / i.total_cents * r.rate_pct / 100)::bigint
-    from public.customer_payments p
-    join public.customer_invoices i on i.id = p.invoice_id
-    join public.sales_reps r on r.id = i.rep_id
-   where i.organization_id = p_org and i.voided_at is null and r.earn_on = 'paid' and i.total_cents > 0 and p.paid_on <= p_to
+  select inv.rep_id, inv.id, p.paid_on,
+         round(inv.sales::numeric * p.amount_cents / inv.total_cents)::bigint,
+         round(inv.profit::numeric * p.amount_cents / inv.total_cents)::bigint,
+         round((case inv.basis when 'sales' then inv.sales else inv.profit end)::numeric * p.amount_cents / inv.total_cents * inv.rate_pct / 100)::bigint
+    from inv join public.customer_payments p on p.invoice_id = inv.id
+   where inv.earn_on = 'paid' and inv.total_cents > 0 and p.paid_on <= p_to
 $$;
 revoke all on function private.commission_events(uuid, date) from public, anon, authenticated;
 

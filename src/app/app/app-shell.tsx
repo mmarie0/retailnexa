@@ -4,6 +4,8 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { cx } from '@/components/ui';
 import { fabFor, locate, type IconKey, type NavArea, type NavPage } from './nav';
+import { useT } from '@/lib/i18n/client';
+import { LanguageSwitch } from '@/components/language-switch';
 
 /* Icon paths copied from the RetailNexa app so the menus look the same. */
 const PATHS: Record<IconKey, ReactNode> = {
@@ -49,8 +51,6 @@ function BrandMark() {
   );
 }
 
-const soonPill = <span className="ml-auto rounded-full bg-soft px-2 py-0.5 text-[11px] font-bold text-muted">Soon</span>;
-
 export function AppShell({ theme, areas, more, orgName, orgSwitcher, email, today, fabPerms, children }: {
   /** Theme id from Appearance (#116); "sky" is the default look. */
   theme: string;
@@ -65,6 +65,8 @@ export function AppShell({ theme, areas, more, orgName, orgSwitcher, email, toda
   fabPerms: string[];
   children: ReactNode;
 }) {
+  const t = useT();
+  const soonPill = <span className="ms-auto rounded-full bg-soft px-2 py-0.5 text-[11px] font-bold text-muted">{t('Soon')}</span>;
   const path = usePathname();
   const here = locate(path, areas);
   const area = areas.find((a) => a.key === here.area) ?? areas[0];
@@ -89,14 +91,14 @@ export function AppShell({ theme, areas, more, orgName, orgSwitcher, email, toda
       <header className="sticky top-0 z-20 -mx-4 bg-paper px-4 pt-3">
         <div className="flex items-center justify-between gap-3">
           <div ref={menuRef} className="relative flex min-w-0 items-center gap-2.5">
-            <button type="button" aria-label="Menu" aria-haspopup="menu" aria-expanded={menuOpen} aria-controls="navmenu" onClick={() => setMenuOpen((o) => !o)}
+            <button type="button" aria-label={t('Menu')} aria-haspopup="menu" aria-expanded={menuOpen} aria-controls="navmenu" onClick={() => setMenuOpen((o) => !o)}
               className={cx('inline-flex flex-none items-center gap-1.5 rounded-xl px-2.5 py-[7px] text-[13.5px] font-bold shadow-[var(--shadow-card)]', menuOpen ? 'bg-accent text-on-accent' : 'bg-card text-ink')}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="size-[18px]"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
-              <span className="max-[421px]:hidden">Menu</span>
+              <span className="max-[421px]:hidden">{t('Menu')}</span>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true" className={cx('size-3.5 transition-transform', menuOpen ? 'rotate-180 text-on-accent' : 'text-muted')}><path d="M6 9l6 6 6-6" /></svg>
             </button>
             {menuOpen && (
-              <nav id="navmenu" aria-label="All pages" onClick={(e) => { if ((e.target as HTMLElement).closest('a')) setMenuOpen(false); }} className="absolute left-0 top-[calc(100%+8px)] z-[45] max-h-[calc(100dvh-180px)] w-[min(300px,calc(100vw-32px))] overflow-y-auto rounded-2xl bg-card p-2 shadow-[0_14px_36px_rgba(40,60,140,.24)]">
+              <nav id="navmenu" aria-label={t('All pages')} onClick={(e) => { if ((e.target as HTMLElement).closest('a')) setMenuOpen(false); }} className="absolute start-0 top-[calc(100%+8px)] z-[45] max-h-[calc(100dvh-180px)] w-[min(300px,calc(100vw-32px))] overflow-y-auto rounded-2xl bg-card p-2 shadow-[0_14px_36px_rgba(40,60,140,.24)]">
                 <div className="px-3 pb-2 pt-1.5">
                   <p className="truncate font-bold">{orgName}</p>
                   {orgSwitcher}
@@ -117,35 +119,36 @@ export function AppShell({ theme, areas, more, orgName, orgSwitcher, email, toda
                 ))}
                 <div className="border-t border-soft py-1">
                   <p className="truncate px-3 pb-1 pt-1.5 text-[12.5px] text-muted" title={email}>{email}</p>
-                  <Link href="/app/help" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="doc" className="text-accent" />Help</Link>
-                  <Link href="/app/settings/appearance" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="settings" className="text-accent" />Appearance</Link>
-                  <Link href="/app/settings/storage" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="download" className="text-accent" />Storage</Link>
-                  <Link href="/account/security" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="shield" className="text-accent" />Two-factor authentication</Link>
-                  <Link href="/onboarding?new=1" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="plus" className="text-accent" />Add another business</Link>
+                  <Link href="/app/help" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="doc" className="text-accent" />{t('Help')}</Link>
+                  <Link href="/app/settings/appearance" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="settings" className="text-accent" />{t('Appearance')}</Link>
+                  <Link href="/app/settings/storage" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="download" className="text-accent" />{t('Storage')}</Link>
+                  <Link href="/account/security" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="shield" className="text-accent" />{t('Two-factor authentication')}</Link>
+                  <Link href="/onboarding?new=1" className="flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-[14.5px] font-medium hover:bg-soft"><Icon k="plus" className="text-accent" />{t('Add another business')}</Link>
+                  <LanguageSwitch className="px-3 py-1.5" />
                   <form action="/auth/signout" method="post">
-                    <button className="flex w-full items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-left text-[14.5px] font-medium hover:bg-soft"><Icon k="logout" className="text-accent" />Log out</button>
+                    <button className="flex w-full items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-start text-[14.5px] font-medium hover:bg-soft"><Icon k="logout" className="text-accent" />{t('Log out')}</button>
                   </form>
                 </div>
               </nav>
             )}
-            <Link href="/app" className="flex min-w-0 items-center gap-2 text-[22px] font-bold tracking-[-.02em] max-[421px]:text-xl"><BrandMark /><span className="truncate">RetailNexa</span></Link>
+            <Link href="/app" className="flex min-w-0 items-center gap-2 text-[22px] font-bold tracking-[-.02em] max-[421px]:text-xl"><BrandMark /><span className="truncate">{t('RetailNexa')}</span></Link>
           </div>
           <span className="flex flex-none items-center gap-2.5">
             <span className="text-[13px] text-muted max-[421px]:hidden">{today}</span>
-            <Link href="/help" className="inline-flex items-center gap-[7px] rounded-full bg-card py-[5px] pl-[5px] pr-3 text-[13.5px] font-bold text-accent-strong shadow-[var(--shadow-card)]">
-              <span className="grid size-[22px] place-items-center rounded-full bg-accent text-[13px] font-extrabold text-white">?</span>Need help?
+            <Link href="/help" className="inline-flex items-center gap-[7px] rounded-full bg-card py-[5px] ps-[5px] pe-3 text-[13.5px] font-bold text-accent-strong shadow-[var(--shadow-card)]">
+              <span className="grid size-[22px] place-items-center rounded-full bg-accent text-[13px] font-extrabold text-white">?</span>{t('Need help?')}
             </Link>
           </span>
         </div>
         {area.pages.length > 1 ? (
-          <nav aria-label="Pages" className="mt-2 flex gap-1 overflow-x-auto [scrollbar-width:none]">
+          <nav aria-label={t('Pages')} className="mt-2 flex gap-1 overflow-x-auto [scrollbar-width:none]">
             {area.pages.map((p) => p.href ? (
               <Link key={p.key} href={p.href} aria-current={here.page === p.key ? 'page' : undefined}
                 className={cx('whitespace-nowrap border-b-2 px-2.5 pb-2.5 pt-2', here.page === p.key ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-muted hover:text-ink')}>
                 {p.label}
               </Link>
             ) : (
-              <span key={p.key} title="Coming soon" className="whitespace-nowrap border-b-2 border-transparent px-2.5 pb-2.5 pt-2 font-medium text-muted/60">{p.label}</span>
+              <span key={p.key} title={t('Coming soon')} className="whitespace-nowrap border-b-2 border-transparent px-2.5 pb-2.5 pt-2 font-medium text-muted/60">{p.label}</span>
             ))}
           </nav>
         ) : <div className="h-3" />}
@@ -154,12 +157,12 @@ export function AppShell({ theme, areas, more, orgName, orgSwitcher, email, toda
       <main id="main" className="flex min-w-0 flex-col gap-[18px] pt-4">{children}</main>
 
       {fab && (
-        <Link href={fab.href} data-fab className="fixed bottom-[calc(84px+env(safe-area-inset-bottom,0px))] right-4 z-30 flex items-center gap-2 rounded-full bg-accent px-[18px] py-3.5 text-[15px] font-semibold text-white shadow-[0_10px_24px_rgba(91,127,245,.45)]">
-          <Icon k="plus" className="size-[18px]" />{fab.label}
+        <Link href={fab.href} data-fab className="fixed bottom-[calc(84px+env(safe-area-inset-bottom,0px))] end-4 z-30 flex items-center gap-2 rounded-full bg-accent px-[18px] py-3.5 text-[15px] font-semibold text-white shadow-[0_10px_24px_rgba(91,127,245,.45)]">
+          <Icon k="plus" className="size-[18px]" />{t(fab.label)}
         </Link>
       )}
 
-      <nav aria-label="Sections" className="fixed inset-x-0 bottom-0 z-40 flex justify-center rounded-t-[22px] bg-card px-2 pb-[calc(6px+env(safe-area-inset-bottom,0px))] pt-1.5 shadow-[0_-6px_24px_rgba(40,110,190,.10)]">
+      <nav aria-label={t('Sections')} className="fixed inset-x-0 bottom-0 z-40 flex justify-center rounded-t-[22px] bg-card px-2 pb-[calc(6px+env(safe-area-inset-bottom,0px))] pt-1.5 shadow-[0_-6px_24px_rgba(40,110,190,.10)]">
         <div className="grid w-full max-w-[560px] grid-cols-5">
           {areas.filter((a) => a.bottom).map((a) => {
             const on = area.key === a.key;
@@ -167,7 +170,7 @@ export function AppShell({ theme, areas, more, orgName, orgSwitcher, email, toda
             // A section with nothing this person can open stays visible (same five tabs as the app) but isn't a link (#123).
             if (!href) {
               return (
-                <span key={a.key} aria-disabled="true" title="Not available for your role yet" className="flex flex-col items-center gap-[3px] rounded-xl px-0.5 py-1.5 text-[11.5px] font-semibold text-muted/50">
+                <span key={a.key} aria-disabled="true" title={t('Not available for your role yet')} className="flex flex-col items-center gap-[3px] rounded-xl px-0.5 py-1.5 text-[11.5px] font-semibold text-muted/50">
                   <Icon k={a.icon} className="size-[22px]" />{a.label}
                 </span>
               );

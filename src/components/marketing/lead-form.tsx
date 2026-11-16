@@ -15,7 +15,7 @@ export function LeadForm({ kind }: { kind: 'demo' | 'contact' }) {
     <form action={action} className="flex flex-col gap-4" noValidate>
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="source_path" value={path} />
-      <div className="absolute -left-[9999px]" aria-hidden="true">
+      <div className="absolute -start-[9999px]" aria-hidden="true">
         <label>Website <input name="website" tabIndex={-1} autoComplete="off" /></label>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
