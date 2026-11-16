@@ -25,6 +25,7 @@ npm run build        # must succeed with no env vars
 - `src/content/` — marketing feature status and help articles. Mark a feature `available` only when it ships.
 
 ## Non-negotiables
+- Every new or changed screen is in English **and Arabic**: show text through `t('…')` (`getT()` on the server, `useT()` in client components, `<Tx>` for messages that arrive as English) and add each phrase to `src/lib/i18n/ar.ts`. Use start/end classes (`ms-`, `pe-`, `text-end`), never left/right. `i18n.test.ts` fails on untranslated text in any file not listed in `src/lib/i18n/not-yet-arabic.json`; that list only shrinks.
 - New tenant table ⇒ RLS + explicit revoke/grant + tests in `tests/db` in the same PR.
 - Never take `organization_id` from user input; never use the service-role client to read tenant data for a user.
 - Money in integer cents. Ledger rows are insert-only.

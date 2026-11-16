@@ -86,4 +86,14 @@ describe('app navigation (copied from the RetailNexa app)', () => {
     const selling = visibleAreas((p) => rep.has(p), 'wholesale').find((a) => a.key === 'selling')!;
     expect(selling.pages.map((p) => p.key)).toEqual(['ws-new', 'ws-orders', 'ws-customers', 'ws-items']);
   });
+
+  it('wholesale Staff has Sales reps and Commissions; retail Staff doesn’t', () => {
+    const all = () => true;
+    const staff = (t: 'retail' | 'wholesale' | 'both') => visibleAreas(all, t).find((a) => a.key === 'staff')!.pages.map((p) => p.key);
+    expect(staff('wholesale')).toEqual(expect.arrayContaining(['ws-reps', 'ws-commissions']));
+    expect(staff('both')).toEqual(expect.arrayContaining(['ws-reps', 'ws-commissions']));
+    expect(staff('retail').some((k) => k.startsWith('ws-'))).toBe(false);
+    const rep = new Set<string>(ROLE_DEFAULTS.sales_rep);
+    expect(visibleAreas((p) => rep.has(p), 'wholesale').find((a) => a.key === 'staff')!.pages.map((p) => p.key)).toEqual(expect.arrayContaining(['ws-reps', 'ws-commissions']));
+  });
 });

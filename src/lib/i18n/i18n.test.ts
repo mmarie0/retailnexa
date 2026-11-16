@@ -3,6 +3,8 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { AR } from './ar';
 import { makeT } from './config';
+import { allTsx, untranslatedText } from './scan';
+import NOT_YET from './not-yet-arabic.json';
 import { AREAS, BILLS_MORE, BOTTOM } from '../../app/app/nav';
 
 /** Every literal t('…') phrase in the app, read from the source files. */
@@ -42,5 +44,18 @@ describe('Arabic', () => {
     expect(t('{n}% off', { n: 5 })).toBe('خصم 5%');
     expect(t('Not translated yet')).toBe('Not translated yet');
     expect(makeT(null)('{v0} free', { v0: 3 })).toBe('3 free');
+  });
+
+  it('every screen outside the not-yet list shows its text through t() (new pages included)', () => {
+    const waiting = new Set<string>(NOT_YET);
+    const problems = allTsx().filter((f) => !f.startsWith('src/demo/') && !waiting.has(f))
+      .flatMap((f) => untranslatedText(f).map((x) => `${f}:${x}`));
+    // Wrap the text in t('…') and add its Arabic to src/lib/i18n/ar.ts.
+    expect(problems).toEqual([]);
+  });
+  it('the not-yet list only shrinks: files listed there still have English and still exist', () => {
+    const done = (NOT_YET as string[]).filter((f) => !allTsx().includes(f) || untranslatedText(f).length === 0);
+    // Remove these from src/lib/i18n/not-yet-arabic.json.
+    expect(done).toEqual([]);
   });
 });

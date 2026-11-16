@@ -14,7 +14,7 @@ export async function wsContext(): Promise<OrgContext & { today: string }> {
 
 export interface Tier { id: string; name: string; pct: number; sort: number }
 export interface Customer {
-  id: string; name: string; contact: string | null; email: string | null; phone: string | null; address: string | null; ship_address: string | null;
+  id: string; rep_id: string | null; name: string; contact: string | null; email: string | null; phone: string | null; address: string | null; ship_address: string | null;
   terms: number; tier_id: string | null; credit_limit_cents: number | null; tax_exempt: boolean; resale_cert: string | null; cert_expiry: string | null;
   auto_email: boolean; on_hold: boolean; notes: string | null; is_active: boolean;
 }
@@ -28,7 +28,7 @@ export interface Settings {
   catalog_view: 'list' | 'grid'; grid_size: 's' | 'm' | 'l'; grid_images: boolean;
 }
 export interface Order {
-  id: string; kind: 'quote' | 'order'; number: string; customer_id: string; order_date: string; need_by: string | null; valid_until: string | null; customer_po: string | null;
+  id: string; rep_id: string | null; kind: 'quote' | 'order'; number: string; customer_id: string; order_date: string; need_by: string | null; valid_until: string | null; customer_po: string | null;
   status: string; discount_cents: number; shipping_cents: number; tax_rate: number; subtotal_cents: number; cost_cents: number; tax_cents: number; total_cents: number;
   notes: string | null; invoice_id: string | null;
 }
@@ -37,9 +37,9 @@ export interface ExpectedPayment { id: string; customer_id: string; due_date: st
 
 export const DEFAULT_SETTINGS: Settings = { default_terms: 30, tax_rate: 0, inv_prefix: 'INV-', next_inv: 1001, so_prefix: 'SO-', next_so: 1, markup: 40, pay_instructions: null, catalog_view: 'list', grid_size: 'm', grid_images: true };
 
-const CUSTOMER_COLS = 'id, name, contact, email, phone, address, ship_address, terms, tier_id, credit_limit_cents, tax_exempt, resale_cert, cert_expiry, auto_email, on_hold, notes, is_active';
+const CUSTOMER_COLS = 'id, rep_id, name, contact, email, phone, address, ship_address, terms, tier_id, credit_limit_cents, tax_exempt, resale_cert, cert_expiry, auto_email, on_hold, notes, is_active';
 const ITEM_COLS = 'id, name, sku, upc, brand, category, subcategory, image_path, sort_order, vendor, bin, unit, cost_cents, price_cents, case_pack, reorder_at, reorder_qty, qty, is_active';
-const ORDER_COLS = 'id, kind, number, customer_id, order_date, need_by, valid_until, customer_po, status, discount_cents, shipping_cents, tax_rate, subtotal_cents, cost_cents, tax_cents, total_cents, notes, invoice_id';
+const ORDER_COLS = 'id, rep_id, kind, number, customer_id, order_date, need_by, valid_until, customer_po, status, discount_cents, shipping_cents, tax_rate, subtotal_cents, cost_cents, tax_cents, total_cents, notes, invoice_id';
 const INVOICE_COLS = 'id, number, customer_id, order_id, invoice_date, terms, due_date, customer_po, discount_cents, shipping_cents, tax_rate, subtotal_cents, cost_cents, tax_cents, total_cents, notes, voided_at, void_reason';
 const PAYMENT_COLS = 'id, invoice_id, paid_on, amount_cents, method, check_no, bank, deposit_date, expected_payment_id';
 
@@ -120,4 +120,29 @@ export async function itemImageUrls(items: { id: string; image_path: string | nu
   const { data } = await (await getSupabase()).storage.from('item-images').createSignedUrls(withImg.map((i) => i.image_path!), 600);
   const byPath = new Map((data ?? []).filter((d) => d.signedUrl).map((d) => [d.path, d.signedUrl]));
   return new Map(withImg.flatMap((i) => (byPath.has(i.image_path) ? [[i.id, byPath.get(i.image_path)!] as [string, string]] : [])));
+}
+
+export interface Rep {
+  id: string; name: string; email: string | null; phone: string | null; user_id: string | null; rate_pct: number; basis: 'sales' | 'profit';
+  earn_on: 'invoiced' | 'paid'; monthly_target_cents: number | null; is_active: boolean; notes: string | null;
+}
+export interface RepSummary {
+  rep_id: string; name: string; is_active: boolean; rate_pct: number; basis: string; earn_on: string; monthly_target_cents: number | null;
+  invoiced_sales_cents: number; invoiced_profit_cents: number; earned_cents: number; paid_out_cents: number;
+  earned_to_date_cents: number; paid_to_date_cents: number; balance_cents: number;
+}
+
+/** Reps this person may see (all for managers; their own record for a rep). */
+export async function loadReps(org: string): Promise<Rep[]> {
+  const { data, error } = await (await getSupabase()).from('sales_reps')
+    .select('id, name, email, phone, user_id, rate_pct, basis, earn_on, monthly_target_cents, is_active, notes').eq('organization_id', org).order('name');
+  if (error) throw error;
+  return num((data ?? []) as Rep[], ['rate_pct', 'monthly_target_cents']);
+}
+
+/** Commission per rep for a period, plus running balance (worked out in the database). */
+export async function loadCommission(org: string, from: string, to: string): Promise<RepSummary[]> {
+  const { data, error } = await (await getSupabase()).rpc('rep_commission_summary', { p_org: org, p_from: from, p_to: to });
+  if (error) throw error;
+  return num((data ?? []) as RepSummary[], ['rate_pct', 'monthly_target_cents', 'invoiced_sales_cents', 'invoiced_profit_cents', 'earned_cents', 'paid_out_cents', 'earned_to_date_cents', 'paid_to_date_cents', 'balance_cents']);
 }
